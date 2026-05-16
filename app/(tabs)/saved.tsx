@@ -2,7 +2,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -45,14 +45,13 @@ type CheckResult = {
   matchedNumbers: number[];
   matchedBonus: number[];
   matchedSuperStar: boolean;
-  mainMatchCount: number; // YENİ: Ana sayılardan kaç tane bildin?
-  prize: PrizeEstimate | null; // YENİ: Tahmini ikramiye
+  mainMatchCount: number;
+  prize: PrizeEstimate | null;
   score: number;
 };
 
 type FilterStatus = 'all' | 'pending' | 'checked';
 
-// Yardımcı: tire ile ayrılmış sayıları diziye çevir
 function parseNumbers(str: string): number[] {
   return str.split(' - ').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
 }
@@ -63,6 +62,7 @@ export default function SavedScreen() {
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
   const [checkingCoupon, setCheckingCoupon] = useState<Coupon | null>(null);
   const [checking, setChecking] = useState(false);
+  const [autoChecking, setAutoChecking] = useState(false);
   const [expandedCoupon, setExpandedCoupon] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [filterGame, setFilterGame] = useState<string | null>(null);
@@ -80,7 +80,104 @@ export default function SavedScreen() {
     }
   };
 
-  useFocusEffect(useCallback(() => { loadCoupons(); }, []));
+  // Otomatik kontrol fonksiyonu
+  const autoCheckAllPending = useCallback(async () => {
+    const saved = await AsyncStorage.getItem('savedCoupons');
+    if (!saved) return;
+    const allCoupons: Coupon[] = JSON.parse(saved);
+    const pending = allCoupons.filter(c => c.matchedCount === undefined || c.matchedCount === null);
+    if (pending.length === 0) return;
+
+    setAutoChecking(true);
+    let updated = [...allCoupons];
+    let hasChanges = false;
+
+    for (const coupon of pending) {
+      try {
+        const [d, m, y] = coupon.date.split('.').map(Number);
+        const couponIso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+        const { data: latestDraw } = await supabase
+          .from('draws')
+          .select('draw_date, draw_date_parsed, superstar')
+          .eq('game', coupon.game)
+          .order('draw_date_parsed', { ascending: false })
+          .limit(1)
+          .single();
+
+        let latestIso = '';
+        if (latestDraw?.draw_date_parsed) {
+          latestIso = latestDraw.draw_date_parsed.substring(0, 10);
+        } else if (latestDraw?.draw_date) {
+          const [dd, mm, yyyy] = latestDraw.draw_date.split('.').map(Number);
+          latestIso = `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+        }
+
+        if (!latestDraw || latestIso < couponIso) continue;
+
+        const { data } = await supabase
+          .from('draws')
+          .select('*')
+          .eq('game', coupon.game)
+          .gt('draw_date_parsed', couponIso)
+          .order('draw_date_parsed', { ascending: true })
+          .limit(1)
+          .single();
+
+        if (!data) continue;
+
+        const targetDraw = data;
+        const drawnNumbers = parseNumbers(targetDraw.numbers);
+        const drawnBonus = targetDraw.bonus && targetDraw.bonus !== '-'
+          ? targetDraw.bonus.split(',').map((n: string) => parseInt(n.trim())).filter((n: number) => !isNaN(n))
+          : [];
+
+        const matchedNumbers = coupon.numbers.filter((n) => drawnNumbers.includes(n));
+        const matchedBonus = coupon.bonus.filter((n) => drawnBonus.includes(n));
+        const matchedSuperStar = coupon.superStar != null && targetDraw.superstar != null && coupon.superStar === targetDraw.superstar;
+        const mainMatchCount = matchedNumbers.length;
+        const score = mainMatchCount + matchedBonus.length + (matchedSuperStar ? 1 : 0);
+
+        updated = updated.map(c =>
+          c.id === coupon.id ? { ...c, matchedCount: score } : c
+        );
+        hasChanges = true;
+      } catch (e) {
+        // Tekil hata sessizce geç, diğer kupona devam et
+      }
+    }
+
+    if (hasChanges) {
+      setCoupons(updated);
+      await AsyncStorage.setItem('savedCoupons', JSON.stringify(updated));
+    }
+    setAutoChecking(false);
+  }, []);
+
+  // Realtime dinleyicisi: yeni çekiliş eklendiğinde tetiklenir
+  useEffect(() => {
+    const channel = supabase
+      .channel('draws-changes')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'draws' },
+        () => {
+          autoCheckAllPending();
+        }
+      )
+      .subscribe();
+
+    // Temizlik: bileşen kapanınca kanalı kapat
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [autoCheckAllPending]);
+
+  useFocusEffect(useCallback(() => {
+    loadCoupons().then(() => {
+      autoCheckAllPending();
+    });
+  }, [autoCheckAllPending]));
 
   const gameChips = useMemo(() => {
     const map = new Map<string, { game: string; icon: string; color: string; count: number }>();
@@ -231,7 +328,6 @@ export default function SavedScreen() {
       const mainMatchCount = matchedNumbers.length;
       const score = mainMatchCount + matchedBonus.length + (matchedSuperStar ? 1 : 0);
 
-      // Tahmini ikramiye tablosundan değeri çek
       const prizeTable = getPrizeTable(coupon.game);
       const prize = prizeTable?.[mainMatchCount] ?? null;
 
@@ -268,7 +364,6 @@ export default function SavedScreen() {
     return { label: `${score} Tutturdu`, color: '#999' };
   };
 
-  // İkramiye formatlayıcı
   const formatPrize = (amount: number) => {
     if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)} Milyon TL`;
     if (amount >= 1_000) return `${(amount / 1_000).toFixed(1)} Bin TL`;
@@ -285,6 +380,12 @@ export default function SavedScreen() {
           <Text style={styles.headerTitle}>{t('savedTitle')}</Text>
           <Text style={styles.headerSub}>{t('savedSub')}</Text>
         </View>
+
+        {autoChecking && (
+          <View style={styles.autoCheckBanner}>
+            <Text style={styles.autoCheckText}>⏳ Bekleyen kuponlar kontrol ediliyor...</Text>
+          </View>
+        )}
 
         {coupons.length > 0 && (
           <View style={styles.statsCard}>
@@ -314,7 +415,6 @@ export default function SavedScreen() {
           </View>
         )}
 
-        {/* Durum Filtreleri */}
         {coupons.length > 0 && (
           <View style={styles.filterRow}>
             <TouchableOpacity
@@ -341,7 +441,6 @@ export default function SavedScreen() {
           </View>
         )}
 
-        {/* Oyun Filtreleri — chip'ler */}
         {gameChips.length > 1 && (
           <ScrollView
             horizontal
@@ -428,7 +527,6 @@ export default function SavedScreen() {
           return (
             <View key={coupon.id}>
               <View style={[styles.couponCard, { borderLeftColor: mainColor }]}>
-                {/* Sayaç ve Game Başlığı */}
                 <View style={styles.couponHeaderRow}>
                   <View style={[styles.couponNumberBadge, { backgroundColor: mainColor + '22', borderColor: mainColor + '44' }]}>
                     <Text style={[styles.couponNumberText, { color: mainColor }]}>#{couponNumber}</Text>
@@ -440,7 +538,6 @@ export default function SavedScreen() {
                   </View>
                 </View>
 
-                {/* Durum Rozeti */}
                 {coupon.matchedCount !== undefined && coupon.matchedCount !== null ? (
                   <View style={[styles.matchBadgeFull, {
                     backgroundColor: coupon.matchedCount === 0 ? '#66666615' : mainColor + '18',
@@ -465,7 +562,6 @@ export default function SavedScreen() {
                   </View>
                 )}
 
-                {/* Sayı Topları */}
                 <View style={styles.numberBalls}>
                   {coupon.numbers.map((num, i) => (
                     <View key={i} style={[styles.ball, { backgroundColor: mainColor }]}>
@@ -487,7 +583,6 @@ export default function SavedScreen() {
                   </>
                 )}
 
-                {/* SüperStar */}
                 {coupon.superStar != null && coupon.game === 'Çılgın Sayısal Loto' && (
                   <>
                     <Text style={styles.bonusLabel}>⭐ SüperStar</Text>
@@ -499,12 +594,7 @@ export default function SavedScreen() {
                   </>
                 )}
 
-                {/* Aksiyon Butonları */}
-                <View style={styles.actionRow}>
-                  <TouchableOpacity style={[styles.actionBtn, { borderColor: mainColor, backgroundColor: mainColor + '22' }]} onPress={() => handleCheck(coupon)}>
-                    <Text style={styles.actionBtnEmoji}>✅</Text>
-                    <Text style={[styles.actionBtnText, { color: mainColor }]}>Kontrol</Text>
-                  </TouchableOpacity>
+<View style={styles.actionRow}>
                   <TouchableOpacity style={styles.actionBtn} onPress={() => handleShare(coupon)}>
                     <Ionicons name="share-outline" size={18} color={mainColor} />
                     <Text style={[styles.actionBtnText, { color: mainColor }]}>Paylaş</Text>
@@ -515,7 +605,6 @@ export default function SavedScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Geçmiş Performans Toggle */}
                 <TouchableOpacity
                   style={[styles.historyToggle, { borderColor: mainColor + '33' }]}
                   onPress={() => setExpandedCoupon(isExpanded ? null : coupon.id)}>
@@ -567,7 +656,6 @@ export default function SavedScreen() {
                     <Text style={[styles.scoreLabel, { color: scoreLabel.color }]}>{scoreLabel.label}</Text>
                   </View>
 
-                  {/* Tahmini İkramiye Kartı */}
                   {hasPrize && (
                     <View style={[styles.prizeCard, { borderColor: '#FFD700' }]}>
                       <View style={styles.prizeCardInner}>
@@ -689,6 +777,8 @@ const styles = StyleSheet.create({
   header: { padding: 20, paddingTop: 20 },
   headerTitle: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
   headerSub: { color: '#999', fontSize: 14, marginTop: 4 },
+  autoCheckBanner: { marginHorizontal: 20, marginBottom: 8, padding: 10, backgroundColor: '#6C63FF22', borderWidth: 1, borderColor: '#6C63FF44', borderRadius: 10, alignItems: 'center' },
+  autoCheckText: { color: '#6C63FF', fontSize: 13, fontWeight: 'bold' },
   statsCard: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: '#2a2a4a' },
   statsTitle: { color: '#fff', fontSize: 15, fontWeight: 'bold', marginBottom: 14 },
   statsGrid: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },

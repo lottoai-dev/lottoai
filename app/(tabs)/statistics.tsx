@@ -48,6 +48,7 @@ function formatOdds(n: number): string {
 }
 
 type NumberStat = { number: number; count: number; percentage: number };
+type ColdNumber = { number: number; count: number; missingSince: number };
 
 const FILTERS = [
   { label: 'Son 10', value: 10 },
@@ -56,7 +57,6 @@ const FILTERS = [
   { label: 'Tümü', value: 0 },
 ];
 
-// Yardımcı: tire ile ayrılmış sayıları diziye çevir
 function parseNumbers(str: string): number[] {
   return str.split(' - ').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
 }
@@ -70,7 +70,8 @@ export default function StatisticsScreen() {
   const [totalDraws, setTotalDraws] = useState(0);
   const [mostCommon, setMostCommon] = useState<NumberStat[]>([]);
   const [leastCommon, setLeastCommon] = useState<NumberStat[]>([]);
-  const [activeTab, setActiveTab] = useState<'most' | 'least' | 'distribution' | 'consecutive' | 'sum' | 'odds'>('most');
+  const [coldNumbers, setColdNumbers] = useState<ColdNumber[]>([]);
+  const [activeTab, setActiveTab] = useState<'most' | 'least' | 'distribution' | 'consecutive' | 'sum' | 'odds' | 'cold'>('most');
   const [filterValue, setFilterValue] = useState(0);
   const [couponCount, setCouponCount] = useState('1');
 
@@ -88,7 +89,7 @@ export default function StatisticsScreen() {
     try {
       let query = supabase
         .from('draws')
-        .select('numbers')
+        .select('numbers, draw_date')
         .eq('game', game.name)
         .order('draw_date_parsed', { ascending: false });
 
@@ -99,6 +100,7 @@ export default function StatisticsScreen() {
       if (!data || data.length === 0) {
         setMostCommon([]);
         setLeastCommon([]);
+        setColdNumbers([]);
         setEvenOddStats({ even: 0, odd: 0 });
         setRangeStats([]);
         setConsecutiveStats({ avg: 0, max: 0, distribution: [] });
@@ -110,19 +112,35 @@ export default function StatisticsScreen() {
       setTotalDraws(data.length);
 
       const countMap: Record<number, number> = {};
+      const missingSinceMap: Record<number, number> = {};
       let totalNumbers = 0;
       let evenCount = 0;
       let oddCount = 0;
 
-      data.forEach((row) => {
-        parseNumbers(row.numbers).forEach((num) => {
-          if (num >= 1 && num <= game.max) {
-            countMap[num] = (countMap[num] || 0) + 1;
-            totalNumbers++;
-            if (num % 2 === 0) evenCount++; else oddCount++;
+      data.forEach((row, drawIndex) => {
+        const nums = parseNumbers(row.numbers).filter(n => n >= 1 && n <= game.max);
+
+        nums.forEach((num) => {
+          countMap[num] = (countMap[num] || 0) + 1;
+          totalNumbers++;
+          if (num % 2 === 0) evenCount++; else oddCount++;
+
+          // İlk görüldüğü (en son) çekilişten itibaren gecikme sayısını kaydet
+          if (missingSinceMap[num] === undefined) {
+            missingSinceMap[num] = drawIndex;
           }
         });
       });
+
+      // Geciken sayılar listesini oluştur (sadece 10 tane)
+      const coldList: ColdNumber[] = [];
+      for (let num = 1; num <= game.max; num++) {
+        const count = countMap[num] || 0;
+        const missingSince = missingSinceMap[num] ?? data.length;
+        coldList.push({ number: num, count, missingSince });
+      }
+      coldList.sort((a, b) => b.missingSince - a.missingSince);
+      setColdNumbers(coldList.slice(0, 10));
 
       const stats: NumberStat[] = Object.entries(countMap).map(([num, count]) => ({
         number: parseInt(num),
@@ -213,12 +231,15 @@ export default function StatisticsScreen() {
     }, [selectedGame, filterValue, fetchStats])
   );
 
-  const displayStats = activeTab === 'most' ? mostCommon : leastCommon;
+  const displayStats = activeTab === 'most' ? mostCommon : activeTab === 'least' ? leastCommon : [];
   const maxCount = displayStats.length > 0 ? displayStats[0].count : 1;
   const maxRangeCount = rangeStats.length > 0 ? Math.max(...rangeStats.map(r => r.count)) : 1;
   const odds = calcOdds(selectedGame);
   const count = parseInt(couponCount) || 1;
   const adjustedOdds = odds / count;
+
+  // Gecikenler için maksimum gecikme değeri (çubuk genişliği için)
+  const maxMissing = coldNumbers.length > 0 ? coldNumbers[0].missingSince : 1;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -305,6 +326,7 @@ export default function StatisticsScreen() {
             {[
               { key: 'most', label: '🔥 En Çok' },
               { key: 'least', label: '❄️ En Az' },
+              { key: 'cold', label: '⏳ Geciken' },
               { key: 'distribution', label: '📈 Dağılım' },
               { key: 'consecutive', label: '🔗 Ardışık' },
               { key: 'sum', label: '∑ Toplam' },
@@ -347,6 +369,35 @@ export default function StatisticsScreen() {
                 </View>
               </View>
             ))}
+          </>
+        )}
+
+        {/* Geciken Sayılar Sekmesi — diğerleri gibi sade ve 10 satırlı */}
+        {!error && !loading && totalDraws > 0 && activeTab === 'cold' && (
+          <>
+            <Text style={styles.sectionTitle}>En Uzun Süredir Çıkmayanlar</Text>
+            {coldNumbers.map((item, index) => (
+              <View key={item.number} style={styles.statRow}>
+                <View style={[styles.rankBadge, { backgroundColor: '#2a2a4a' }]}>
+                  <Text style={styles.rankText}>{index + 1}</Text>
+                </View>
+                <View style={[styles.numberBall, { backgroundColor: mainColor }]}>
+                  <Text style={styles.numberText}>{item.number}</Text>
+                </View>
+                <View style={styles.barContainer}>
+                <View style={[styles.bar, { width: `${(item.missingSince / maxMissing) * 100}%`, backgroundColor: mainColor }]} />
+                </View>
+                <View style={styles.countContainer}>
+                  <Text style={styles.countText}>{item.missingSince}</Text>
+                  <Text style={styles.percentText}>çekiliş</Text>
+                </View>
+              </View>
+            ))}
+            {coldNumbers.length === 0 && (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Geciken sayı verisi bulunamadı.</Text>
+              </View>
+            )}
           </>
         )}
 
@@ -623,4 +674,11 @@ const styles = StyleSheet.create({
   summaryBigNum: { fontSize: 28, fontWeight: 'bold' },
   summaryItemLabel: { color: '#999', fontSize: 12, marginTop: 4 },
   distSubTitle: { color: '#ccc', fontSize: 13, marginBottom: 10 },
+  // Geciken sayılar stilleri (sade tasarım)
+  coldInfoBox: { marginHorizontal: 20, marginBottom: 12, backgroundColor: '#16213e', padding: 12, borderRadius: 10 },
+  coldInfoText: { color: '#999', fontSize: 12, lineHeight: 18 },
+  coldRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 10, gap: 10 },
+  coldLastSeen: { color: '#999', fontSize: 12 },
+  coldMissingSince: { color: '#ccc', fontSize: 13, marginTop: 2 },
+  coldTotalCount: { color: '#666', fontSize: 11, marginTop: 2 },
 });

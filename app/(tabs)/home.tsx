@@ -20,6 +20,7 @@ import { t } from '../../lib/i18n';
 import { supabase } from '../../lib/supabase';
 
 const { width } = Dimensions.get('window');
+const CARD_WIDTH = width - 40;
 
 const DAY_LABELS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 
@@ -36,6 +37,7 @@ type LastDraw = {
   draw_date: string;
   draw_no: string;
   created_at: string;
+  estimated_prize?: number | null;
 };
 
 type NewDrawNotif = {
@@ -81,13 +83,15 @@ function formatCountdown(ms: number) {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
-function getGameByName(name: string) {
-  return GAMES.find(g => g.name === name);
-}
-
-// Yardımcı: tire ile ayrılmış sayıları diziye çevir (CSV formatı)
 function parseNumbers(str: string): number[] {
   return str.split(' - ').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+}
+
+function formatPrize(amount: number): string {
+  if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(1)} Milyar TL`;
+  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)} Milyon TL`;
+  if (amount >= 1_000) return `${(amount / 1_000).toFixed(1)} Bin TL`;
+  return `${amount} TL`;
 }
 
 export default function HomeScreen() {
@@ -388,7 +392,7 @@ export default function HomeScreen() {
           })()}
         </LinearGradient>
 
-        {/* Son Çekilişler */}
+        {/* Son Çekilişler — tam genişlik, sayfa sayfa kaydırma */}
         {!error && lastDraws.length > 0 && (
           <>
             <View style={styles.sectionHeader}>
@@ -397,39 +401,39 @@ export default function HomeScreen() {
                 <Text style={styles.seeAll}>Tümü →</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 20 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              pagingEnabled
+              decelerationRate="fast"
+              snapToInterval={CARD_WIDTH + 16}
+              snapToAlignment="start"
+              contentContainerStyle={{ paddingLeft: 20, paddingRight: 20 }}>
               {lastDraws.map((draw, index) => {
                 const gc = GAME_COLORS[draw.game as keyof typeof GAME_COLORS];
                 const mainColor = gc?.main || '#6C63FF';
                 const bonusColor = gc?.bonus || '#FF6B6B';
                 const icon = getGameIcon(draw.game);
-                const cardWidth = (width - 60) / 2;
-
                 const nums = parseNumbers(draw.numbers);
 
                 return (
-                  <TouchableOpacity key={index} onPress={() => router.push(`/results?game=${getGameId(draw.game)}` as any)}>
+                  <TouchableOpacity key={index} activeOpacity={0.9} onPress={() => router.push(`/results?game=${getGameId(draw.game)}` as any)}>
                     <LinearGradient
                       colors={[mainColor + '33', '#16213e']}
-                      style={[styles.lastDrawCard, { borderColor: mainColor + '66', width: cardWidth }]}>
+                      style={[styles.lastDrawCard, { borderColor: mainColor + '66', width: CARD_WIDTH }]}>
                       <View style={styles.lastDrawHeader}>
                         <Text style={styles.lastDrawEmoji}>{icon}</Text>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.lastDrawGame} numberOfLines={1}>{draw.game}</Text>
+                          <Text style={styles.lastDrawGame}>{draw.game}</Text>
                           <Text style={styles.lastDrawDate}>📅 {draw.draw_date}</Text>
                         </View>
                       </View>
                       <View style={styles.lastDrawNumbers}>
-                        {nums.slice(0, 6).map((num, i) => (
+                        {nums.map((num, i) => (
                           <View key={i} style={[styles.lastDrawBall, { backgroundColor: mainColor }]}>
                             <Text style={styles.lastDrawBallText}>{num}</Text>
                           </View>
                         ))}
-                        {nums.length > 6 && (
-                          <View style={[styles.lastDrawBall, { backgroundColor: mainColor + '88' }]}>
-                            <Text style={styles.lastDrawBallText}>+{nums.length - 6}</Text>
-                          </View>
-                        )}
                       </View>
                       {draw.bonus && draw.bonus !== '-' && (
                         <View style={styles.lastDrawBonus}>
@@ -445,6 +449,12 @@ export default function HomeScreen() {
                           <View style={[styles.lastDrawBall, { backgroundColor: '#FFD700' }]}>
                             <Text style={[styles.lastDrawBallText, { color: '#000' }]}>{draw.superstar}</Text>
                           </View>
+                        </View>
+                      )}
+                      {draw.estimated_prize != null && draw.estimated_prize > 0 && (
+                        <View style={styles.prizeRow}>
+                          <Text style={styles.prizeLabel}>💰 Büyük İkramiye</Text>
+                          <Text style={[styles.prizeAmount, { color: '#FFD700' }]}>{formatPrize(draw.estimated_prize)}</Text>
                         </View>
                       )}
                     </LinearGradient>
@@ -557,16 +567,19 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 20, marginBottom: 12 },
   sectionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   seeAll: { color: '#6C63FF', fontSize: 14, fontWeight: 'bold' },
-  lastDrawCard: { marginRight: 12, padding: 16, borderRadius: 16, borderWidth: 1, minHeight: 170 },
-  lastDrawHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  lastDrawEmoji: { fontSize: 24 },
-  lastDrawGame: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  lastDrawDate: { color: '#999', fontSize: 10, marginTop: 2 },
-  lastDrawNumbers: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 8 },
-  lastDrawBall: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
-  lastDrawBallText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
-  lastDrawBonus: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  lastDrawBonusLabel: { color: '#999', fontSize: 12 },
+  lastDrawCard: { marginRight: 16, padding: 20, borderRadius: 20, borderWidth: 1.5, minHeight: 200, justifyContent: 'center' },
+  lastDrawHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  lastDrawEmoji: { fontSize: 32 },
+  lastDrawGame: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  lastDrawDate: { color: '#999', fontSize: 12, marginTop: 3 },
+  lastDrawNumbers: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12, justifyContent: 'center' },
+  lastDrawBall: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
+  lastDrawBallText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  lastDrawBonus: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' },
+  lastDrawBonusLabel: { color: '#999', fontSize: 14 },
+  prizeRow: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#2a2a4a', alignItems: 'center' },
+  prizeLabel: { color: '#999', fontSize: 12 },
+  prizeAmount: { fontSize: 18, fontWeight: 'bold', marginTop: 4 },
   guideCard: { marginHorizontal: 20, backgroundColor: '#16213e', borderRadius: 20, borderWidth: 1, borderColor: '#2a2a4a', padding: 28, alignItems: 'center', gap: 14, marginBottom: 24 },
   guideEmoji: { fontSize: 48 },
   guideTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
