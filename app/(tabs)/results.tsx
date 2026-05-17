@@ -29,7 +29,6 @@ type DrawResult = {
 
 const LAST_SEEN_PREFIX = 'lastSeenResult_';
 
-// Yardımcı: tire ile ayrılmış sayıları diziye çevir
 function parseNumbers(str: string): number[] {
   return str.split(' - ').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
 }
@@ -240,14 +239,11 @@ export default function ResultsScreen() {
               </View>
               <Text style={styles.numbersLabel}>{t('drawnNumbers')}</Text>
               <View style={styles.numberBalls}>
-                {(() => {
-                  const nums = parseNumbers(draws[0].numbers);
-                  return nums.map((num, index) => (
-                    <View key={index} style={[nums.length > 10 ? styles.smallBall : styles.ball, { backgroundColor: mainColor }]}>
-                      <Text style={nums.length > 10 ? styles.smallBallText : styles.ballText}>{num}</Text>
-                    </View>
-                  ));
-                })()}
+                {parseNumbers(draws[0].numbers).map((num, index) => (
+                  <View key={index} style={[styles.ball, { backgroundColor: mainColor }]}>
+                    <Text style={styles.ballText}>{num}</Text>
+                  </View>
+                ))}
               </View>
               {draws[0].bonus && draws[0].bonus !== '-' && (
                 <>

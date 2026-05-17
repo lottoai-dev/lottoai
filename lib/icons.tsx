@@ -110,3 +110,77 @@ export function ProfileIcon({ color, size }: IconProps) {
     </Svg>
   );
 }
+
+// Yeni SVG ikonlar (Profil sayfası için)
+export function StatsIcon({ color, size }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="10" width="4" height="10" rx="1" fill={color} />
+      <Rect x="10" y="6" width="4" height="14" rx="1" fill={color} />
+      <Rect x="17" y="2" width="4" height="18" rx="1" fill={color} />
+    </Svg>
+  );
+}
+
+export function PrivacyIcon({ color, size }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M4 6h16M4 12h16M4 18h12" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <Circle cx="19" cy="18" r="3" fill={color} opacity={0.3} stroke={color} strokeWidth="1.5" />
+      <Path d="M18 18h2" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function TermsIcon({ color, size }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 2L3 7v4c0 5 3.5 10 9 12 5.5-2 9-7 9-12V7l-9-5z" fill={color} opacity={0.15} stroke={color} strokeWidth="1.5" />
+      <Path d="M9 12l2 2 4-4" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function ContactIcon({ color, size }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="2" y="4" width="20" height="16" rx="2" fill={color} opacity={0.15} stroke={color} strokeWidth="1.5" />
+      <Path d="M2 8l10 6 10-6" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function InfoIcon({ color, size }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="10" fill={color} opacity={0.15} stroke={color} strokeWidth="1.5" />
+      <Path d="M12 16v-4M12 8h.01" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function EditIcon({ color, size }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M16 3l5 5-12 12H4v-5L16 3z" fill={color} opacity={0.15} stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+      <Path d="M13 6l5 5" stroke={color} strokeWidth="1.5" />
+    </Svg>
+  );
+}
+
+export function ChevronRightIcon({ color, size }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M9 6l6 6-6 6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function TrashIcon({ color, size }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M4 6h16M6 6v14a2 2 0 002 2h8a2 2 0 002-2V6M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M10 10v6M14 10v6" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+    </Svg>
+  );
+}

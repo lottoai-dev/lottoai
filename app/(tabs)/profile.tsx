@@ -1,5 +1,4 @@
 // tabs_profile.tsx
-import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -17,6 +16,18 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GAME_COLORS } from '../../lib/games';
 import { t } from '../../lib/i18n';
+import {
+  AnalyzeIcon,
+  ChevronRightIcon,
+  ContactIcon,
+  EditIcon,
+  InfoIcon,
+  NotificationIcon,
+  PrivacyIcon,
+  StatsIcon,
+  TermsIcon,
+  TrashIcon,
+} from '../../lib/icons';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -127,7 +138,7 @@ export default function ProfileScreen() {
                 style={styles.nameRow}
                 onPress={() => { setTempName(name); setEditingName(true); }}>
                 <Text style={styles.nameText}>{name || t('addName')}</Text>
-                <Ionicons name="pencil-outline" size={16} color="#999" />
+                <EditIcon color="#999" size={16} />
               </TouchableOpacity>
             )}
             <Text style={styles.memberText}>{t('luckyPickUser')}</Text>
@@ -162,39 +173,39 @@ export default function ProfileScreen() {
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/notifications' as any)}>
             <View style={[styles.menuIcon, { backgroundColor: '#6C63FF22' }]}>
-              <Ionicons name="notifications-outline" size={20} color="#6C63FF" />
+              <NotificationIcon color="#6C63FF" size={20} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuItemText}>{t('notifications')}</Text>
               <Text style={styles.menuItemSub}>{notificationsEnabled ? 'Açık' : 'Kapalı'}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#666" />
+            <ChevronRightIcon color="#666" size={18} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/statistics' as any)}>
             <View style={[styles.menuIcon, { backgroundColor: '#FFD93D22' }]}>
-              <Ionicons name="bar-chart-outline" size={20} color="#FFD93D" />
+              <StatsIcon color="#FFD93D" size={20} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuItemText}>{t('statsTitle')}</Text>
               <Text style={styles.menuItemSub}>{t('statsSub')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#666" />
+            <ChevronRightIcon color="#666" size={18} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/analyze' as any)}>
             <View style={[styles.menuIcon, { backgroundColor: '#6BCB7722' }]}>
-              <Ionicons name="search-outline" size={20} color="#6BCB77" />
+              <AnalyzeIcon color="#6BCB77" size={20} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuItemText}>{t('analyzeTitle')}</Text>
               <Text style={styles.menuItemSub}>{t('analyzeSub')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#666" />
+            <ChevronRightIcon color="#666" size={18} />
           </TouchableOpacity>
         </View>
 
@@ -204,46 +215,46 @@ export default function ProfileScreen() {
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/legal' as any)}>
             <View style={[styles.menuIcon, { backgroundColor: '#FF6B6B22' }]}>
-              <Ionicons name="document-text-outline" size={20} color="#FF6B6B" />
+              <PrivacyIcon color="#FF6B6B" size={20} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuItemText}>{t('privacy')}</Text>
               <Text style={styles.menuItemSub}>Kişisel verileriniz</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#666" />
+            <ChevronRightIcon color="#666" size={18} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/legal' as any)}>
             <View style={[styles.menuIcon, { backgroundColor: '#FF9F4322' }]}>
-              <Ionicons name="shield-checkmark-outline" size={20} color="#FF9F43" />
+              <TermsIcon color="#FF9F43" size={20} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuItemText}>{t('terms')}</Text>
               <Text style={styles.menuItemSub}>Uygulama kuralları</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#666" />
+            <ChevronRightIcon color="#666" size={18} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
 
           <TouchableOpacity style={styles.menuItem} onPress={() => Linking.openURL('mailto:lottoai.destek@gmail.com')}>
             <View style={[styles.menuIcon, { backgroundColor: '#6C63FF22' }]}>
-              <Ionicons name="mail-outline" size={20} color="#6C63FF" />
+              <ContactIcon color="#6C63FF" size={20} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuItemText}>{t('contactUs')}</Text>
               <Text style={styles.menuItemSub}>lottoai.destek@gmail.com</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#666" />
+            <ChevronRightIcon color="#666" size={18} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
 
           <View style={styles.menuItem}>
             <View style={[styles.menuIcon, { backgroundColor: '#2a2a4a' }]}>
-              <Ionicons name="information-circle-outline" size={20} color="#999" />
+              <InfoIcon color="#999" size={20} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuItemText}>Versiyon</Text>
@@ -255,7 +266,7 @@ export default function ProfileScreen() {
         {/* Tehlikeli Alan */}
         <View style={styles.dangerCard}>
           <TouchableOpacity style={styles.dangerBtn} onPress={handleClearData}>
-            <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+            <TrashIcon color="#FF6B6B" size={20} />
             <Text style={styles.dangerBtnText}>{t('clearAllData')}</Text>
           </TouchableOpacity>
         </View>

@@ -4,20 +4,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
-  Modal,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CouponHistory from '../../lib/CouponHistory';
 import { GAME_COLORS } from '../../lib/games';
 import { t } from '../../lib/i18n';
-import { getPrizeTable, type PrizeEstimate } from '../../lib/prizeEstimates';
+import { type PrizeEstimate } from '../../lib/prizeEstimates';
 import { supabase } from '../../lib/supabase';
 
 type Coupon = {
@@ -62,10 +63,10 @@ export default function SavedScreen() {
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
   const [checkingCoupon, setCheckingCoupon] = useState<Coupon | null>(null);
   const [checking, setChecking] = useState(false);
-  const [autoChecking, setAutoChecking] = useState(false);
   const [expandedCoupon, setExpandedCoupon] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [filterGame, setFilterGame] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // YENİ: yükleme durumu
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const router = useRouter();
@@ -80,7 +81,6 @@ export default function SavedScreen() {
     }
   };
 
-  // Otomatik kontrol fonksiyonu
   const autoCheckAllPending = useCallback(async () => {
     const saved = await AsyncStorage.getItem('savedCoupons');
     if (!saved) return;
@@ -88,7 +88,6 @@ export default function SavedScreen() {
     const pending = allCoupons.filter(c => c.matchedCount === undefined || c.matchedCount === null);
     if (pending.length === 0) return;
 
-    setAutoChecking(true);
     let updated = [...allCoupons];
     let hasChanges = false;
 
@@ -142,19 +141,15 @@ export default function SavedScreen() {
           c.id === coupon.id ? { ...c, matchedCount: score } : c
         );
         hasChanges = true;
-      } catch (e) {
-        // Tekil hata sessizce geç, diğer kupona devam et
-      }
+      } catch (e) {}
     }
 
     if (hasChanges) {
       setCoupons(updated);
       await AsyncStorage.setItem('savedCoupons', JSON.stringify(updated));
     }
-    setAutoChecking(false);
   }, []);
 
-  // Realtime dinleyicisi: yeni çekiliş eklendiğinde tetiklenir
   useEffect(() => {
     const channel = supabase
       .channel('draws-changes')
@@ -167,15 +162,16 @@ export default function SavedScreen() {
       )
       .subscribe();
 
-    // Temizlik: bileşen kapanınca kanalı kapat
     return () => {
       supabase.removeChannel(channel);
     };
   }, [autoCheckAllPending]);
 
   useFocusEffect(useCallback(() => {
+    setIsLoading(true);
     loadCoupons().then(() => {
       autoCheckAllPending();
+      setIsLoading(false);
     });
   }, [autoCheckAllPending]));
 
@@ -265,95 +261,6 @@ export default function SavedScreen() {
     }
   };
 
-  const handleCheck = async (coupon: Coupon) => {
-    setChecking(true);
-    setCheckingCoupon(coupon);
-    setCheckResult(null);
-    setCheckModal(true);
-
-    try {
-      const [d, m, y] = coupon.date.split('.').map(Number);
-      const couponIso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-
-      const { data: latestDraw } = await supabase
-        .from('draws')
-        .select('draw_date, draw_date_parsed, superstar')
-        .eq('game', coupon.game)
-        .order('draw_date_parsed', { ascending: false })
-        .limit(1)
-        .single();
-
-      let latestIso = '';
-      if (latestDraw?.draw_date_parsed) {
-        latestIso = latestDraw.draw_date_parsed.substring(0, 10);
-      } else if (latestDraw?.draw_date) {
-        const [dd, mm, yyyy] = latestDraw.draw_date.split('.').map(Number);
-        latestIso = `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
-      }
-
-      if (!latestDraw || latestIso < couponIso) {
-        Alert.alert('⏳ Sonuç Bekleniyor', 'Bu kupona ait çekiliş sonucu henüz açıklanmadı veya sisteme girilmedi.');
-        setCheckModal(false);
-        return;
-      }
-
-      const { data } = await supabase
-        .from('draws')
-        .select('*')
-        .eq('game', coupon.game)
-        .gte('draw_date_parsed', couponIso)
-        .order('draw_date_parsed', { ascending: true })
-        .limit(1)
-        .single();
-
-      if (!data) {
-        Alert.alert('Sonuç Yok', 'Bu oyun için henüz çekiliş sonucu girilmemiş.');
-        setCheckModal(false);
-        return;
-      }
-
-      const targetDraw = data;
-
-      const drawnNumbers = parseNumbers(targetDraw.numbers);
-      const drawnBonus = targetDraw.bonus && targetDraw.bonus !== '-'
-        ? targetDraw.bonus.split(',').map((n: string) => parseInt(n.trim())).filter((n: number) => !isNaN(n))
-        : [];
-
-      const matchedNumbers = coupon.numbers.filter((n) => drawnNumbers.includes(n));
-      const matchedBonus = coupon.bonus.filter((n) => drawnBonus.includes(n));
-
-      const drawnSuperStar = targetDraw.superstar ?? null;
-      const matchedSuperStar = coupon.superStar != null && drawnSuperStar != null && coupon.superStar === drawnSuperStar;
-
-      const mainMatchCount = matchedNumbers.length;
-      const score = mainMatchCount + matchedBonus.length + (matchedSuperStar ? 1 : 0);
-
-      const prizeTable = getPrizeTable(coupon.game);
-      const prize = prizeTable?.[mainMatchCount] ?? null;
-
-      const updatedCoupons = coupons.map(c =>
-        c.id === coupon.id ? { ...c, matchedCount: score } : c
-      );
-      setCoupons(updatedCoupons);
-      await AsyncStorage.setItem('savedCoupons', JSON.stringify(updatedCoupons));
-
-      setCheckResult({
-        draw: { ...targetDraw, superstar: drawnSuperStar },
-        matchedNumbers,
-        matchedBonus,
-        matchedSuperStar,
-        mainMatchCount,
-        prize,
-        score,
-      });
-    } catch (e) {
-      Alert.alert('Hata', 'Kontrol yapılamadı!');
-      setCheckModal(false);
-    } finally {
-      setChecking(false);
-    }
-  };
-
   const getScoreLabel = (score: number, game: string) => {
     if (score === 0) return { label: 'Hiç tutmadı 😢', color: '#666' };
     const gc = GAME_COLORS[game as keyof typeof GAME_COLORS];
@@ -381,252 +288,255 @@ export default function SavedScreen() {
           <Text style={styles.headerSub}>{t('savedSub')}</Text>
         </View>
 
-        {autoChecking && (
-          <View style={styles.autoCheckBanner}>
-            <Text style={styles.autoCheckText}>⏳ Bekleyen kuponlar kontrol ediliyor...</Text>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#6C63FF" />
+            <Text style={styles.loadingText}>Kuponların yükleniyor...</Text>
           </View>
-        )}
-
-        {coupons.length > 0 && (
-          <View style={styles.statsCard}>
-            <Text style={styles.statsTitle}>📊 Kupon İstatistiklerin</Text>
-            <View style={styles.statsGrid}>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{coupons.length}</Text>
-                <Text style={styles.statLabel}>Toplam Kupon</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{bestResult}</Text>
-                <Text style={styles.statLabel}>En İyi Sonuç</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{totalMatched}</Text>
-                <Text style={styles.statLabel}>Toplam Tutuşan</Text>
-              </View>
-            </View>
-            {mostPlayedGame && (
-              <View style={styles.mostPlayed}>
-                <Text style={styles.mostPlayedLabel}>⭐ En çok oynanan:</Text>
-                <Text style={styles.mostPlayedValue}>{mostPlayedGame[0]} ({mostPlayedGame[1]} kez)</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {coupons.length > 0 && (
-          <View style={styles.filterRow}>
-            <TouchableOpacity
-              style={[styles.filterBtn, filterStatus === 'all' && styles.filterBtnActive]}
-              onPress={() => setFilterStatus('all')}>
-              <Text style={[styles.filterBtnText, filterStatus === 'all' && styles.filterBtnTextActive]}>
-                Tümü ({coupons.length})
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.filterBtn, filterStatus === 'pending' && styles.filterBtnActive]}
-              onPress={() => setFilterStatus('pending')}>
-              <Text style={[styles.filterBtnText, filterStatus === 'pending' && styles.filterBtnTextActive]}>
-                ⏳ Bekleyen ({coupons.filter(c => c.matchedCount === undefined || c.matchedCount === null).length})
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.filterBtn, filterStatus === 'checked' && styles.filterBtnActive]}
-              onPress={() => setFilterStatus('checked')}>
-              <Text style={[styles.filterBtnText, filterStatus === 'checked' && styles.filterBtnTextActive]}>
-                ✅ Kontrol ({coupons.filter(c => c.matchedCount !== undefined && c.matchedCount !== null).length})
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {gameChips.length > 1 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.gameChipRow}
-            contentContainerStyle={{ paddingLeft: 20, paddingRight: 4, gap: 8 }}>
-            <TouchableOpacity
-              style={[styles.gameChip, !filterGame && styles.gameChipActive]}
-              onPress={() => setFilterGame(null)}>
-              <Text style={[styles.gameChipText, !filterGame && styles.gameChipTextActive]}>
-                Tümü ({coupons.length})
-              </Text>
-            </TouchableOpacity>
-            {gameChips.map(chip => (
-              <TouchableOpacity
-                key={chip.game}
-                style={[
-                  styles.gameChip,
-                  filterGame === chip.game && {
-                    backgroundColor: chip.color + '22',
-                    borderColor: chip.color,
-                  },
-                ]}
-                onPress={() => setFilterGame(filterGame === chip.game ? null : chip.game)}>
-                <Text style={styles.gameChipEmoji}>{chip.icon}</Text>
-                <Text
-                  style={[
-                    styles.gameChipText,
-                    filterGame === chip.game && { color: chip.color },
-                  ]}>
-                  {chip.game} ({chip.count})
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-
-        <View style={styles.topRow}>
-          <Text style={styles.sectionTitle}>Toplam {totalCoupons} Kupon</Text>
-          {coupons.length > 0 && (
-            <TouchableOpacity onPress={handleDeleteAll}>
-              <Text style={styles.deleteAllText}>{t('deleteAll')}</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {coupons.length === 0 ? (
-          <View style={styles.guideCard}>
-            <Text style={styles.guideEmoji}>🎲</Text>
-            <Text style={styles.guideTitle}>İlk Kuponunu Üret!</Text>
-            <Text style={styles.guideDesc}>
-              Henüz kayıtlı kuponun yok. Kupon Üret ekranına git, sayılarını seç ve kaydet.
-            </Text>
-            <TouchableOpacity
-              style={styles.guideBtn}
-              onPress={() => router.push('/(tabs)/generate' as any)}>
-              <Text style={styles.guideBtnText}>🎲 Kupon Üret</Text>
-            </TouchableOpacity>
-          </View>
-        ) : filteredCoupons.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyEmoji}>🎫</Text>
-            <Text style={styles.emptyTitle}>
-              {filterStatus === 'pending' ? 'Bekleyen kupon yok' :
-               filterStatus === 'checked' ? 'Kontrol edilmiş kupon yok' :
-               t('noCoupons')}
-            </Text>
-            <Text style={styles.emptyDesc}>
-              {filterStatus === 'all' ? t('noCouponsDesc') :
-               filterStatus === 'pending' ? 'Tüm kuponlarını kontrol ettin. Yeni kupon üretip kaydedebilirsin.' :
-               'Henüz hiçbir kuponu kontrol etmedin. Bekleyen kuponlarını kontrol edebilirsin.'}
-            </Text>
-          </View>
-        ) : null}
-
-        {filteredCoupons.map((coupon, index) => {
-          const gc = GAME_COLORS[coupon.game as keyof typeof GAME_COLORS];
-          const mainColor = gc?.main || coupon.color;
-          const bonusColor = gc?.bonus || '#FF6B6B';
-          const isExpanded = expandedCoupon === coupon.id;
-          const couponNumber = totalCoupons - index;
-          const bonusLabel = coupon.game === 'Çılgın Sayısal Loto' ? 'Joker' : 'Şans Topu';
-
-          return (
-            <View key={coupon.id}>
-              <View style={[styles.couponCard, { borderLeftColor: mainColor }]}>
-                <View style={styles.couponHeaderRow}>
-                  <View style={[styles.couponNumberBadge, { backgroundColor: mainColor + '22', borderColor: mainColor + '44' }]}>
-                    <Text style={[styles.couponNumberText, { color: mainColor }]}>#{couponNumber}</Text>
+        ) : (
+          <>
+            {coupons.length > 0 && (
+              <View style={styles.statsCard}>
+                <Text style={styles.statsTitle}>📊 Kupon İstatistiklerin</Text>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{coupons.length}</Text>
+                    <Text style={styles.statLabel}>Toplam Kupon</Text>
                   </View>
-                  <Text style={styles.couponEmoji}>{coupon.icon}</Text>
-                  <View style={styles.couponInfo}>
-                    <Text style={styles.couponGame}>{coupon.game}</Text>
-                    <Text style={styles.couponDate}>📅 {coupon.date}</Text>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{bestResult}</Text>
+                    <Text style={styles.statLabel}>En İyi Sonuç</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{totalMatched}</Text>
+                    <Text style={styles.statLabel}>Toplam Tutuşan</Text>
                   </View>
                 </View>
-
-                {coupon.matchedCount !== undefined && coupon.matchedCount !== null ? (
-                  <View style={[styles.matchBadgeFull, {
-                    backgroundColor: coupon.matchedCount === 0 ? '#66666615' : mainColor + '18',
-                    borderColor: coupon.matchedCount === 0 ? '#66666644' : mainColor + '55',
-                  }]}>
-                    <Text style={styles.matchBadgeFullEmoji}>
-                      {coupon.matchedCount === 0 ? '😔' : coupon.matchedCount <= 2 ? '🎯' : coupon.matchedCount <= 4 ? '🔥' : '🏆'}
-                    </Text>
-                    <Text style={[styles.matchBadgeFullText, {
-                      color: coupon.matchedCount === 0 ? '#666' : mainColor
-                    }]}>
-                      {coupon.matchedCount === 0 ? 'Maalesef hiç tutmadı' :
-                       coupon.matchedCount <= 2 ? `${coupon.matchedCount} sayı tutturdu` :
-                       coupon.matchedCount <= 4 ? `${coupon.matchedCount} sayı tutturdu!` :
-                       `${coupon.matchedCount} sayı tutturdun!`}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={[styles.matchBadgeFull, { backgroundColor: '#FF9F4318', borderColor: '#FF9F4355' }]}>
-                    <Text style={styles.matchBadgeFullEmoji}>⏳</Text>
-                    <Text style={[styles.matchBadgeFullText, { color: '#FF9F43' }]}>Sonuç bekleniyor</Text>
+                {mostPlayedGame && (
+                  <View style={styles.mostPlayed}>
+                    <Text style={styles.mostPlayedLabel}>⭐ En çok oynanan:</Text>
+                    <Text style={styles.mostPlayedValue}>{mostPlayedGame[0]} ({mostPlayedGame[1]} kez)</Text>
                   </View>
                 )}
+              </View>
+            )}
 
-                <View style={styles.numberBalls}>
-                  {coupon.numbers.map((num, i) => (
-                    <View key={i} style={[styles.ball, { backgroundColor: mainColor }]}>
-                      <Text style={styles.ballText}>{num}</Text>
+            {coupons.length > 0 && (
+              <View style={styles.filterRow}>
+                <TouchableOpacity
+                  style={[styles.filterBtn, filterStatus === 'all' && styles.filterBtnActive]}
+                  onPress={() => setFilterStatus('all')}>
+                  <Text style={[styles.filterBtnText, filterStatus === 'all' && styles.filterBtnTextActive]}>
+                    Tümü ({coupons.length})
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.filterBtn, filterStatus === 'pending' && styles.filterBtnActive]}
+                  onPress={() => setFilterStatus('pending')}>
+                  <Text style={[styles.filterBtnText, filterStatus === 'pending' && styles.filterBtnTextActive]}>
+                    ⏳ Bekleyen ({coupons.filter(c => c.matchedCount === undefined || c.matchedCount === null).length})
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.filterBtn, filterStatus === 'checked' && styles.filterBtnActive]}
+                  onPress={() => setFilterStatus('checked')}>
+                  <Text style={[styles.filterBtnText, filterStatus === 'checked' && styles.filterBtnTextActive]}>
+                    ✅ Kontrol ({coupons.filter(c => c.matchedCount !== undefined && c.matchedCount !== null).length})
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {gameChips.length > 1 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.gameChipRow}
+                contentContainerStyle={{ paddingLeft: 20, paddingRight: 4, gap: 8 }}>
+                <TouchableOpacity
+                  style={[styles.gameChip, !filterGame && styles.gameChipActive]}
+                  onPress={() => setFilterGame(null)}>
+                  <Text style={[styles.gameChipText, !filterGame && styles.gameChipTextActive]}>
+                    Tümü ({coupons.length})
+                  </Text>
+                </TouchableOpacity>
+                {gameChips.map(chip => (
+                  <TouchableOpacity
+                    key={chip.game}
+                    style={[
+                      styles.gameChip,
+                      filterGame === chip.game && {
+                        backgroundColor: chip.color + '22',
+                        borderColor: chip.color,
+                      },
+                    ]}
+                    onPress={() => setFilterGame(filterGame === chip.game ? null : chip.game)}>
+                    <Text style={styles.gameChipEmoji}>{chip.icon}</Text>
+                    <Text
+                      style={[
+                        styles.gameChipText,
+                        filterGame === chip.game && { color: chip.color },
+                      ]}>
+                      {chip.game} ({chip.count})
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+
+            <View style={styles.topRow}>
+              <Text style={styles.sectionTitle}>Toplam {totalCoupons} Kupon</Text>
+              {coupons.length > 0 && (
+                <TouchableOpacity onPress={handleDeleteAll}>
+                  <Text style={styles.deleteAllText}>{t('deleteAll')}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {coupons.length === 0 ? (
+              <View style={styles.guideCard}>
+                <Text style={styles.guideEmoji}>🎲</Text>
+                <Text style={styles.guideTitle}>İlk Kuponunu Üret!</Text>
+                <Text style={styles.guideDesc}>
+                  Henüz kayıtlı kuponun yok. Kupon Üret ekranına git, sayılarını seç ve kaydet.
+                </Text>
+                <TouchableOpacity
+                  style={styles.guideBtn}
+                  onPress={() => router.push('/(tabs)/generate' as any)}>
+                  <Text style={styles.guideBtnText}>🎲 Kupon Üret</Text>
+                </TouchableOpacity>
+              </View>
+            ) : filteredCoupons.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyEmoji}>🎫</Text>
+                <Text style={styles.emptyTitle}>
+                  {filterStatus === 'pending' ? 'Bekleyen kupon yok' :
+                   filterStatus === 'checked' ? 'Kontrol edilmiş kupon yok' :
+                   t('noCoupons')}
+                </Text>
+                <Text style={styles.emptyDesc}>
+                  {filterStatus === 'all' ? t('noCouponsDesc') :
+                   filterStatus === 'pending' ? 'Tüm kuponlarını kontrol ettin. Yeni kupon üretip kaydedebilirsin.' :
+                   'Henüz hiçbir kuponu kontrol etmedin. Bekleyen kuponlarını kontrol edebilirsin.'}
+                </Text>
+              </View>
+            ) : null}
+
+            {filteredCoupons.map((coupon, index) => {
+              const gc = GAME_COLORS[coupon.game as keyof typeof GAME_COLORS];
+              const mainColor = gc?.main || coupon.color;
+              const bonusColor = gc?.bonus || '#FF6B6B';
+              const isExpanded = expandedCoupon === coupon.id;
+              const couponNumber = totalCoupons - index;
+              const bonusLabel = coupon.game === 'Çılgın Sayısal Loto' ? 'Joker' : 'Şans Topu';
+
+              return (
+                <View key={coupon.id}>
+                  <View style={[styles.couponCard, { borderLeftColor: mainColor }]}>
+                    <View style={styles.couponHeaderRow}>
+                      <View style={[styles.couponNumberBadge, { backgroundColor: mainColor + '22', borderColor: mainColor + '44' }]}>
+                        <Text style={[styles.couponNumberText, { color: mainColor }]}>#{couponNumber}</Text>
+                      </View>
+                      <Text style={styles.couponEmoji}>{coupon.icon}</Text>
+                      <View style={styles.couponInfo}>
+                        <Text style={styles.couponGame}>{coupon.game}</Text>
+                        <Text style={styles.couponDate}>📅 {coupon.date}</Text>
+                      </View>
                     </View>
-                  ))}
-                </View>
 
-                {coupon.bonus && coupon.bonus.length > 0 && (
-                  <>
-                    <Text style={styles.bonusLabel}>🎯 {bonusLabel}</Text>
+                    {coupon.matchedCount !== undefined && coupon.matchedCount !== null ? (
+                      <View style={[styles.matchBadgeFull, {
+                        backgroundColor: coupon.matchedCount === 0 ? '#66666615' : mainColor + '18',
+                        borderColor: coupon.matchedCount === 0 ? '#66666644' : mainColor + '55',
+                      }]}>
+                        <Text style={styles.matchBadgeFullEmoji}>
+                          {coupon.matchedCount === 0 ? '😔' : coupon.matchedCount <= 2 ? '🎯' : coupon.matchedCount <= 4 ? '🔥' : '🏆'}
+                        </Text>
+                        <Text style={[styles.matchBadgeFullText, {
+                          color: coupon.matchedCount === 0 ? '#666' : mainColor
+                        }]}>
+                          {coupon.matchedCount === 0 ? 'Maalesef hiç tutmadı' :
+                           coupon.matchedCount <= 2 ? `${coupon.matchedCount} sayı tutturdu` :
+                           coupon.matchedCount <= 4 ? `${coupon.matchedCount} sayı tutturdu!` :
+                           `${coupon.matchedCount} sayı tutturdun!`}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.matchBadgeFull, { backgroundColor: '#FF9F4318', borderColor: '#FF9F4355' }]}>
+                        <Text style={styles.matchBadgeFullEmoji}>⏳</Text>
+                        <Text style={[styles.matchBadgeFullText, { color: '#FF9F43' }]}>Sonuç bekleniyor</Text>
+                      </View>
+                    )}
+
                     <View style={styles.numberBalls}>
-                      {coupon.bonus.map((num, i) => (
-                        <View key={i} style={[styles.ball, styles.bonusBall, { backgroundColor: bonusColor }]}>
+                      {coupon.numbers.map((num, i) => (
+                        <View key={i} style={[styles.ball, { backgroundColor: mainColor }]}>
                           <Text style={styles.ballText}>{num}</Text>
                         </View>
                       ))}
                     </View>
-                  </>
-                )}
 
-                {coupon.superStar != null && coupon.game === 'Çılgın Sayısal Loto' && (
-                  <>
-                    <Text style={styles.bonusLabel}>⭐ SüperStar</Text>
-                    <View style={styles.numberBalls}>
-                      <View style={[styles.ball, { backgroundColor: '#FFD700' }]}>
-                        <Text style={[styles.ballText, { color: '#000' }]}>{coupon.superStar}</Text>
-                      </View>
+                    {coupon.bonus && coupon.bonus.length > 0 && (
+                      <>
+                        <Text style={styles.bonusLabel}>🎯 {bonusLabel}</Text>
+                        <View style={styles.numberBalls}>
+                          {coupon.bonus.map((num, i) => (
+                            <View key={i} style={[styles.ball, styles.bonusBall, { backgroundColor: bonusColor }]}>
+                              <Text style={styles.ballText}>{num}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </>
+                    )}
+
+                    {coupon.superStar != null && coupon.game === 'Çılgın Sayısal Loto' && (
+                      <>
+                        <Text style={styles.bonusLabel}>⭐ SüperStar</Text>
+                        <View style={styles.numberBalls}>
+                          <View style={[styles.ball, { backgroundColor: '#FFD700' }]}>
+                            <Text style={[styles.ballText, { color: '#000' }]}>{coupon.superStar}</Text>
+                          </View>
+                        </View>
+                      </>
+                    )}
+
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity style={styles.actionBtn} onPress={() => handleShare(coupon)}>
+                        <Ionicons name="share-outline" size={18} color={mainColor} />
+                        <Text style={[styles.actionBtnText, { color: mainColor }]}>Paylaş</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(coupon.id)}>
+                        <Ionicons name="trash-outline" size={18} color="#FF6B6B" />
+                        <Text style={[styles.actionBtnText, { color: '#FF6B6B' }]}>Sil</Text>
+                      </TouchableOpacity>
                     </View>
-                  </>
-                )}
 
-<View style={styles.actionRow}>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleShare(coupon)}>
-                    <Ionicons name="share-outline" size={18} color={mainColor} />
-                    <Text style={[styles.actionBtnText, { color: mainColor }]}>Paylaş</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(coupon.id)}>
-                    <Ionicons name="trash-outline" size={18} color="#FF6B6B" />
-                    <Text style={[styles.actionBtnText, { color: '#FF6B6B' }]}>Sil</Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.historyToggle, { borderColor: mainColor + '33' }]}
+                      onPress={() => setExpandedCoupon(isExpanded ? null : coupon.id)}>
+                      <Text style={[styles.historyToggleText, { color: mainColor }]}>
+                        📊 Geçmiş Performans {isExpanded ? '▲' : '▼'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {isExpanded && (
+                    <CouponHistory
+                      game={coupon.game}
+                      numbers={coupon.numbers}
+                      bonus={coupon.bonus}
+                      superStar={coupon.superStar ?? undefined}
+                    />
+                  )}
                 </View>
+              );
+            })}
 
-                <TouchableOpacity
-                  style={[styles.historyToggle, { borderColor: mainColor + '33' }]}
-                  onPress={() => setExpandedCoupon(isExpanded ? null : coupon.id)}>
-                  <Text style={[styles.historyToggleText, { color: mainColor }]}>
-                    📊 Geçmiş Performans {isExpanded ? '▲' : '▼'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {isExpanded && (
-                <CouponHistory
-                  game={coupon.game}
-                  numbers={coupon.numbers}
-                  bonus={coupon.bonus}
-                  superStar={coupon.superStar ?? undefined}
-                />
-              )}
-            </View>
-          );
-        })}
-
-        <View style={{ height: 30 }} />
+            <View style={{ height: 30 }} />
+          </>
+        )}
       </ScrollView>
 
       <Modal visible={checkModal} transparent animationType="slide" onRequestClose={() => setCheckModal(false)}>
@@ -777,8 +687,8 @@ const styles = StyleSheet.create({
   header: { padding: 20, paddingTop: 20 },
   headerTitle: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
   headerSub: { color: '#999', fontSize: 14, marginTop: 4 },
-  autoCheckBanner: { marginHorizontal: 20, marginBottom: 8, padding: 10, backgroundColor: '#6C63FF22', borderWidth: 1, borderColor: '#6C63FF44', borderRadius: 10, alignItems: 'center' },
-  autoCheckText: { color: '#6C63FF', fontSize: 13, fontWeight: 'bold' },
+  loadingContainer: { alignItems: 'center', padding: 80, gap: 12 },
+  loadingText: { color: '#999', fontSize: 14, marginTop: 8 },
   statsCard: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: '#2a2a4a' },
   statsTitle: { color: '#fff', fontSize: 15, fontWeight: 'bold', marginBottom: 14 },
   statsGrid: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
@@ -829,9 +739,8 @@ const styles = StyleSheet.create({
   ballText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
   bonusBall: { elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2 },
   bonusLabel: { color: '#999', fontSize: 12, marginBottom: 6 },
-  actionRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  actionRow: { flexDirection: 'row', gap: 8, marginTop: 12, justifyContent: 'center' },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#2a2a4a', backgroundColor: '#0f0f23' },
-  actionBtnEmoji: { fontSize: 14 },
   actionBtnText: { fontSize: 12, fontWeight: '600' },
   historyToggle: { marginTop: 12, padding: 10, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
   historyToggleText: { fontSize: 13, fontWeight: 'bold' },
