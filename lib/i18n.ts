@@ -3,6 +3,7 @@
 export const t = (key: string, params?: Record<string, string | number>): string => {
   const texts: Record<string, string> = {
     appName: 'LottoAI',
+    aiAssistant: 'AI Asistan',
     welcome: 'Hoş Geldiniz! 👋',
     tryYourLuck: 'Şansını Dene!',
     smartCoupon: 'Akıllı kupon üretici ile sayılarını seç',

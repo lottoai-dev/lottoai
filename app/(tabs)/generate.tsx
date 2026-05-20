@@ -193,7 +193,6 @@ function generateWithConstraints(
   return null;
 }
 
-// ─── Geçmiş tipi (SüperStar eklendi) ──────────────────────────
 type HistoryEntry = {
   game: string;
   gameId: string;
@@ -201,12 +200,12 @@ type HistoryEntry = {
   bonus: number[];
   superStar?: number;
   timestamp: number;
+  aiExplanation?: string;
 };
 
 const HISTORY_KEY = 'generationHistory';
 const MAX_HISTORY = 5;
 
-// ─── Ekran ────────────────────────────────────────────────────
 export default function GenerateScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -214,7 +213,8 @@ export default function GenerateScreen() {
   const [selectedGame, setSelectedGame] = useState(GAMES[0]);
   const [generatedNumbers, setGeneratedNumbers] = useState<number[]>([]);
   const [bonusNumbers, setBonusNumbers] = useState<number[]>([]);
-  const [superStarNumber, setSuperStarNumber] = useState<number | null>(null); // YENİ
+  const [superStarNumber, setSuperStarNumber] = useState<number | null>(null);
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
   const [showFilter, setShowFilter] = useState(false);
   const [evenCount, setEvenCount] = useState<number | null>(null);
   const [balanced, setBalanced] = useState(false);
@@ -258,6 +258,7 @@ export default function GenerateScreen() {
         setGeneratedNumbers([]);
         setBonusNumbers([]);
         setSuperStarNumber(null);
+        setAiExplanation(null);
       }
     }
   }, [params.game]);
@@ -324,7 +325,6 @@ export default function GenerateScreen() {
       ? generateNumbers(selectedGame.bonus.count, selectedGame.bonus.max)
       : [];
 
-    // SüperStar üretimi
     let ss: number | undefined;
     if (selectedGame.superStar) {
       ss = generateNumbers(1, selectedGame.superStar.max)[0];
@@ -333,6 +333,7 @@ export default function GenerateScreen() {
     setGeneratedNumbers(nums);
     setBonusNumbers(bonus);
     setSuperStarNumber(ss ?? null);
+    setAiExplanation(null);
     animateNumbers();
 
     saveToHistory({
@@ -350,6 +351,7 @@ export default function GenerateScreen() {
     setGeneratedNumbers([]);
     setBonusNumbers([]);
     setSuperStarNumber(null);
+    setAiExplanation(null);
     setEvenCount(null);
     setBalanced(false);
     setNoConsecutive(false);
@@ -366,6 +368,7 @@ export default function GenerateScreen() {
     setGeneratedNumbers(entry.numbers);
     setBonusNumbers(entry.bonus);
     setSuperStarNumber(entry.superStar ?? null);
+    setAiExplanation(entry.aiExplanation ?? null);
     setHistoryModal(false);
   };
 
@@ -409,7 +412,9 @@ export default function GenerateScreen() {
           bonus: entry.bonus,
           superStar: entry.superStar,
           date: new Date().toLocaleDateString('tr-TR'),
+          timestamp: new Date().toISOString(),
           matchedCount: undefined,
+          aiExplanation: entry.aiExplanation,
         });
         savedCount++;
       }
@@ -473,7 +478,9 @@ export default function GenerateScreen() {
                   bonus: bonusNumbers,
                   superStar: superStarNumber,
                   date: new Date().toLocaleDateString('tr-TR'),
+                  timestamp: new Date().toISOString(),
                   matchedCount: undefined,
+                  aiExplanation: aiExplanation,
                 });
                 await AsyncStorage.setItem('savedCoupons', JSON.stringify(coupons));
                 Alert.alert(t('savedSuccess'), t('savedSuccessMsg'), [
@@ -496,7 +503,9 @@ export default function GenerateScreen() {
         bonus: bonusNumbers,
         superStar: superStarNumber,
         date: new Date().toLocaleDateString('tr-TR'),
+        timestamp: new Date().toISOString(),
         matchedCount: undefined,
+        aiExplanation: aiExplanation,
       });
       await AsyncStorage.setItem('savedCoupons', JSON.stringify(coupons));
       Alert.alert(t('savedSuccess'), t('savedSuccessMsg'), [
@@ -575,7 +584,6 @@ export default function GenerateScreen() {
                   </Animated.View>
                 </>
               )}
-              {/* SüperStar gösterimi */}
               {superStarNumber !== null && selectedGame.superStar && (
                 <>
                   <Text style={styles.bonusLabel}>⭐ SüperStar</Text>
@@ -852,6 +860,9 @@ const styles = StyleSheet.create({
   emptyNumbers: { alignItems: 'center', gap: 10, paddingVertical: 10 },
   emptyNumbersEmoji: { fontSize: 40 },
   emptyNumbersText: { color: '#666', fontSize: 13, textAlign: 'center' },
+  aiExplanationBox: { backgroundColor: '#6C63FF11', borderWidth: 1, borderColor: '#6C63FF33', borderRadius: 10, padding: 12, marginBottom: 12 },
+  aiExplanationTitle: { color: '#6C63FF', fontSize: 13, fontWeight: 'bold', marginBottom: 4 },
+  aiExplanationText: { color: '#ccc', fontSize: 12, lineHeight: 18 },
   ballsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   ball: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4 },
   ballText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },

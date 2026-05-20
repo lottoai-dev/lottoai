@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t } from '../../lib/i18n';
 import {
+  AIAssistantIcon,
   GenerateIcon,
   HomeIcon,
   ProfileIcon,
@@ -39,6 +40,13 @@ export default function TabLayout() {
         options={{
           title: t('generate'),
           tabBarIcon: ({ color, size }) => <GenerateIcon color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="ai-assistant"
+        options={{
+          title: t('aiAssistant'),
+          tabBarIcon: ({ color, size }) => <AIAssistantIcon color={color} size={size} />,
         }}
       />
       <Tabs.Screen

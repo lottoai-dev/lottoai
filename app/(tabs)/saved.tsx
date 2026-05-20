@@ -4,15 +4,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    ScrollView,
-    Share,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CouponHistory from '../../lib/CouponHistory';
@@ -30,7 +30,11 @@ type Coupon = {
   bonus: number[];
   superStar?: number | null;
   date: string;
+  timestamp?: string;
   matchedCount?: number;
+  matchedNumbers?: number[];
+  matchedBonus?: number[];
+  matchedSuperStar?: boolean;
 };
 
 type DrawResult = {
@@ -57,6 +61,10 @@ function parseNumbers(str: string): number[] {
   return str.split(' - ').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
 }
 
+// Renkler
+const PENDING_COLOR = '#3a3a5c';      // Sonuç bekleyen top rengi (açık gri)
+const MISS_COLOR = '#3a3a5c';         // Tutmayan top rengi (açık gri - sonuç bekleyenle aynı)
+
 export default function SavedScreen() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [checkModal, setCheckModal] = useState(false);
@@ -66,7 +74,7 @@ export default function SavedScreen() {
   const [expandedCoupon, setExpandedCoupon] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [filterGame, setFilterGame] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // YENİ: yükleme durumu
+  const [isLoading, setIsLoading] = useState(true);
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const router = useRouter();
@@ -93,8 +101,13 @@ export default function SavedScreen() {
 
     for (const coupon of pending) {
       try {
-        const [d, m, y] = coupon.date.split('.').map(Number);
-        const couponIso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        let couponTimestamp: string;
+        if (coupon.timestamp) {
+          couponTimestamp = coupon.timestamp;
+        } else {
+          const [d, m, y] = coupon.date.split('.').map(Number);
+          couponTimestamp = new Date(y, m - 1, d, 23, 59, 59).toISOString();
+        }
 
         const { data: latestDraw } = await supabase
           .from('draws')
@@ -112,13 +125,13 @@ export default function SavedScreen() {
           latestIso = `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
         }
 
-        if (!latestDraw || latestIso < couponIso) continue;
+        if (!latestDraw || latestIso < couponTimestamp.split('T')[0]) continue;
 
         const { data } = await supabase
           .from('draws')
           .select('*')
           .eq('game', coupon.game)
-          .gt('draw_date_parsed', couponIso)
+          .gte('draw_date_parsed', couponTimestamp.split('T')[0])
           .order('draw_date_parsed', { ascending: true })
           .limit(1)
           .single();
@@ -138,7 +151,13 @@ export default function SavedScreen() {
         const score = mainMatchCount + matchedBonus.length + (matchedSuperStar ? 1 : 0);
 
         updated = updated.map(c =>
-          c.id === coupon.id ? { ...c, matchedCount: score } : c
+          c.id === coupon.id ? {
+            ...c,
+            matchedCount: score,
+            matchedNumbers: matchedNumbers,
+            matchedBonus: matchedBonus,
+            matchedSuperStar: matchedSuperStar,
+          } : c
         );
         hasChanges = true;
       } catch (e) {}
@@ -431,6 +450,7 @@ export default function SavedScreen() {
               const isExpanded = expandedCoupon === coupon.id;
               const couponNumber = totalCoupons - index;
               const bonusLabel = coupon.game === 'Çılgın Sayısal Loto' ? 'Joker' : 'Şans Topu';
+              const isChecked = coupon.matchedCount !== undefined && coupon.matchedCount !== null;
 
               return (
                 <View key={coupon.id}>
@@ -446,57 +466,56 @@ export default function SavedScreen() {
                       </View>
                     </View>
 
-                    {coupon.matchedCount !== undefined && coupon.matchedCount !== null ? (
-                      <View style={[styles.matchBadgeFull, {
-                        backgroundColor: coupon.matchedCount === 0 ? '#66666615' : mainColor + '18',
-                        borderColor: coupon.matchedCount === 0 ? '#66666644' : mainColor + '55',
-                      }]}>
-                        <Text style={styles.matchBadgeFullEmoji}>
-                          {coupon.matchedCount === 0 ? '😔' : coupon.matchedCount <= 2 ? '🎯' : coupon.matchedCount <= 4 ? '🔥' : '🏆'}
-                        </Text>
-                        <Text style={[styles.matchBadgeFullText, {
-                          color: coupon.matchedCount === 0 ? '#666' : mainColor
-                        }]}>
-                          {coupon.matchedCount === 0 ? 'Maalesef hiç tutmadı' :
-                           coupon.matchedCount <= 2 ? `${coupon.matchedCount} sayı tutturdu` :
-                           coupon.matchedCount <= 4 ? `${coupon.matchedCount} sayı tutturdu!` :
-                           `${coupon.matchedCount} sayı tutturdun!`}
-                        </Text>
-                      </View>
-                    ) : (
-                      <View style={[styles.matchBadgeFull, { backgroundColor: '#FF9F4318', borderColor: '#FF9F4355' }]}>
-                        <Text style={styles.matchBadgeFullEmoji}>⏳</Text>
-                        <Text style={[styles.matchBadgeFullText, { color: '#FF9F43' }]}>Sonuç bekleniyor</Text>
-                      </View>
-                    )}
-
+                    {/* Ana sayı topları */}
                     <View style={styles.numberBalls}>
-                      {coupon.numbers.map((num, i) => (
-                        <View key={i} style={[styles.ball, { backgroundColor: mainColor }]}>
-                          <Text style={styles.ballText}>{num}</Text>
-                        </View>
-                      ))}
+                      {coupon.numbers.map((num, i) => {
+                        const isHit = coupon.matchedNumbers && coupon.matchedNumbers.includes(num);
+                        let bgColor = PENDING_COLOR;
+                        if (isChecked) {
+                          bgColor = isHit ? mainColor : MISS_COLOR;
+                        }
+                        return (
+                          <View key={i} style={[styles.ball, { backgroundColor: bgColor }]}>
+                            <Text style={styles.ballText}>{num}</Text>
+                          </View>
+                        );
+                      })}
                     </View>
 
+                    {/* Bonus / Joker */}
                     {coupon.bonus && coupon.bonus.length > 0 && (
                       <>
                         <Text style={styles.bonusLabel}>🎯 {bonusLabel}</Text>
                         <View style={styles.numberBalls}>
-                          {coupon.bonus.map((num, i) => (
-                            <View key={i} style={[styles.ball, styles.bonusBall, { backgroundColor: bonusColor }]}>
-                              <Text style={styles.ballText}>{num}</Text>
-                            </View>
-                          ))}
+                          {coupon.bonus.map((num, i) => {
+                            const isBonusHit = coupon.matchedBonus && coupon.matchedBonus.includes(num);
+                            let bgColor = PENDING_COLOR;
+                            if (isChecked) {
+                              bgColor = isBonusHit ? bonusColor : MISS_COLOR;
+                            }
+                            return (
+                              <View key={i} style={[styles.ball, { backgroundColor: bgColor }]}>
+                                <Text style={styles.ballText}>{num}</Text>
+                              </View>
+                            );
+                          })}
                         </View>
                       </>
                     )}
 
+                    {/* SüperStar */}
                     {coupon.superStar != null && coupon.game === 'Çılgın Sayısal Loto' && (
                       <>
                         <Text style={styles.bonusLabel}>⭐ SüperStar</Text>
                         <View style={styles.numberBalls}>
-                          <View style={[styles.ball, { backgroundColor: '#FFD700' }]}>
-                            <Text style={[styles.ballText, { color: '#000' }]}>{coupon.superStar}</Text>
+                          <View style={[styles.ball, {
+                            backgroundColor: isChecked
+                              ? (coupon.matchedSuperStar ? '#FFD700' : MISS_COLOR)
+                              : PENDING_COLOR
+                          }]}>
+                            <Text style={[styles.ballText, (!isChecked || coupon.matchedSuperStar) && { color: '#000' }]}>
+                              {coupon.superStar}
+                            </Text>
                           </View>
                         </View>
                       </>
@@ -731,9 +750,6 @@ const styles = StyleSheet.create({
   couponInfo: { flex: 1 },
   couponGame: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
   couponDate: { color: '#999', fontSize: 12, marginTop: 2 },
-  matchBadgeFull: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 10, borderWidth: 1, marginBottom: 14 },
-  matchBadgeFullEmoji: { fontSize: 16 },
-  matchBadgeFullText: { fontSize: 13, fontWeight: 'bold', flex: 1 },
   numberBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   ball: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2 },
   ballText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },

@@ -30,6 +30,17 @@ export function GenerateIcon({ color, size }: IconProps) {
   );
 }
 
+export function AIAssistantIcon({ color, size }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="10" fill={color} opacity={0.1} stroke={color} strokeWidth="1.5" />
+      <Path d="M8 12h8M12 8v8M9 9l6 6M15 9l-6 6" stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity={0.4} />
+      <Circle cx="12" cy="12" r="3" fill={color} />
+      <Path d="M11 12h2M12 11v2" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function ResultsIcon({ color, size }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -111,7 +122,6 @@ export function ProfileIcon({ color, size }: IconProps) {
   );
 }
 
-// Yeni SVG ikonlar (Profil sayfası için)
 export function StatsIcon({ color, size }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
