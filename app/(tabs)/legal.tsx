@@ -13,109 +13,147 @@ import { t } from '../../lib/i18n';
 
 const PRIVACY_POLICY = `LottoAI Gizlilik Politikası
 
-Son güncelleme: Mayıs 2025
+Son güncelleme: Mayıs 2026
 
 1. TOPLANAN VERİLER
 LottoAI uygulaması aşağıdaki verileri toplar:
 - Kaydettiğiniz kupon bilgileri (cihazınızda saklanır)
 - Bildirim tercihleri (cihazınızda saklanır)
+- AI Asistan ile yaptığınız sohbet geçmişi (geçici olarak işlenir, kalıcı olarak saklanmaz)
+- Uygulama içi tercihleriniz (isim, favori oyunlar vb.)
 
 2. VERİLERİN KULLANIMI
-Toplanan veriler yalnızca uygulama işlevlerini sağlamak amacıyla kullanılır. Verileriniz üçüncü şahıslarla paylaşılmaz.
+Toplanan veriler yalnızca uygulama işlevlerini sağlamak amacıyla kullanılır:
+- Kuponlarınızın kaydedilmesi ve çekiliş sonuçlarıyla karşılaştırılması
+- Size özel bildirimlerin gönderilmesi
+- AI Asistan'ın size daha iyi hizmet verebilmesi
+Verileriniz hiçbir şekilde üçüncü şahıslarla paylaşılmaz veya satılmaz.
 
 3. VERİ GÜVENLİĞİ
-Tüm veriler cihazınızda yerel olarak saklanır. Sunucularımızda kişisel veri saklanmaz.
+Tüm kişisel verileriniz cihazınızda yerel olarak saklanır. Sunucularımızda (Supabase) yalnızca çekiliş sonuçları gibi anonim veriler bulunur. Veri aktarımı şifreli bağlantılar (HTTPS) üzerinden gerçekleştirilir.
 
-4. ÇEREZ VE TAKİP
-Uygulama herhangi bir izleme veya analitik araç kullanmaz.
+4. YASAL DAYANAK
+Veri işleme faaliyetlerimiz, 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) ve ilgili mevzuata uygun olarak yürütülmektedir.
 
-5. ÜÇÜNCÜ TARAF HİZMETLER
-Uygulama, çekiliş verilerini sağlamak için Supabase altyapısını kullanır. Supabase'in gizlilik politikası için: supabase.com/privacy
+5. ÇEREZ VE TAKİP
+Uygulama herhangi bir izleme, analitik veya reklam çerezi kullanmaz.
 
-6. ÇOCUKLARIN GİZLİLİĞİ
-Bu uygulama 18 yaş altı bireylere yönelik değildir. 18 yaş altı bireylerin uygulamayı kullanması yasaktır.
+6. ÜÇÜNCÜ TARAF HİZMETLER
+Uygulama, çekiliş verilerini sağlamak için Supabase altyapısını ve AI hizmetleri için DeepSeek API'yi kullanır. Bu hizmetlerin gizlilik politikaları için:
+- Supabase: supabase.com/privacy
+- DeepSeek: platform.deepseek.com/privacy
 
-7. DEĞİŞİKLİKLER
+7. ÇOCUKLARIN GİZLİLİĞİ
+Bu uygulama yalnızca 18 yaş ve üzeri bireyler için tasarlanmıştır. 18 yaş altı bireylerin uygulamayı kullanması yasaktır.
+
+8. VERİ SAKLAMA VE SİLME
+- Kupon verileriniz ve tercihleriniz, siz silene kadar cihazınızda saklanır.
+- AI sohbet geçmişi yalnızca oturum süresince tutulur, uygulama kapatıldığında silinir.
+- Profil > Tüm Verileri Sil seçeneği ile tüm yerel verilerinizi silebilirsiniz.
+
+9. DEĞİŞİKLİKLER
 Bu gizlilik politikası zaman zaman güncellenebilir. Değişiklikler uygulama içinde duyurulacaktır.
 
-8. İLETİŞİM
+10. İLETİŞİM
 Sorularınız için: lottoai.destek@gmail.com`;
 
 const TERMS_OF_USE = `LottoAI Kullanım Şartları
 
-Son güncelleme: Mayıs 2025
+Son güncelleme: Mayıs 2026
 
 1. KABUL
-Bu uygulamayı kullanarak aşağıdaki şartları kabul etmiş sayılırsınız.
+Bu uygulamayı kullanarak aşağıdaki şartları kabul etmiş sayılırsınız. Şartları kabul etmiyorsanız uygulamayı kullanmayı bırakmalısınız.
 
 2. YASAL UYARI
 - Bu uygulama yalnızca 18 yaş ve üzeri bireyler için tasarlanmıştır.
-- Uygulama yalnızca bilgilendirme amaçlıdır.
+- Uygulama yalnızca bilgilendirme ve eğlence amaçlıdır.
 - Şans oyunları bağımlılık yapabilir. Lütfen sorumlu oynayın.
 - Yardım için: 182 (Bağımlılık Danışma Hattı)
+- Kumar bağımlılığı riski taşıyorsanız bu uygulamayı kullanmayın.
 
 3. HİZMET KAPSAMI
 LottoAI şunları sağlar:
 - Rastgele kupon üretimi
 - Çekiliş sonuçlarının görüntülenmesi
 - İstatistik ve analiz araçları
+- AI destekli kupon önerileri
 - Çekiliş hatırlatıcıları
 
-4. SORUMLULUK REDDİ
+4. AI ASİSTAN KULLANIMI
+- AI Asistan tarafından üretilen tüm içerikler (kupon önerileri, istatistik yorumları vb.) yalnızca bilgilendirme amaçlıdır.
+- AI, kazanma garantisi vermez.
+- AI'ın verdiği bilgilerde hatalar olabilir. Kesin bilgi için resmi kaynakları kontrol edin.
+- AI ile paylaştığınız kişisel bilgilerden siz sorumlusunuz.
+
+5. SORUMLULUK REDDİ
 - Uygulama kazanç garantisi vermez.
-- Çekiliş sonuçları Milli Piyango İdaresi tarafından belirlenir.
+- Çekiliş sonuçları Sisal Şans tarafından belirlenir.
 - Uygulama içindeki ikramiye tutarları tahminidir.
 - Gerçek ikramiye tutarları için millipiyangoonline.com adresini ziyaret edin.
+- Uygulama, hiçbir şekilde Milli Piyango İdaresi veya Sisal Şans ile resmi olarak bağlantılı değildir.
 
-5. KULLANIM KURALLARI
+6. KULLANIM KURALLARI
 - Uygulamayı yalnızca yasal amaçlarla kullanabilirsiniz.
-- Uygulamayı kötüye kullanmak yasaktır.
+- Uygulamayı kötüye kullanmak, tersine mühendislik yapmak veya izinsiz kopyalamak yasaktır.
+- AI Asistan'ı yasa dışı veya uygunsuz amaçlarla kullanamazsınız.
 
-6. DEĞİŞİKLİKLER
-Bu şartlar zaman zaman güncellenebilir. Güncellemeler uygulama içinde duyurulacaktır.
+7. FİKRİ MÜLKİYET
+- Uygulama kodu, tasarımı ve içeriği LottoAI'ye aittir.
+- Çılgın Sayısal Loto, Süper Loto, Şans Topu, On Numara isimleri ve logoları ilgili kurumların tescilli markalarıdır.
 
-7. UYGULANACAK HUKUK
-Bu şartlar Türkiye Cumhuriyeti kanunlarına tabidir.
+8. DEĞİŞİKLİKLER
+Bu şartlar zaman zaman güncellenebilir. Güncellemeler uygulama içinde duyurulacaktır. Güncellemeden sonra uygulamayı kullanmaya devam etmeniz, yeni şartları kabul ettiğiniz anlamına gelir.
 
-8. İLETİŞİM
+9. UYGULANACAK HUKUK
+Bu şartlar Türkiye Cumhuriyeti kanunlarına tabidir. Uyuşmazlık durumunda İstanbul (Çağlayan) Mahkemeleri ve İcra Daireleri yetkilidir.
+
+10. İLETİŞİM
 Sorularınız için: lottoai.destek@gmail.com`;
 
 const FAQ = [
   {
     question: 'LottoAI nedir?',
-    answer: 'LottoAI, Türkiye\'deki şans oyunları için kupon üretme, sonuç takibi ve analiz yapmanızı sağlayan bir yardımcı uygulamadır.',
+    answer: 'LottoAI, Türkiye\'deki şans oyunları için kupon üretme, sonuç takibi, AI destekli analiz ve istatistik yapmanızı sağlayan ücretsiz bir yardımcı uygulamadır.',
   },
   {
     question: 'Uygulama ücretli mi?',
-    answer: 'Hayır, LottoAI tamamen ücretsizdir.',
+    answer: 'Hayır, LottoAI tamamen ücretsizdir. Hiçbir uygulama içi satın alma veya abonelik içermez.',
+  },
+  {
+    question: 'AI Asistan nasıl çalışır?',
+    answer: 'AI Asistan sekmesinden loto hakkında sorular sorabilir, istatistiksel yorumlar alabilir ve size özel kupon üretmesini isteyebilirsiniz. AI, DeepSeek altyapısını kullanır ve verdiği bilgiler tahmin amaçlıdır.',
+  },
+  {
+    question: 'AI Asistan\'ın ürettiği kuponlar kazanma garantisi verir mi?',
+    answer: 'Hayır. AI tarafından üretilen kuponlar tamamen rastgele veya istatistiksel verilere dayalıdır. Hiçbir şekilde kazanma garantisi vermez.',
   },
   {
     question: 'Kupon nasıl üretilir?',
-    answer: 'Kupon Üret ekranından oyunu seçip "Kupon Üret" butonuna basmanız yeterlidir. Rastgele sayılar otomatik olarak oluşturulur.',
+    answer: 'Kupon Üret ekranından oyunu seçip "Kupon Üret" butonuna basarak rastgele kupon oluşturabilir veya AI Asistan\'dan size özel kupon üretmesini isteyebilirsiniz.',
   },
   {
     question: 'Filtreleri nasıl kullanırım?',
-    answer: 'Kupon Üret ekranında ⚙️ butonuna tıklayarak çift/tek, ardışık engelleme ve toplam aralığı filtrelerini kullanabilirsiniz.',
+    answer: 'Kupon Üret ekranında ⚙️ butonuna tıklayarak çift/tek dengesi, ardışık sayı engelleme ve toplam aralığı gibi filtreleri kullanabilirsiniz.',
   },
   {
     question: 'Çekiliş sonuçları nasıl güncellenir?',
-    answer: 'Çekiliş sonuçları her çekilişten sonra sistemimize manuel olarak girilmektedir. Sonuçlar genellikle çekilişten kısa süre sonra uygulamada görünür.',
+    answer: 'Çekiliş sonuçları, çekilişten sonra uygulama veritabanına girilmektedir. Sonuçlar genellikle çekilişten kısa süre sonra uygulamada görünür.',
+  },
+  {
+    question: 'Kuponlarım otomatik olarak kontrol ediliyor mu?',
+    answer: 'Evet! Kaydettiğiniz kuponlar, çekiliş sonuçları veritabanına girildiğinde otomatik olarak kontrol edilir. Tutan sayılar kupon kartında renkli olarak gösterilir.',
   },
   {
     question: 'Hatırlatıcılar nasıl çalışır?',
-    answer: 'Hatırlatıcılar sekmesinden oyunu açıp switch\'i açık konuma getirin. Çekiliş kapanışından 30 dakika önce otomatik bildirim alırsınız.',
-  },
-  {
-    question: 'Kuponumu nasıl kontrol ederim?',
-    answer: 'Önce Kupon Üret ekranından kuponunuzu kaydedin. Ardından Kuponlarım ekranında kuponunuzu seçip ✅ butonuyla çekiliş sonucuyla karşılaştırabilirsiniz.',
-  },
-  {
-    question: 'İstatistikler ne kadar güvenilir?',
-    answer: 'İstatistikler sisteme girilen gerçek çekiliş verilerine dayanmaktadır. Daha fazla veri girdikçe istatistikler daha anlamlı hale gelir.',
+    answer: 'Profil > Hatırlatıcılar ekranından istediğiniz oyunlar için çekiliş öncesi ve sonrası bildirimleri açabilirsiniz.',
   },
   {
     question: 'Uygulama internet gerektiriyor mu?',
-    answer: 'Çekiliş sonuçlarını ve istatistikleri görüntülemek için internet bağlantısı gereklidir. Kupon üretme ve kaydetme işlemleri çevrimdışı da çalışır.',
+    answer: 'Çekiliş sonuçlarını, istatistikleri ve AI Asistan\'ı kullanmak için internet bağlantısı gereklidir. Kupon üretme ve kaydetme işlemleri çevrimdışı da çalışır.',
+  },
+  {
+    question: 'Verilerim güvende mi?',
+    answer: 'Evet. Tüm kişisel verileriniz cihazınızda yerel olarak saklanır. AI sohbet geçmişi oturum kapanınca silinir. Verileriniz üçüncü şahıslarla paylaşılmaz.',
   },
   {
     question: 'Bu uygulama kumar teşvik ediyor mu?',

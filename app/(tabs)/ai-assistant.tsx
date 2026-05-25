@@ -21,21 +21,28 @@ import { GAMES, GAME_COLORS } from '../../lib/games';
 type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
-  coupon?: {              // YENİ: Mesaja bağlı kupon
+  coupon?: {
     game: string;
     numbers: number[];
     explanation: string;
   };
 };
 
-const SYSTEM_PROMPT = `Sen, Türkiye'deki şans oyunları konusunda uzman bir loto asistanısın. Kullanıcılara güncel oyun kuralları hakkında bilgi verir, istatistiksel yorumlar yapar ve isterlerse rastgele kupon üretirsin.
+const getBasePrompt = (): string => {
+  const today = new Date();
+  const gunAdi = today.toLocaleDateString('tr-TR', { weekday: 'long' });
+  const tarih = today.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  return `Sen, Türkiye'deki şans oyunları konusunda uzman bir loto asistanısın. Kullanıcılara güncel oyun kuralları hakkında bilgi verir, istatistiksel yorumlar yapar ve isterlerse rastgele kupon üretirsin.
 Kesinlikle kazanma garantisi vermezsin. Yanıtlarında sohbet havasında, sade bir dil kullan ve gereksiz yere markdown formatı (yıldız, tire gibi) kullanma.
 
+Bugün ${gunAdi}, ${tarih}.
+
 Güncel Oyun Bilgileri:
-- Çılgın Sayısal Loto: 1-90 arasından 6 numara seçilir. Joker (1-90 arası 1 numara) ve SüperStar (1-90 arası 1 numara) çekilişleri vardır. Haftada 3 gün (Pazartesi, Çarşamba, Cumartesi) çekilir.
-- Süper Loto: 1-60 arasından 6 numara seçilir. Haftada 3 gün (Salı, Perşembe, Pazar) çekilir.
-- Şans Topu: 1-34 arasından 5 numara + 1-14 arasından 1 "Şans Topu" seçilir. Haftada 2 gün (Çarşamba, Pazar) çekilir.
-- On Numara: 1-80 arasından 10 numara seçilir. Çekilişte 22 numara belirlenir. Haftada 2 gün (Pazartesi, Cuma) çekilir.
+- Çılgın Sayısal Loto: 1-90 arasından 6 numara seçilir. Joker (1-90 arası 1 numara) ve SüperStar (1-90 arası 1 numara) çekilişleri vardır. SADECE Pazartesi, Çarşamba ve Cumartesi günleri çekilir.
+- Süper Loto: 1-60 arasından 6 numara seçilir. SADECE Salı, Perşembe ve Pazar günleri çekilir.
+- Şans Topu: 1-34 arasından 5 numara + 1-14 arasından 1 "Şans Topu" seçilir. SADECE Çarşamba ve Pazar günleri çekilir.
+- On Numara: 1-80 arasından 10 numara seçilir. Çekilişte 22 numara belirlenir. SADECE Pazartesi ve Cuma günleri çekilir.
 
 Eğer kullanıcı bir kupon üretmeni isterse, yanıtının SONUNDA mutlaka şu alanları içeren bir JSON objesi bulundur. JSON'u her zaman bir kod bloğu içine al:
 \`\`\`json
@@ -48,6 +55,7 @@ JSON'daki "numbers" dizisi:
 - Şans Topu için 5 adet, benzersiz sayı içermeli.
 - On Numara için 10 adet, benzersiz sayı içermeli.
 Sayılar, oyunun kendi numara aralığında olmalıdır.`;
+};
 
 export default function AIAssistantScreen() {
   const insets = useSafeAreaInsets();
@@ -79,7 +87,7 @@ export default function AIAssistantScreen() {
     setLoading(true);
 
     const apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: getBasePrompt() },
       ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
       { role: 'user', content: input.trim() },
     ];
@@ -173,7 +181,6 @@ export default function AIAssistantScreen() {
               <View style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : styles.aiBubble]}>
                 <Text style={styles.messageText}>{msg.content}</Text>
               </View>
-              {/* Kupon kartı mesajın altında */}
               {msg.coupon && (() => {
                 const c = msg.coupon;
                 const color = GAME_COLORS[c.game as keyof typeof GAME_COLORS]?.main || '#6C63FF';
