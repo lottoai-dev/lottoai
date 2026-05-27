@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { GAMES, GAME_COLORS, type Game } from './games';
+import { GAME_COLORS, getDefaultCountry, getGamesByCountry, type Game } from './games';
 
 type Props = {
   selectedGame: Game;
@@ -16,12 +16,16 @@ type Props = {
 };
 
 export default function GameSelector({ selectedGame, onSelect, newResults = [] }: Props) {
+  // Cihazın ülkesine göre oyunları filtrele
+  const country = getDefaultCountry();
+  const countryGames = getGamesByCountry(country);
+
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       style={styles.selector}>
-      {GAMES.map((game) => {
+      {countryGames.map((game) => {
         const gc = GAME_COLORS[game.name as keyof typeof GAME_COLORS];
         const color = gc?.main || '#6C63FF';
         const isSelected = selectedGame.id === game.id;

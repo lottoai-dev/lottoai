@@ -1,4 +1,6 @@
 // lib/games.ts
+import { getLocales } from 'expo-localization';
+
 export type GameId = 'cilgin' | 'superloto' | 'sanstopu' | 'onnumara';
 
 export type Game = {
@@ -8,8 +10,8 @@ export type Game = {
   count: number;
   max: number;
   bonus: { count: number; max: number } | null;
-  superStar?: { max: number }; // YENİ: opsiyonel, sadece Çılgın Sayısal Loto'da var
-  drawDays: number[];    // 0=Pazar, 1=Pazartesi, ...
+  superStar?: { max: number };
+  drawDays: number[];
   drawHour: number;
   drawMinute: number;
   drawDaysLabel: string;
@@ -24,6 +26,9 @@ export type Game = {
     bonus: string;
     gradient: [string, string];
   };
+  country: 'TR' | 'US';
+  currency: 'TRY' | 'USD';
+  locale: 'tr-TR' | 'en-US';
 };
 
 export const GAMES: Game[] = [
@@ -34,7 +39,7 @@ export const GAMES: Game[] = [
     count: 6,
     max: 90,
     bonus: null,
-    superStar: { max: 90 }, // YENİ
+    superStar: { max: 90 },
     drawDays: [1, 3, 6],
     drawHour: 21,
     drawMinute: 30,
@@ -50,6 +55,9 @@ export const GAMES: Game[] = [
       bonus: '#1E88E5',
       gradient: ['#E53935', '#B71C1C'],
     },
+    country: 'TR',
+    currency: 'TRY',
+    locale: 'tr-TR',
   },
   {
     id: 'superloto',
@@ -73,6 +81,9 @@ export const GAMES: Game[] = [
       bonus: '#FF6D00',
       gradient: ['#FF6D00', '#E65100'],
     },
+    country: 'TR',
+    currency: 'TRY',
+    locale: 'tr-TR',
   },
   {
     id: 'sanstopu',
@@ -96,6 +107,9 @@ export const GAMES: Game[] = [
       bonus: '#00BCD4',
       gradient: ['#E91E8C', '#880E4F'],
     },
+    country: 'TR',
+    currency: 'TRY',
+    locale: 'tr-TR',
   },
   {
     id: 'onnumara',
@@ -119,6 +133,9 @@ export const GAMES: Game[] = [
       bonus: '#7B1FA2',
       gradient: ['#7B1FA2', '#4A148C'],
     },
+    country: 'TR',
+    currency: 'TRY',
+    locale: 'tr-TR',
   },
 ];
 
@@ -137,7 +154,7 @@ export const GAME_COLORS = Object.fromEntries(
       main: g.colors.main,
       bonus: g.colors.bonus,
       gradient: g.colors.gradient,
-      superstar: g.colors.main, // SüperStar için ana rengi kullan
+      superstar: g.colors.main,
     },
   ])
 ) as Record<string, { main: string; bonus: string; gradient: [string, string]; superstar: string }>;
@@ -152,4 +169,26 @@ export function getGameGradient(gameName: string): [string, string] {
 
 export function getBonusColor(gameName: string): string {
   return getGameByName(gameName)?.colors.bonus ?? '#FF6B6B';
+}
+
+// Ülkeye göre oyunları filtrele
+export function getGamesByCountry(country: 'TR' | 'US'): Game[] {
+  return GAMES.filter((g) => g.country === country);
+}
+
+// Cihazın yerel ayarlarından ülkeyi otomatik tespit et
+export function getDefaultCountry(): 'TR' | 'US' {
+  const locales = getLocales();
+  const languageTag = locales[0]?.languageTag ?? 'en-US';
+  if (languageTag.startsWith('tr') || languageTag.startsWith('TR')) return 'TR';
+  return 'US';
+}
+
+// Ülkeye göre gün isimlerini çevir
+const DAY_LABELS_TR = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+const DAY_LABELS_US = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+export function getDayLabel(dayIndex: number, locale: 'tr-TR' | 'en-US'): string {
+  if (locale === 'en-US') return DAY_LABELS_US[dayIndex];
+  return DAY_LABELS_TR[dayIndex];
 }

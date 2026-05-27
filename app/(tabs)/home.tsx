@@ -15,14 +15,12 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GAMES, GAME_COLORS } from '../../lib/games';
+import { GAME_COLORS, getDayLabel, getDefaultCountry, getGameByName, getGamesByCountry } from '../../lib/games';
 import { t } from '../../lib/i18n';
 import { supabase } from '../../lib/supabase';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 40;
-
-const DAY_LABELS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 
 function getTodayIndex(): number {
   const jsDay = new Date().getDay();
@@ -52,7 +50,10 @@ function getNextDraw() {
   let nextGame = null;
   let minDiff = Infinity;
 
-  for (const game of GAMES) {
+  // Sadece kullanıcının ülkesine ait oyunları tara
+  const countryGames = getGamesByCountry(getDefaultCountry());
+
+  for (const game of countryGames) {
     for (const day of game.drawDays) {
       const next = new Date();
       next.setHours(game.drawHour, game.drawMinute, 0, 0);
@@ -87,7 +88,13 @@ function parseNumbers(str: string): number[] {
   return str.split(' - ').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
 }
 
-function formatPrize(amount: number): string {
+function formatPrize(amount: number, currency: string = 'TRY'): string {
+  if (currency === 'USD') {
+    if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1)} Billion`;
+    if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)} Million`;
+    if (amount >= 1_000) return `$${(amount / 1_000).toFixed(1)}K`;
+    return `$${amount}`;
+  }
   if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(1)} Milyar TL`;
   if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)} Milyon TL`;
   if (amount >= 1_000) return `${(amount / 1_000).toFixed(1)} Bin TL`;
@@ -111,21 +118,26 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Kullanıcının ülkesi ve oyunları
+  const userCountry = getDefaultCountry();
+  const countryGames = useMemo(() => getGamesByCountry(userCountry), [userCountry]);
+  const locale = countryGames[0]?.locale || 'tr-TR';
+
   const weekSchedule = useMemo(() => {
     const schedule: { day: number; label: string; games: { name: string; icon: string; time: string }[] }[] = [];
     for (let d = 0; d < 7; d++) {
       const jsDay = d === 6 ? 0 : d + 1;
-      const gamesOfDay = GAMES
+      const gamesOfDay = countryGames
         .filter(g => g.drawDays.includes(jsDay))
         .map(g => ({
           name: g.name,
           icon: g.icon,
           time: `${g.drawHour}:${String(g.drawMinute).padStart(2, '0')}`,
         }));
-      schedule.push({ day: d, label: DAY_LABELS[d], games: gamesOfDay });
+      schedule.push({ day: d, label: getDayLabel(d, locale), games: gamesOfDay });
     }
     return schedule;
-  }, []);
+  }, [countryGames, locale]);
 
   useEffect(() => {
     Animated.parallel([
@@ -159,7 +171,7 @@ export default function HomeScreen() {
       const today = now.getDay();
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
-      const count = GAMES.filter(g => {
+      const count = countryGames.filter(g => {
         if (!g.drawDays.includes(today)) return false;
         const drawTime = g.drawHour * 60 + g.drawMinute;
         const currentTime = currentHour * 60 + currentMinute;
@@ -167,11 +179,11 @@ export default function HomeScreen() {
       }).length;
       setTodayDrawCount(count);
     } catch (e) {}
-  }, []);
+  }, [countryGames]);
 
   const fetchLastDraws = useCallback(async () => {
     try {
-      const gameNames = ['Çılgın Sayısal Loto', 'Süper Loto', 'Şans Topu', 'On Numara'];
+      const gameNames = countryGames.map(g => g.name);
       const settled = await Promise.allSettled(
         gameNames.map((gameName) =>
           supabase
@@ -193,7 +205,7 @@ export default function HomeScreen() {
       });
       setLastDraws(results);
     } catch (e) {}
-  }, []);
+  }, [countryGames]);
 
   const checkNewDraws = useCallback(async () => {
     try {
@@ -203,7 +215,7 @@ export default function HomeScreen() {
       if (lastSeen === today) return;
 
       const settled = await Promise.allSettled(
-        GAMES.map((game) =>
+        countryGames.map((game) =>
           supabase
             .from('draws')
             .select('game, draw_date')
@@ -221,7 +233,7 @@ export default function HomeScreen() {
       settled.forEach((result, index) => {
         if (result.status !== 'fulfilled' || !result.value.data) return;
         const data = result.value.data;
-        const game = GAMES[index];
+        const game = countryGames[index];
         const gc = GAME_COLORS[game.name as keyof typeof GAME_COLORS];
         const drawDate = new Date(data.draw_date.split('.').reverse().join('-'));
         if (drawDate >= yesterday) {
@@ -234,7 +246,7 @@ export default function HomeScreen() {
         await AsyncStorage.setItem(lastSeenKey, today);
       }
     } catch (e) {}
-  }, []);
+  }, [countryGames]);
 
   const loadAllData = useCallback(async () => {
     setError(null);
@@ -269,11 +281,11 @@ export default function HomeScreen() {
   }, []);
 
   const getGameIcon = useCallback((gameName: string) => {
-    return GAMES.find(g => g.name === gameName)?.icon || '🎱';
+    return getGameByName(gameName)?.icon || '🎱';
   }, []);
 
   const getGameId = useCallback((gameName: string): string => {
-    const game = GAMES.find(g => g.name === gameName);
+    const game = getGameByName(gameName);
     return game?.id || 'cilgin';
   }, []);
 
@@ -383,7 +395,7 @@ export default function HomeScreen() {
                     </Text>
                     <Text style={styles.countdownTimer}>{countdown}</Text>
                     <Text style={styles.countdownDate}>
-                      📅 {nextDraw.next.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })} · {nextDraw.game.drawHour}:{nextDraw.game.drawMinute.toString().padStart(2, '0')}
+                      📅 {nextDraw.next.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })} · {nextDraw.game.drawHour}:{nextDraw.game.drawMinute.toString().padStart(2, '0')}
                     </Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -392,7 +404,7 @@ export default function HomeScreen() {
           })()}
         </LinearGradient>
 
-        {/* Son Çekilişler — tam genişlik, sayfa sayfa kaydırma */}
+        {/* Son Çekilişler */}
         {!error && lastDraws.length > 0 && (
           <>
             <View style={styles.sectionHeader}>
@@ -415,6 +427,7 @@ export default function HomeScreen() {
                 const bonusColor = gc?.bonus || '#FF6B6B';
                 const icon = getGameIcon(draw.game);
                 const nums = parseNumbers(draw.numbers);
+                const gameCurrency = getGameByName(draw.game)?.currency || 'TRY';
 
                 return (
                   <TouchableOpacity key={index} activeOpacity={0.9} onPress={() => router.push(`/results?game=${getGameId(draw.game)}` as any)}>
@@ -454,7 +467,9 @@ export default function HomeScreen() {
                       {draw.estimated_prize != null && draw.estimated_prize > 0 && (
                         <View style={styles.prizeRow}>
                           <Text style={styles.prizeLabel}>💰 Büyük İkramiye</Text>
-                          <Text style={[styles.prizeAmount, { color: '#FFD700' }]}>{formatPrize(draw.estimated_prize)}</Text>
+                          <Text style={[styles.prizeAmount, { color: '#FFD700' }]}>
+                            {formatPrize(draw.estimated_prize, gameCurrency)}
+                          </Text>
                         </View>
                       )}
                     </LinearGradient>

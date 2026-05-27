@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GAMES, GAME_COLORS } from '../../lib/games';
+import { GAME_COLORS, getDefaultCountry, getGameByName, getGamesByCountry } from '../../lib/games';
 import GameSelector from '../../lib/GameSelector';
 import { t } from '../../lib/i18n';
 import { supabase } from '../../lib/supabase';
@@ -36,7 +36,12 @@ function parseNumbers(str: string): number[] {
 export default function ResultsScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ game?: string }>();
-  const [selectedGame, setSelectedGame] = useState(GAMES[0]);
+
+  // Kullanıcının ülkesine ait oyunlar
+  const userCountry = getDefaultCountry();
+  const countryGames = getGamesByCountry(userCountry);
+
+  const [selectedGame, setSelectedGame] = useState(countryGames[0]);
   const [draws, setDraws] = useState<DrawResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,9 +56,12 @@ export default function ResultsScreen() {
   const mainColor = gameColors?.main || '#6C63FF';
   const bonusColor = gameColors?.bonus || '#FF6B6B';
 
+  // Router'dan gelen oyun ID'sini filtreli listede ara
   useEffect(() => {
     if (params.game) {
-      const game = GAMES.find(g => g.id === params.game);
+      const game = getGameByName(
+        countryGames.find(g => g.id === params.game)?.name || ''
+      );
       if (game) {
         setDraws([]);
         setExpanded(null);
@@ -74,7 +82,7 @@ export default function ResultsScreen() {
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
 
-      for (const game of GAMES) {
+      for (const game of countryGames) {
         const { data } = await supabase
           .from('draws')
           .select('draw_date')
@@ -98,7 +106,7 @@ export default function ResultsScreen() {
       }
       setNewResults(newGames);
     } catch (e) {}
-  }, []);
+  }, [countryGames]);
 
   const markAsSeen = useCallback(async (gameName: string) => {
     setNewResults(prev => prev.filter(g => g !== gameName));
@@ -114,7 +122,7 @@ export default function ResultsScreen() {
     }
   }, []);
 
-  const fetchResults = async (game: typeof GAMES[0], pageNum = 0, append = false) => {
+  const fetchResults = async (game: typeof countryGames[0], pageNum = 0, append = false) => {
     setError(null);
     setLoading(true);
     try {
@@ -160,7 +168,7 @@ export default function ResultsScreen() {
     }, [selectedGame])
   );
 
-  const handleGameSelect = async (game: typeof GAMES[0]) => {
+  const handleGameSelect = async (game: typeof countryGames[0]) => {
     setDraws([]);
     setExpanded(null);
     setPage(0);

@@ -11,21 +11,25 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GAMES, GAME_COLORS } from '../../lib/games';
+import { GAME_COLORS, getDefaultCountry, getGamesByCountry } from '../../lib/games';
 import GameSelector from '../../lib/GameSelector';
 import { t } from '../../lib/i18n';
 import { supabase } from '../../lib/supabase';
 
 type DrawRow = { numbers: string; draw_date: string };
 
-// Yardımcı: tire ile ayrılmış sayıları diziye çevir
 function parseNumbers(str: string): number[] {
   return str.split(' - ').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
 }
 
 export default function AnalyzeScreen() {
   const insets = useSafeAreaInsets();
-  const [selectedGame, setSelectedGame] = useState(GAMES[0]);
+
+  // Kullanıcının ülkesine ait oyunlar
+  const userCountry = getDefaultCountry();
+  const countryGames = getGamesByCountry(userCountry);
+
+  const [selectedGame, setSelectedGame] = useState(countryGames[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draws, setDraws] = useState<DrawRow[]>([]);
@@ -45,7 +49,7 @@ export default function AnalyzeScreen() {
   const gc = GAME_COLORS[selectedGame.name as keyof typeof GAME_COLORS];
   const mainColor = gc?.main || '#6C63FF';
 
-  const fetchDraws = async (game: typeof GAMES[0]) => {
+  const fetchDraws = async (game: (typeof countryGames)[0]) => {
     setError(null);
     setLoading(true);
     setAnalysisResult(null);

@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CouponHistory from '../../lib/CouponHistory';
-import { GAME_COLORS } from '../../lib/games';
+import { GAME_COLORS, getGameByName } from '../../lib/games';
 import { t } from '../../lib/i18n';
 import { type PrizeEstimate } from '../../lib/prizeEstimates';
 import { supabase } from '../../lib/supabase';
@@ -62,8 +62,8 @@ function parseNumbers(str: string): number[] {
 }
 
 // Renkler
-const PENDING_COLOR = '#3a3a5c';      // Sonuç bekleyen top rengi (açık gri)
-const MISS_COLOR = '#3a3a5c';         // Tutmayan top rengi (açık gri - sonuç bekleyenle aynı)
+const PENDING_COLOR = '#3a3a5c';
+const MISS_COLOR = '#3a3a5c';
 
 export default function SavedScreen() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -290,7 +290,15 @@ export default function SavedScreen() {
     return { label: `${score} Tutturdu`, color: '#999' };
   };
 
-  const formatPrize = (amount: number) => {
+  // İkramiye formatlayıcı (para birimi desteği ile)
+  const formatPrize = (amount: number, currency: string = 'TRY') => {
+    if (currency === 'USD') {
+      if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1)}B`;
+      if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
+      if (amount >= 1_000) return `$${(amount / 1_000).toFixed(1)}K`;
+      return `$${amount}`;
+    }
+    // TRY (varsayılan)
     if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)} Milyon TL`;
     if (amount >= 1_000) return `${(amount / 1_000).toFixed(1)} Bin TL`;
     return `${amount} TL`;
@@ -573,6 +581,7 @@ export default function SavedScreen() {
               const bonusColor = gc?.bonus || '#FF6B6B';
               const scoreLabel = getScoreLabel(checkResult.score, checkingCoupon.game);
               const hasPrize = checkResult.prize !== null;
+              const gameCurrency = getGameByName(checkingCoupon.game)?.currency || 'TRY';
 
               return (
                 <>
@@ -591,7 +600,9 @@ export default function SavedScreen() {
                         <Text style={styles.prizeEmoji}>💰</Text>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.prizeTitle}>Tahmini İkramiye</Text>
-                          <Text style={styles.prizeAmount}>{formatPrize(checkResult.prize!.amount)}</Text>
+                          <Text style={styles.prizeAmount}>
+                            {formatPrize(checkResult.prize!.amount, gameCurrency)}
+                          </Text>
                           {checkResult.prize!.note ? (
                             <Text style={styles.prizeNote}>{checkResult.prize!.note}</Text>
                           ) : null}

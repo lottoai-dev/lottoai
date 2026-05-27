@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GAMES, GAME_COLORS } from '../../lib/games';
+import { GAMES, GAME_COLORS, getDefaultCountry, getGamesByCountry } from '../../lib/games';
 import GameSelector from '../../lib/GameSelector';
 import { t } from '../../lib/i18n';
 import { supabase } from '../../lib/supabase';
@@ -29,7 +29,7 @@ function combination(n: number, r: number): number {
 
 const ON_NUMARA_DRAWN = 22;
 
-function calcOdds(game: typeof GAMES[0]): number {
+function calcOdds(game: (typeof GAMES)[0]): number {
   if (game.id === 'onnumara') {
     return combination(game.max, game.count) / combination(ON_NUMARA_DRAWN, game.count);
   }
@@ -64,7 +64,12 @@ function parseNumbers(str: string): number[] {
 export default function StatisticsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [selectedGame, setSelectedGame] = useState(GAMES[0]);
+
+  // Kullanıcının ülkesine ait oyunlar
+  const userCountry = getDefaultCountry();
+  const countryGames = getGamesByCountry(userCountry);
+
+  const [selectedGame, setSelectedGame] = useState(countryGames[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalDraws, setTotalDraws] = useState(0);
@@ -83,7 +88,7 @@ export default function StatisticsScreen() {
   const gc = GAME_COLORS[selectedGame.name as keyof typeof GAME_COLORS];
   const mainColor = gc?.main || '#6C63FF';
 
-  const fetchStats = useCallback(async (game: typeof GAMES[0], limit: number) => {
+  const fetchStats = useCallback(async (game: (typeof countryGames)[0], limit: number) => {
     setError(null);
     setLoading(true);
     try {
@@ -125,14 +130,12 @@ export default function StatisticsScreen() {
           totalNumbers++;
           if (num % 2 === 0) evenCount++; else oddCount++;
 
-          // İlk görüldüğü (en son) çekilişten itibaren gecikme sayısını kaydet
           if (missingSinceMap[num] === undefined) {
             missingSinceMap[num] = drawIndex;
           }
         });
       });
 
-      // Geciken sayılar listesini oluştur (sadece 10 tane)
       const coldList: ColdNumber[] = [];
       for (let num = 1; num <= game.max; num++) {
         const count = countMap[num] || 0;
@@ -238,7 +241,6 @@ export default function StatisticsScreen() {
   const count = parseInt(couponCount) || 1;
   const adjustedOdds = odds / count;
 
-  // Gecikenler için maksimum gecikme değeri (çubuk genişliği için)
   const maxMissing = coldNumbers.length > 0 ? coldNumbers[0].missingSince : 1;
 
   return (
@@ -250,11 +252,9 @@ export default function StatisticsScreen() {
           <Text style={styles.headerSub}>{t('statsSub')}</Text>
         </View>
 
-        {/* Oyun Seçici */}
         <Text style={styles.sectionTitle}>{t('selectGame')}</Text>
         <GameSelector selectedGame={selectedGame} onSelect={setSelectedGame} />
 
-        {/* Zaman Filtresi */}
         <Text style={styles.sectionTitle}>Zaman Aralığı</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
           {FILTERS.map((f) => {
@@ -270,7 +270,6 @@ export default function StatisticsScreen() {
           })}
         </ScrollView>
 
-        {/* Hata Durumu */}
         {error && (
           <View style={styles.errorCard}>
             <Text style={styles.errorEmoji}>⚠️</Text>
@@ -281,7 +280,6 @@ export default function StatisticsScreen() {
           </View>
         )}
 
-        {/* Görsel Özet Kartı */}
         {!error && (
           <View style={[styles.summaryCard, { borderColor: mainColor }]}>
             <View style={styles.summaryHeader}>
@@ -316,7 +314,6 @@ export default function StatisticsScreen() {
           </View>
         )}
 
-        {/* Sekme Menüsü */}
         {!error && totalDraws > 0 && (
           <ScrollView
             horizontal
@@ -349,7 +346,6 @@ export default function StatisticsScreen() {
           </View>
         )}
 
-        {/* En Çok / En Az */}
         {!error && !loading && totalDraws > 0 && (activeTab === 'most' || activeTab === 'least') && (
           <>
             {displayStats.map((stat, index) => (
@@ -372,7 +368,6 @@ export default function StatisticsScreen() {
           </>
         )}
 
-        {/* Geciken Sayılar Sekmesi — diğerleri gibi sade ve 10 satırlı */}
         {!error && !loading && totalDraws > 0 && activeTab === 'cold' && (
           <>
             <Text style={styles.sectionTitle}>En Uzun Süredir Çıkmayanlar</Text>
@@ -381,11 +376,14 @@ export default function StatisticsScreen() {
                 <View style={[styles.rankBadge, { backgroundColor: '#2a2a4a' }]}>
                   <Text style={styles.rankText}>{index + 1}</Text>
                 </View>
-                <View style={[styles.numberBall, { backgroundColor: mainColor }]}>
+                <View style={[styles.numberBall, {
+                  backgroundColor: item.missingSince > 50 ? '#FF6B6B' :
+                                  item.missingSince > 25 ? '#FF9F43' : mainColor,
+                }]}>
                   <Text style={styles.numberText}>{item.number}</Text>
                 </View>
                 <View style={styles.barContainer}>
-                <View style={[styles.bar, { width: `${(item.missingSince / maxMissing) * 100}%`, backgroundColor: mainColor }]} />
+                  <View style={[styles.bar, { width: `${(item.missingSince / maxMissing) * 100}%`, backgroundColor: '#FF9F43' }]} />
                 </View>
                 <View style={styles.countContainer}>
                   <Text style={styles.countText}>{item.missingSince}</Text>
@@ -401,7 +399,6 @@ export default function StatisticsScreen() {
           </>
         )}
 
-        {/* Dağılım */}
         {!error && !loading && totalDraws > 0 && activeTab === 'distribution' && (
           <View style={styles.distributionContainer}>
 
@@ -454,7 +451,6 @@ export default function StatisticsScreen() {
           </View>
         )}
 
-        {/* Ardışık */}
         {!error && !loading && totalDraws > 0 && activeTab === 'consecutive' && (
           <View style={styles.distributionContainer}>
             <View style={[styles.distCard, { borderColor: mainColor + '44' }]}>
@@ -491,7 +487,6 @@ export default function StatisticsScreen() {
           </View>
         )}
 
-        {/* Toplam */}
         {!error && !loading && totalDraws > 0 && activeTab === 'sum' && (
           <View style={styles.distributionContainer}>
             <View style={[styles.distCard, { borderColor: mainColor + '44' }]}>
@@ -533,7 +528,6 @@ export default function StatisticsScreen() {
           </View>
         )}
 
-        {/* İhtimal */}
         {!error && !loading && totalDraws > 0 && activeTab === 'odds' && (
           <View style={styles.oddsContainer}>
             <View style={[styles.oddsMainCard, { borderColor: mainColor }]}>
@@ -674,11 +668,4 @@ const styles = StyleSheet.create({
   summaryBigNum: { fontSize: 28, fontWeight: 'bold' },
   summaryItemLabel: { color: '#999', fontSize: 12, marginTop: 4 },
   distSubTitle: { color: '#ccc', fontSize: 13, marginBottom: 10 },
-  // Geciken sayılar stilleri (sade tasarım)
-  coldInfoBox: { marginHorizontal: 20, marginBottom: 12, backgroundColor: '#16213e', padding: 12, borderRadius: 10 },
-  coldInfoText: { color: '#999', fontSize: 12, lineHeight: 18 },
-  coldRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 10, gap: 10 },
-  coldLastSeen: { color: '#999', fontSize: 12 },
-  coldMissingSince: { color: '#ccc', fontSize: 13, marginTop: 2 },
-  coldTotalCount: { color: '#666', fontSize: 11, marginTop: 2 },
 });
