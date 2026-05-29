@@ -183,7 +183,7 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#FFFFFF',
     paddingTop: 60,
     paddingBottom: 40,
   },
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   skipText: {
-    color: '#888',
+    color: '#8E8E93',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -215,13 +215,13 @@ const styles = StyleSheet.create({
   },
   emoji: { fontSize: 70 },
   title: {
-    color: '#fff',
+    color: '#1a1a2e',
     fontSize: 26,
     fontWeight: 'bold',
     textAlign: 'center',
   },
   description: {
-    color: '#999',
+    color: '#8E8E93',
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,

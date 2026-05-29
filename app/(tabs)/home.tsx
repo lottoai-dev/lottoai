@@ -50,7 +50,6 @@ function getNextDraw() {
   let nextGame = null;
   let minDiff = Infinity;
 
-  // Sadece kullanıcının ülkesine ait oyunları tara
   const countryGames = getGamesByCountry(getDefaultCountry());
 
   for (const game of countryGames) {
@@ -118,7 +117,6 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Kullanıcının ülkesi ve oyunları
   const userCountry = getDefaultCountry();
   const countryGames = useMemo(() => getGamesByCountry(userCountry), [userCountry]);
   const locale = countryGames[0]?.locale || 'tr-TR';
@@ -291,7 +289,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f0f23" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 30 }}
@@ -301,12 +299,11 @@ export default function HomeScreen() {
             onRefresh={onRefresh}
             tintColor="#6C63FF"
             colors={['#6C63FF']}
-            progressBackgroundColor="#1a1a2e"
           />
         }>
 
         {/* Header */}
-        <LinearGradient colors={['#0f0f23', '#1a1a3e', '#1a1a2e']} style={styles.headerGradient}>
+        <LinearGradient colors={['#F0EEFF', '#FFFFFF']} style={styles.headerGradient}>
           <Animated.View style={[styles.header, { opacity: fadeAnim, paddingTop: insets.top + 12 }]}>
             <View>
               <Text style={styles.greeting}>
@@ -346,7 +343,7 @@ export default function HomeScreen() {
               )}
               {todayDrawCount > 0 && (
                 <TouchableOpacity
-                  style={[styles.smartSummaryRow, pendingCoupons > 0 && { borderTopWidth: 1, borderTopColor: '#2a2a4a' }]}
+                  style={[styles.smartSummaryRow, pendingCoupons > 0 && { borderTopWidth: 1, borderTopColor: '#E5E5EA' }]}
                   onPress={() => router.push('/(tabs)/generate' as any)}>
                   <Text style={styles.smartSummaryEmoji}>🎰</Text>
                   <Text style={styles.smartSummaryText}>
@@ -387,8 +384,8 @@ export default function HomeScreen() {
                   activeOpacity={0.8}
                   onPress={() => router.push(`/(tabs)/generate?game=${nextDraw.game.id}` as any)}>
                   <LinearGradient
-                    colors={[color + '33', color + '11']}
-                    style={[styles.countdownCard, { borderColor: color + '66' }]}>
+                    colors={[color + '18', color + '08']}
+                    style={[styles.countdownCard, { borderColor: color + '33' }]}>
                     <Text style={styles.countdownLabel}>{t('nextDraw')}</Text>
                     <Text style={[styles.countdownGame, { color }]}>
                       {nextDraw.game.icon} {nextDraw.game.name}
@@ -432,8 +429,8 @@ export default function HomeScreen() {
                 return (
                   <TouchableOpacity key={index} activeOpacity={0.9} onPress={() => router.push(`/results?game=${getGameId(draw.game)}` as any)}>
                     <LinearGradient
-                      colors={[mainColor + '33', '#16213e']}
-                      style={[styles.lastDrawCard, { borderColor: mainColor + '66', width: CARD_WIDTH }]}>
+                      colors={['#FFFFFF', '#F9F9FB']}
+                      style={[styles.lastDrawCard, { borderColor: mainColor + '33', width: CARD_WIDTH }]}>
                       <View style={styles.lastDrawHeader}>
                         <Text style={styles.lastDrawEmoji}>{icon}</Text>
                         <View style={{ flex: 1 }}>
@@ -467,7 +464,7 @@ export default function HomeScreen() {
                       {draw.estimated_prize != null && draw.estimated_prize > 0 && (
                         <View style={styles.prizeRow}>
                           <Text style={styles.prizeLabel}>💰 Büyük İkramiye</Text>
-                          <Text style={[styles.prizeAmount, { color: '#FFD700' }]}>
+                          <Text style={[styles.prizeAmount, { color: '#E53935' }]}>
                             {formatPrize(draw.estimated_prize, gameCurrency)}
                           </Text>
                         </View>
@@ -496,7 +493,7 @@ export default function HomeScreen() {
                 <Text style={styles.guideBtnText}>Kupon Üret</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.guideBtn, { backgroundColor: '#6C63FF18', borderColor: '#6C63FF44' }]}
+                style={[styles.guideBtn, { backgroundColor: '#6C63FF12', borderColor: '#6C63FF33' }]}
                 onPress={() => router.push('/(tabs)/notifications' as any)}>
                 <Text style={styles.guideBtnEmoji}>🔔</Text>
                 <Text style={[styles.guideBtnText, { color: '#6C63FF' }]}>Hatırlatıcıları Ayarla</Text>
@@ -526,13 +523,13 @@ export default function HomeScreen() {
                     </View>
                     <View style={styles.scheduleGames}>
                       {dayItem.games.length === 0 ? (
-                        <Text style={{ color: '#444', fontSize: 12 }}>—</Text>
+                        <Text style={{ color: '#C7C7CC', fontSize: 12 }}>—</Text>
                       ) : (
                         dayItem.games.map((g, i) => {
                           const gc2 = GAME_COLORS[g.name as keyof typeof GAME_COLORS];
                           const color = gc2?.main || '#6C63FF';
                           return (
-                            <View key={i} style={[styles.scheduleGameChip, { backgroundColor: color + '22', borderColor: color + '66' }]}>
+                            <View key={i} style={[styles.scheduleGameChip, { backgroundColor: color + '15', borderColor: color + '33' }]}>
                               <Text style={styles.scheduleGameEmoji}>{g.icon}</Text>
                               <Text style={[styles.scheduleGameTime, { color }]}>{g.time}</Text>
                             </View>
@@ -553,71 +550,71 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#F5F5F7' },
   headerGradient: { paddingBottom: 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 50 },
-  greeting: { color: '#999', fontSize: 14 },
-  appName: { color: '#fff', fontSize: 32, fontWeight: 'bold', letterSpacing: 1 },
+  greeting: { color: '#8E8E93', fontSize: 14 },
+  appName: { color: '#1a1a2e', fontSize: 32, fontWeight: 'bold', letterSpacing: 1 },
   appSubtitle: { color: '#6C63FF', fontSize: 12, marginTop: 2 },
   logoGradient: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' },
   logoEmoji: { fontSize: 28 },
-  errorCard: { marginHorizontal: 20, marginBottom: 12, backgroundColor: '#FF6B6B11', borderWidth: 1, borderColor: '#FF6B6B44', borderRadius: 16, padding: 20, alignItems: 'center', gap: 12 },
+  errorCard: { marginHorizontal: 20, marginBottom: 12, backgroundColor: '#FF6B6B11', borderWidth: 1, borderColor: '#FF6B6B33', borderRadius: 16, padding: 20, alignItems: 'center', gap: 12 },
   errorEmoji: { fontSize: 36 },
   errorText: { color: '#FF6B6B', fontSize: 14, textAlign: 'center' },
   retryBtn: { backgroundColor: '#FF6B6B22', borderWidth: 1, borderColor: '#FF6B6B', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
   retryBtnText: { color: '#FF6B6B', fontSize: 14, fontWeight: 'bold' },
-  notifBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16213e', marginHorizontal: 20, marginBottom: 10, padding: 12, borderRadius: 12, borderLeftWidth: 4, gap: 10 },
+  notifBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', marginHorizontal: 20, marginBottom: 10, padding: 12, borderRadius: 12, borderLeftWidth: 4, gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   notifEmoji: { fontSize: 24 },
-  notifTitle: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
-  notifText: { color: '#999', fontSize: 12, marginTop: 2 },
+  notifTitle: { color: '#1a1a2e', fontSize: 13, fontWeight: 'bold' },
+  notifText: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
   notifBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   notifBtnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
   notifClose: { padding: 4 },
-  notifCloseText: { color: '#666', fontSize: 14 },
-  countdownCard: { marginHorizontal: 20, padding: 20, borderRadius: 20, borderWidth: 1, alignItems: 'center', gap: 6 },
-  countdownLabel: { color: '#999', fontSize: 13 },
+  notifCloseText: { color: '#A0A0A5', fontSize: 14 },
+  countdownCard: { marginHorizontal: 20, padding: 20, borderRadius: 20, borderWidth: 1, alignItems: 'center', gap: 6, backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  countdownLabel: { color: '#8E8E93', fontSize: 13 },
   countdownGame: { fontSize: 16, fontWeight: 'bold' },
-  countdownTimer: { color: '#fff', fontSize: 42, fontWeight: 'bold', fontVariant: ['tabular-nums'], letterSpacing: 2 },
-  countdownDate: { color: '#999', fontSize: 12 },
+  countdownTimer: { color: '#1a1a2e', fontSize: 42, fontWeight: 'bold', fontVariant: ['tabular-nums'], letterSpacing: 2 },
+  countdownDate: { color: '#8E8E93', fontSize: 12 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 20, marginBottom: 12 },
-  sectionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  sectionTitle: { color: '#1a1a2e', fontSize: 18, fontWeight: 'bold' },
   seeAll: { color: '#6C63FF', fontSize: 14, fontWeight: 'bold' },
-  lastDrawCard: { marginRight: 16, padding: 20, borderRadius: 20, borderWidth: 1.5, minHeight: 200, justifyContent: 'center' },
+  lastDrawCard: { marginRight: 16, padding: 20, borderRadius: 20, borderWidth: 1.5, minHeight: 200, justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   lastDrawHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   lastDrawEmoji: { fontSize: 32 },
-  lastDrawGame: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  lastDrawDate: { color: '#999', fontSize: 12, marginTop: 3 },
+  lastDrawGame: { color: '#1a1a2e', fontSize: 16, fontWeight: 'bold' },
+  lastDrawDate: { color: '#8E8E93', fontSize: 12, marginTop: 3 },
   lastDrawNumbers: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12, justifyContent: 'center' },
   lastDrawBall: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
   lastDrawBallText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
   lastDrawBonus: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' },
-  lastDrawBonusLabel: { color: '#999', fontSize: 14 },
-  prizeRow: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#2a2a4a', alignItems: 'center' },
-  prizeLabel: { color: '#999', fontSize: 12 },
+  lastDrawBonusLabel: { color: '#8E8E93', fontSize: 14 },
+  prizeRow: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#E5E5EA', alignItems: 'center' },
+  prizeLabel: { color: '#8E8E93', fontSize: 12 },
   prizeAmount: { fontSize: 18, fontWeight: 'bold', marginTop: 4 },
-  guideCard: { marginHorizontal: 20, backgroundColor: '#16213e', borderRadius: 20, borderWidth: 1, borderColor: '#2a2a4a', padding: 28, alignItems: 'center', gap: 14, marginBottom: 24 },
+  guideCard: { marginHorizontal: 20, backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: '#E5E5EA', padding: 28, alignItems: 'center', gap: 14, marginBottom: 24 },
   guideEmoji: { fontSize: 48 },
-  guideTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  guideDesc: { color: '#999', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  guideTitle: { color: '#1a1a2e', fontSize: 20, fontWeight: 'bold' },
+  guideDesc: { color: '#8E8E93', fontSize: 14, textAlign: 'center', lineHeight: 22 },
   guideButtons: { flexDirection: 'row', gap: 10, width: '100%' },
-  guideBtn: { flex: 1, backgroundColor: '#0f0f23', borderWidth: 1, borderColor: '#2a2a4a', borderRadius: 14, padding: 14, alignItems: 'center', gap: 6 },
+  guideBtn: { flex: 1, backgroundColor: '#F5F5F7', borderWidth: 1, borderColor: '#E5E5EA', borderRadius: 14, padding: 14, alignItems: 'center', gap: 6 },
   guideBtnEmoji: { fontSize: 22 },
-  guideBtnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  guideFootnote: { color: '#555', fontSize: 11, textAlign: 'center' },
-  scheduleContainer: { marginHorizontal: 20, marginBottom: 30, backgroundColor: '#16213e', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#2a2a4a' },
-  scheduleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#2a2a4a' },
-  scheduleTodayRow: { backgroundColor: '#6C63FF11' },
+  guideBtnText: { color: '#1a1a2e', fontSize: 12, fontWeight: 'bold' },
+  guideFootnote: { color: '#A0A0A5', fontSize: 11, textAlign: 'center' },
+  scheduleContainer: { marginHorizontal: 20, marginBottom: 30, backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E5EA' },
+  scheduleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E5EA' },
+  scheduleTodayRow: { backgroundColor: '#6C63FF08' },
   scheduleDayBadge: { width: 70, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  scheduleDayText: { color: '#999', fontSize: 13, fontWeight: '600' },
+  scheduleDayText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
   scheduleTodayDot: { color: '#6C63FF', fontSize: 8 },
   scheduleGames: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   scheduleGameChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, gap: 4 },
   scheduleGameEmoji: { fontSize: 14 },
   scheduleGameTime: { fontSize: 12, fontWeight: 'bold' },
-  smartSummaryCard: { marginHorizontal: 20, marginBottom: 12, backgroundColor: '#16213e', borderRadius: 16, borderWidth: 1, borderColor: '#2a2a4a', overflow: 'hidden' },
+  smartSummaryCard: { marginHorizontal: 20, marginBottom: 12, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E5EA', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   smartSummaryRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   smartSummaryEmoji: { fontSize: 20 },
-  smartSummaryText: { flex: 1, color: '#ccc', fontSize: 14 },
-  smartSummaryHighlight: { color: '#fff', fontWeight: 'bold' },
+  smartSummaryText: { flex: 1, color: '#8E8E93', fontSize: 14 },
+  smartSummaryHighlight: { color: '#1a1a2e', fontWeight: 'bold' },
   smartSummaryArrow: { color: '#6C63FF', fontSize: 16, fontWeight: 'bold' },
 });

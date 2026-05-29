@@ -30,7 +30,6 @@ type HistoryResult = {
   recentMatches: { date: string; matched: number; draw_no: string; superStarMatched?: boolean }[];
 };
 
-// Yardımcı: tire ile ayrılmış sayıları diziye çevir
 function parseNumbers(str: string): number[] {
   return str.split(' - ').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
 }
@@ -120,8 +119,8 @@ export default function CouponHistory({ game, numbers, bonus, superStar }: Props
   const getMatchColor = (matched: number) => {
     if (matched >= 5) return '#FFD700';
     if (matched >= 3) return mainColor;
-    if (matched >= 1) return '#999';
-    return '#444';
+    if (matched >= 1) return '#8E8E93';
+    return '#C7C7CC';
   };
 
   const maxPossibleMatch = numbers.length + (bonus.length > 0 ? 1 : 0) + (superStar != null ? 1 : 0);
@@ -129,7 +128,7 @@ export default function CouponHistory({ game, numbers, bonus, superStar }: Props
   return (
     <>
       <TouchableOpacity
-        style={[styles.btn, { borderColor: mainColor }]}
+        style={[styles.btn, { borderColor: mainColor + '33' }]}
         onPress={analyze}>
         <Text style={styles.btnEmoji}>📊</Text>
         <View>
@@ -158,26 +157,26 @@ export default function CouponHistory({ game, numbers, bonus, superStar }: Props
             {!loading && result && (
               <ScrollView showsVerticalScrollIndicator={false}>
 
-                <View style={[styles.summaryCard, { borderColor: mainColor }]}>
+                <View style={[styles.summaryCard, { borderColor: mainColor + '33' }]}>
                   <Text style={styles.summaryTotal}>
                     {t('historyScanned', { count: result.totalDraws })}
                   </Text>
                 </View>
 
                 <View style={styles.statsGrid}>
-                  <View style={[styles.statCard, { borderColor: '#FFD700' }]}>
+                  <View style={[styles.statCard, { borderColor: '#FFD70033' }]}>
                     <Text style={[styles.statValue, { color: '#FFD700' }]}>{result.bestMatch}</Text>
                     <Text style={styles.statLabel}>{t('historyBest')}</Text>
                     <Text style={styles.statDate}>{result.bestMatchDate}</Text>
                   </View>
-                  <View style={[styles.statCard, { borderColor: mainColor }]}>
+                  <View style={[styles.statCard, { borderColor: mainColor + '33' }]}>
                     <Text style={[styles.statValue, { color: mainColor }]}>
                       {result.averageMatch.toFixed(1)}
                     </Text>
                     <Text style={styles.statLabel}>{t('historyAverage')}</Text>
                     <Text style={styles.statDate}>{t('historyMatchUnit')}</Text>
                   </View>
-                  <View style={[styles.statCard, { borderColor: '#6BCB77' }]}>
+                  <View style={[styles.statCard, { borderColor: '#6BCB7733' }]}>
                     <Text style={[styles.statValue, { color: '#6BCB77' }]}>
                       {result.matchDistribution[0] || 0}
                     </Text>
@@ -216,7 +215,7 @@ export default function CouponHistory({ game, numbers, bonus, superStar }: Props
                     <View key={i} style={styles.recentRow}>
                       <Text style={styles.recentDate}>📅 {match.date}</Text>
                       <Text style={styles.recentNo}>No: {match.draw_no}</Text>
-                      <View style={[styles.recentBadge, { backgroundColor: getMatchColor(match.matched) + '33', borderColor: getMatchColor(match.matched) }]}>
+                      <View style={[styles.recentBadge, { backgroundColor: getMatchColor(match.matched) + '15', borderColor: getMatchColor(match.matched) + '33' }]}>
                         <Text style={[styles.recentBadgeText, { color: getMatchColor(match.matched) }]}>
                           {t('historyMatchesFound', { count: match.matched })}
                           {match.superStarMatched ? ' ⭐' : ''}
@@ -268,44 +267,44 @@ export default function CouponHistory({ game, numbers, bonus, superStar }: Props
 }
 
 const styles = StyleSheet.create({
-  btn: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1.5, borderRadius: 16, padding: 14, marginHorizontal: 20, marginBottom: 12, backgroundColor: '#16213e' },
+  btn: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1.5, borderRadius: 16, padding: 14, marginHorizontal: 20, marginBottom: 12, backgroundColor: '#FFFFFF' },
   btnEmoji: { fontSize: 28 },
   btnTitle: { fontSize: 15, fontWeight: 'bold' },
-  btnSub: { color: '#999', fontSize: 12, marginTop: 2 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#1a1a2e', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '85%' },
+  btnSub: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '85%' },
   modalHeader: { marginBottom: 16 },
-  modalTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  modalSubtitle: { color: '#999', fontSize: 13, marginTop: 4 },
+  modalTitle: { color: '#1a1a2e', fontSize: 22, fontWeight: 'bold' },
+  modalSubtitle: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
   loadingContainer: { alignItems: 'center', padding: 40, gap: 12 },
-  loadingText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  loadingSubText: { color: '#999', fontSize: 13 },
-  summaryCard: { backgroundColor: '#16213e', padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 16, alignItems: 'center' },
-  summaryTotal: { color: '#fff', fontSize: 15 },
+  loadingText: { color: '#1a1a2e', fontSize: 16, fontWeight: 'bold' },
+  loadingSubText: { color: '#8E8E93', fontSize: 13 },
+  summaryCard: { backgroundColor: '#FFFFFF', padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 16, alignItems: 'center' },
+  summaryTotal: { color: '#1a1a2e', fontSize: 15 },
   statsGrid: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  statCard: { flex: 1, backgroundColor: '#16213e', padding: 12, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
+  statCard: { flex: 1, backgroundColor: '#FFFFFF', padding: 12, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
   statValue: { fontSize: 24, fontWeight: 'bold' },
-  statLabel: { color: '#fff', fontSize: 12, fontWeight: 'bold', marginTop: 4 },
-  statDate: { color: '#999', fontSize: 10, marginTop: 2, textAlign: 'center' },
-  sectionTitle: { color: '#fff', fontSize: 15, fontWeight: 'bold', marginBottom: 10 },
-  distributionCard: { backgroundColor: '#16213e', padding: 14, borderRadius: 12, marginBottom: 16, gap: 8 },
+  statLabel: { color: '#1a1a2e', fontSize: 12, fontWeight: 'bold', marginTop: 4 },
+  statDate: { color: '#8E8E93', fontSize: 10, marginTop: 2, textAlign: 'center' },
+  sectionTitle: { color: '#1a1a2e', fontSize: 15, fontWeight: 'bold', marginBottom: 10 },
+  distributionCard: { backgroundColor: '#FFFFFF', padding: 14, borderRadius: 12, marginBottom: 16, gap: 8, borderWidth: 1, borderColor: '#E5E5EA' },
   distRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   distBall: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   distBallText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
-  distBarContainer: { flex: 1, height: 8, backgroundColor: '#2a2a4a', borderRadius: 4, overflow: 'hidden' },
+  distBarContainer: { flex: 1, height: 8, backgroundColor: '#E5E5EA', borderRadius: 4, overflow: 'hidden' },
   distBar: { height: '100%', borderRadius: 4 },
-  distCount: { color: '#fff', fontSize: 12, width: 35, textAlign: 'right' },
-  distPct: { color: '#999', fontSize: 11, width: 45, textAlign: 'right' },
-  recentCard: { backgroundColor: '#16213e', padding: 14, borderRadius: 12, marginBottom: 16, gap: 10 },
+  distCount: { color: '#1a1a2e', fontSize: 12, width: 35, textAlign: 'right' },
+  distPct: { color: '#8E8E93', fontSize: 11, width: 45, textAlign: 'right' },
+  recentCard: { backgroundColor: '#FFFFFF', padding: 14, borderRadius: 12, marginBottom: 16, gap: 10, borderWidth: 1, borderColor: '#E5E5EA' },
   recentRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  recentDate: { color: '#fff', fontSize: 12, flex: 1 },
-  recentNo: { color: '#999', fontSize: 11 },
+  recentDate: { color: '#1a1a2e', fontSize: 12, flex: 1 },
+  recentNo: { color: '#8E8E93', fontSize: 11 },
   recentBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1 },
   recentBadgeText: { fontSize: 11, fontWeight: 'bold' },
-  numbersCard: { backgroundColor: '#16213e', padding: 14, borderRadius: 12, marginBottom: 16 },
+  numbersCard: { backgroundColor: '#FFFFFF', padding: 14, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#E5E5EA' },
   numberBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   ball: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   ballText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  closeBtn: { backgroundColor: '#2a2a4a', padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-  closeBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+  closeBtn: { backgroundColor: '#F5F5F7', padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+  closeBtnText: { color: '#1a1a2e', fontSize: 15, fontWeight: 'bold' },
 });

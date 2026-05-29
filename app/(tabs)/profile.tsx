@@ -108,8 +108,7 @@ export default function ProfileScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
 
-        {/* Header */}
-        <LinearGradient colors={['#0f0f23', '#1a1a2e']} style={styles.headerGradient}>
+        <LinearGradient colors={['#F0EEFF', '#FFFFFF']} style={styles.headerGradient}>
           <View style={styles.avatarContainer}>
             <LinearGradient colors={['#6C63FF', '#4834d4']} style={styles.avatar}>
               <Text style={styles.avatarText}>
@@ -123,7 +122,7 @@ export default function ProfileScreen() {
                   value={tempName}
                   onChangeText={setTempName}
                   placeholder={t('addName')}
-                  placeholderTextColor="#666"
+                  placeholderTextColor="#A0A0A5"
                   autoFocus
                 />
                 <TouchableOpacity style={styles.nameSaveBtn} onPress={handleSaveName}>
@@ -138,14 +137,13 @@ export default function ProfileScreen() {
                 style={styles.nameRow}
                 onPress={() => { setTempName(name); setEditingName(true); }}>
                 <Text style={styles.nameText}>{name || t('addName')}</Text>
-                <EditIcon color="#999" size={16} />
+                <EditIcon color="#8E8E93" size={16} />
               </TouchableOpacity>
             )}
             <Text style={styles.memberText}>{t('luckyPickUser')}</Text>
           </View>
         </LinearGradient>
 
-        {/* İstatistikler */}
         <View style={styles.statsCard}>
           <Text style={styles.cardTitle}>{t('myStats')}</Text>
           <View style={styles.statsGrid}>
@@ -160,26 +158,25 @@ export default function ProfileScreen() {
             </View>
           </View>
           {mostPlayedGame !== '' && (
-            <View style={[styles.mostPlayedRow, { backgroundColor: getGameColor(mostPlayedGame) + '22', borderColor: getGameColor(mostPlayedGame) + '44' }]}>
+            <View style={[styles.mostPlayedRow, { backgroundColor: getGameColor(mostPlayedGame) + '15', borderColor: getGameColor(mostPlayedGame) + '33' }]}>
               <Text style={styles.mostPlayedText}>⭐ En çok oynadığın: </Text>
               <Text style={[styles.mostPlayedGame, { color: getGameColor(mostPlayedGame) }]}>{mostPlayedGame}</Text>
             </View>
           )}
         </View>
 
-        {/* Araçlar */}
         <View style={styles.menuCard}>
           <Text style={styles.cardTitle}>🛠 Araçlar</Text>
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/notifications' as any)}>
-            <View style={[styles.menuIcon, { backgroundColor: '#6C63FF22' }]}>
+            <View style={[styles.menuIcon, { backgroundColor: '#6C63FF15' }]}>
               <NotificationIcon color="#6C63FF" size={20} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuItemText}>{t('notifications')}</Text>
               <Text style={styles.menuItemSub}>{notificationsEnabled ? 'Açık' : 'Kapalı'}</Text>
             </View>
-            <ChevronRightIcon color="#666" size={18} />
+            <ChevronRightIcon color="#C7C7CC" size={18} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
@@ -192,69 +189,68 @@ export default function ProfileScreen() {
               <Text style={styles.menuItemText}>{t('statsTitle')}</Text>
               <Text style={styles.menuItemSub}>{t('statsSub')}</Text>
             </View>
-            <ChevronRightIcon color="#666" size={18} />
+            <ChevronRightIcon color="#C7C7CC" size={18} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/analyze' as any)}>
-            <View style={[styles.menuIcon, { backgroundColor: '#6BCB7722' }]}>
+            <View style={[styles.menuIcon, { backgroundColor: '#6BCB7715' }]}>
               <AnalyzeIcon color="#6BCB77" size={20} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuItemText}>{t('analyzeTitle')}</Text>
               <Text style={styles.menuItemSub}>{t('analyzeSub')}</Text>
             </View>
-            <ChevronRightIcon color="#666" size={18} />
+            <ChevronRightIcon color="#C7C7CC" size={18} />
           </TouchableOpacity>
         </View>
 
-        {/* Hakkında */}
         <View style={styles.menuCard}>
           <Text style={styles.cardTitle}>ℹ️ Hakkında</Text>
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/legal' as any)}>
-            <View style={[styles.menuIcon, { backgroundColor: '#FF6B6B22' }]}>
+            <View style={[styles.menuIcon, { backgroundColor: '#FF6B6B15' }]}>
               <PrivacyIcon color="#FF6B6B" size={20} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuItemText}>{t('privacy')}</Text>
               <Text style={styles.menuItemSub}>Kişisel verileriniz</Text>
             </View>
-            <ChevronRightIcon color="#666" size={18} />
+            <ChevronRightIcon color="#C7C7CC" size={18} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/legal' as any)}>
-            <View style={[styles.menuIcon, { backgroundColor: '#FF9F4322' }]}>
+            <View style={[styles.menuIcon, { backgroundColor: '#FF9F4315' }]}>
               <TermsIcon color="#FF9F43" size={20} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuItemText}>{t('terms')}</Text>
               <Text style={styles.menuItemSub}>Uygulama kuralları</Text>
             </View>
-            <ChevronRightIcon color="#666" size={18} />
+            <ChevronRightIcon color="#C7C7CC" size={18} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
 
           <TouchableOpacity style={styles.menuItem} onPress={() => Linking.openURL('mailto:lottoai.destek@gmail.com')}>
-            <View style={[styles.menuIcon, { backgroundColor: '#6C63FF22' }]}>
+            <View style={[styles.menuIcon, { backgroundColor: '#6C63FF15' }]}>
               <ContactIcon color="#6C63FF" size={20} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuItemText}>{t('contactUs')}</Text>
               <Text style={styles.menuItemSub}>lottoai.destek@gmail.com</Text>
             </View>
-            <ChevronRightIcon color="#666" size={18} />
+            <ChevronRightIcon color="#C7C7CC" size={18} />
           </TouchableOpacity>
 
           <View style={styles.menuDivider} />
 
           <View style={styles.menuItem}>
-            <View style={[styles.menuIcon, { backgroundColor: '#2a2a4a' }]}>
-              <InfoIcon color="#999" size={20} />
+            <View style={[styles.menuIcon, { backgroundColor: '#E5E5EA' }]}>
+              <InfoIcon color="#8E8E93" size={20} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuItemText}>Versiyon</Text>
@@ -263,7 +259,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Tehlikeli Alan */}
         <View style={styles.dangerCard}>
           <TouchableOpacity style={styles.dangerBtn} onPress={handleClearData}>
             <TrashIcon color="#FF6B6B" size={20} />
@@ -283,41 +278,41 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#F5F5F7' },
   headerGradient: { paddingBottom: 30 },
   avatarContainer: { alignItems: 'center', paddingTop: 40, gap: 10 },
   avatar: { width: 90, height: 90, borderRadius: 45, justifyContent: 'center', alignItems: 'center' },
   avatarText: { fontSize: 40 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  nameText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
+  nameText: { color: '#1a1a2e', fontSize: 22, fontWeight: 'bold' },
   nameEditRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  nameInput: { backgroundColor: '#16213e', color: '#fff', fontSize: 18, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#6C63FF', minWidth: 180 },
+  nameInput: { backgroundColor: '#FFFFFF', color: '#1a1a2e', fontSize: 18, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#6C63FF33', minWidth: 180 },
   nameSaveBtn: { backgroundColor: '#6C63FF', padding: 10, borderRadius: 10 },
   nameSaveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  nameCancelBtn: { backgroundColor: '#2a2a4a', padding: 10, borderRadius: 10 },
-  nameCancelBtnText: { color: '#999', fontSize: 16 },
+  nameCancelBtn: { backgroundColor: '#E5E5EA', padding: 10, borderRadius: 10 },
+  nameCancelBtnText: { color: '#8E8E93', fontSize: 16 },
   memberText: { color: '#6C63FF', fontSize: 13 },
-  statsCard: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 16, borderRadius: 16, marginTop: 20, marginBottom: 12, borderWidth: 1, borderColor: '#2a2a4a' },
-  cardTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginBottom: 16 },
+  statsCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 16, marginTop: 20, marginBottom: 12, borderWidth: 1, borderColor: '#E5E5EA', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  cardTitle: { color: '#1a1a2e', fontSize: 16, fontWeight: 'bold', marginBottom: 16 },
   statsGrid: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   statItem: { flex: 1, alignItems: 'center' },
   statValue: { fontSize: 28, fontWeight: 'bold' },
-  statLabel: { color: '#999', fontSize: 12, marginTop: 2 },
-  statDivider: { width: 1, height: 40, backgroundColor: '#2a2a4a' },
+  statLabel: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
+  statDivider: { width: 1, height: 40, backgroundColor: '#E5E5EA' },
   mostPlayedRow: { flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 10, borderWidth: 1 },
-  mostPlayedText: { color: '#999', fontSize: 13 },
+  mostPlayedText: { color: '#8E8E93', fontSize: 13 },
   mostPlayedGame: { fontSize: 13, fontWeight: 'bold', flex: 1 },
-  menuCard: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#2a2a4a' },
+  menuCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E5E5EA', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
   menuIcon: { width: 38, height: 38, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  menuItemText: { color: '#fff', fontSize: 15 },
-  menuItemSub: { color: '#999', fontSize: 12, marginTop: 1 },
-  menuDivider: { height: 1, backgroundColor: '#2a2a4a', marginVertical: 4 },
-  dangerCard: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#FF6B6B22' },
+  menuItemText: { color: '#1a1a2e', fontSize: 15 },
+  menuItemSub: { color: '#8E8E93', fontSize: 12, marginTop: 1 },
+  menuDivider: { height: 1, backgroundColor: '#E5E5EA', marginVertical: 4 },
+  dangerCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#FF6B6B22' },
   dangerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: '#FF6B6B11' },
   dangerBtnText: { color: '#FF6B6B', fontSize: 15, fontWeight: 'bold' },
   footer: { alignItems: 'center', padding: 20, gap: 4 },
-  footerText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  footerSub: { color: '#666', fontSize: 12 },
+  footerText: { color: '#1a1a2e', fontSize: 14, fontWeight: 'bold' },
+  footerSub: { color: '#8E8E93', fontSize: 12 },
   footerWarning: { color: '#FF9F43', fontSize: 11, marginTop: 4 },
 });

@@ -1,4 +1,4 @@
-// lib_OfflineBanner.tsx
+// lib/OfflineBanner.tsx
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { t } from './i18n';

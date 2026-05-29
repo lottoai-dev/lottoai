@@ -16,7 +16,6 @@ type Props = {
 };
 
 export default function GameSelector({ selectedGame, onSelect, newResults = [] }: Props) {
-  // Cihazın ülkesine göre oyunları filtrele
   const country = getDefaultCountry();
   const countryGames = getGamesByCountry(country);
 
@@ -78,8 +77,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
-    backgroundColor: '#16213e',
+    borderColor: '#E5E5EA',
+    backgroundColor: '#FFFFFF',
     minWidth: 100,
   },
   emoji: {
@@ -87,7 +86,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   name: {
-    color: '#999',
+    color: '#8E8E93',
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',

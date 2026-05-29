@@ -17,7 +17,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GAMES, type GameId } from '../../lib/games';
 import { t } from '../../lib/i18n';
 
-// ─── Bildirim handler — uygulama açıkken de göster ───────────
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -28,7 +27,6 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// ─── Ayarlar tipi ─────────────────────────────────────────────
 type GameSettings = {
   before: boolean;
   after: boolean;
@@ -36,7 +34,6 @@ type GameSettings = {
 type NotifSettings = Partial<Record<GameId, GameSettings>>;
 const SETTINGS_KEY = 'notificationSettings_v2';
 
-// ─── İzin yönetimi ────────────────────────────────────────────
 async function requestPermission(): Promise<boolean> {
   if (!Device.isDevice) {
     Alert.alert(t('notifTitle'), t('notifDeviceWarning'));
@@ -61,7 +58,6 @@ async function requestPermission(): Promise<boolean> {
   return true;
 }
 
-// ─── Bildirim zamanla ─────────────────────────────────────────
 async function scheduleNotifications(gameId: GameId, settings: GameSettings) {
   const game = GAMES.find(g => g.id === gameId);
   if (!game) return;
@@ -117,7 +113,6 @@ async function scheduleNotifications(gameId: GameId, settings: GameSettings) {
   }
 }
 
-// ─── Test bildirimi ───────────────────────────────────────────
 async function sendTestNotification() {
   await Notifications.scheduleNotificationAsync({
     content: {
@@ -135,7 +130,6 @@ async function sendTestNotification() {
   Alert.alert('✅', t('notifTestAlert'));
 }
 
-// ─── Ekran ────────────────────────────────────────────────────
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const [hasPermission, setHasPermission] = useState(false);
@@ -191,7 +185,6 @@ export default function NotificationsScreen() {
           <Text style={styles.headerSub}>{t('notifSub')}</Text>
         </View>
 
-        {/* İzin kartı */}
         {!hasPermission ? (
           <TouchableOpacity style={styles.permissionCard} onPress={handleRequestPermission}>
             <Text style={styles.permissionEmoji}>🔔</Text>
@@ -207,14 +200,12 @@ export default function NotificationsScreen() {
           </View>
         )}
 
-        {/* Test bildirimi butonu */}
         {hasPermission && (
           <TouchableOpacity style={styles.testBtn} onPress={sendTestNotification}>
             <Text style={styles.testBtnText}>{t('notifTestBtn')}</Text>
           </TouchableOpacity>
         )}
 
-        {/* Oyun kartları */}
         <Text style={styles.sectionTitle}>{t('notifGames')}</Text>
         {GAMES.map((game) => {
           const gs = getGameSettings(game.id);
@@ -229,7 +220,6 @@ export default function NotificationsScreen() {
               key={game.id}
               style={[styles.gameCard, anyEnabled(game.id) && { borderLeftColor: color }]}>
 
-              {/* Oyun başlığı */}
               <View style={styles.gameHeader}>
                 <Text style={styles.gameEmoji}>{game.icon}</Text>
                 <View style={{ flex: 1 }}>
@@ -240,7 +230,6 @@ export default function NotificationsScreen() {
                 </View>
               </View>
 
-              {/* Çekiliş öncesi toggle */}
               <View style={styles.toggleRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.toggleLabel}>{t('notifToggleBeforeLabel')}</Text>
@@ -251,13 +240,12 @@ export default function NotificationsScreen() {
                 <Switch
                   value={gs.before}
                   onValueChange={(v) => handleToggle(game.id, 'before', v)}
-                  trackColor={{ false: '#2a2a4a', true: color }}
-                  thumbColor={gs.before ? '#fff' : '#666'}
+                  trackColor={{ false: '#E5E5EA', true: color }}
+                  thumbColor={gs.before ? '#fff' : '#C7C7CC'}
                 />
               </View>
 
-              {/* Sonuç bildirimi toggle */}
-              <View style={[styles.toggleRow, { borderTopWidth: 1, borderTopColor: '#1a1a3a' }]}>
+              <View style={[styles.toggleRow, { borderTopWidth: 1, borderTopColor: '#E5E5EA' }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.toggleLabel}>{t('notifToggleAfterLabel')}</Text>
                   <Text style={styles.toggleDesc}>
@@ -267,8 +255,8 @@ export default function NotificationsScreen() {
                 <Switch
                   value={gs.after}
                   onValueChange={(v) => handleToggle(game.id, 'after', v)}
-                  trackColor={{ false: '#2a2a4a', true: color }}
-                  thumbColor={gs.after ? '#fff' : '#666'}
+                  trackColor={{ false: '#E5E5EA', true: color }}
+                  thumbColor={gs.after ? '#fff' : '#C7C7CC'}
                 />
               </View>
 
@@ -286,56 +274,58 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#F5F5F7' },
   header: { padding: 20 },
-  headerTitle: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
-  headerSub: { color: '#999', fontSize: 14, marginTop: 4 },
+  headerTitle: { color: '#1a1a2e', fontSize: 26, fontWeight: 'bold' },
+  headerSub: { color: '#8E8E93', fontSize: 14, marginTop: 4 },
   permissionCard: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#FF6B6B22', marginHorizontal: 20,
+    backgroundColor: '#FF6B6B15', marginHorizontal: 20,
     padding: 16, borderRadius: 12,
-    borderWidth: 1, borderColor: '#FF6B6B',
+    borderWidth: 1, borderColor: '#FF6B6B33',
     marginBottom: 16, gap: 12,
   },
   permissionEmoji: { fontSize: 28 },
-  permissionTitle: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
-  permissionDesc: { color: '#999', fontSize: 12, marginTop: 2 },
+  permissionTitle: { color: '#1a1a2e', fontSize: 15, fontWeight: 'bold' },
+  permissionDesc: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
   permissionBtn: { color: '#FF6B6B', fontSize: 14, fontWeight: 'bold' },
   permissionGranted: {
     backgroundColor: '#6BCB7722', marginHorizontal: 20,
     padding: 12, borderRadius: 12, marginBottom: 12,
-    borderWidth: 1, borderColor: '#6BCB77',
+    borderWidth: 1, borderColor: '#6BCB7733',
   },
   permissionGrantedText: { color: '#6BCB77', fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
   testBtn: {
-    backgroundColor: '#6C63FF22', marginHorizontal: 20,
+    backgroundColor: '#6C63FF15', marginHorizontal: 20,
     padding: 14, borderRadius: 12, marginBottom: 16,
-    borderWidth: 1, borderColor: '#6C63FF', alignItems: 'center',
+    borderWidth: 1, borderColor: '#6C63FF33', alignItems: 'center',
   },
   testBtnText: { color: '#6C63FF', fontSize: 14, fontWeight: 'bold' },
-  sectionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', paddingHorizontal: 20, marginBottom: 12 },
+  sectionTitle: { color: '#1a1a2e', fontSize: 18, fontWeight: 'bold', paddingHorizontal: 20, marginBottom: 12 },
   gameCard: {
-    backgroundColor: '#16213e', marginHorizontal: 20,
+    backgroundColor: '#FFFFFF', marginHorizontal: 20,
     borderRadius: 12, marginBottom: 12,
-    borderLeftWidth: 4, borderLeftColor: '#2a2a4a',
-    overflow: 'hidden',
+    borderLeftWidth: 4, borderLeftColor: '#E5E5EA',
+    overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
   gameHeader: {
     flexDirection: 'row', alignItems: 'center',
     gap: 12, padding: 14, paddingBottom: 10,
   },
   gameEmoji: { fontSize: 26 },
-  gameName: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
-  gameMeta: { color: '#666', fontSize: 11, marginTop: 3 },
+  gameName: { color: '#1a1a2e', fontSize: 15, fontWeight: 'bold' },
+  gameMeta: { color: '#8E8E93', fontSize: 11, marginTop: 3 },
   toggleRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 14, paddingVertical: 10, gap: 12,
   },
-  toggleLabel: { color: '#ccc', fontSize: 13, fontWeight: '600' },
-  toggleDesc: { color: '#666', fontSize: 11, marginTop: 2 },
+  toggleLabel: { color: '#1a1a2e', fontSize: 13, fontWeight: '600' },
+  toggleDesc: { color: '#8E8E93', fontSize: 11, marginTop: 2 },
   infoBox: {
-    backgroundColor: '#16213e', marginHorizontal: 20,
+    backgroundColor: '#FFFFFF', marginHorizontal: 20,
     padding: 14, borderRadius: 12, marginTop: 4, marginBottom: 30,
+    borderWidth: 1, borderColor: '#E5E5EA',
   },
-  infoText: { color: '#666', fontSize: 13, lineHeight: 20 },
+  infoText: { color: '#8E8E93', fontSize: 13, lineHeight: 20 },
 });

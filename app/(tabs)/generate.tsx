@@ -551,8 +551,8 @@ export default function GenerateScreen() {
         <GameSelector selectedGame={selectedGame} onSelect={handleGameSelect} />
 
         <LinearGradient
-          colors={[mainColor + '22', '#16213e']}
-          style={[styles.numbersCard, { borderColor: mainColor + '44' }]}>
+          colors={['#FFFFFF', '#F9F9FB']}
+          style={[styles.numbersCard, { borderColor: mainColor + '33' }]}>
           {generatedNumbers.length === 0 ? (
             <View style={styles.emptyNumbers}>
               <Text style={styles.emptyNumbersEmoji}>🎲</Text>
@@ -609,16 +609,16 @@ export default function GenerateScreen() {
             <Text style={styles.generateBtnText}>Kupon Üret</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.filterToggleBtn, filterActive && { backgroundColor: mainColor + '33', borderColor: mainColor }]}
+            style={[styles.filterToggleBtn, filterActive && { backgroundColor: mainColor + '15', borderColor: mainColor }]}
             onPress={() => setShowFilter(!showFilter)}>
-            <Ionicons name="options-outline" size={20} color={filterActive ? mainColor : '#999'} />
+            <Ionicons name="options-outline" size={20} color={filterActive ? mainColor : '#8E8E93'} />
             {filterActive && <View style={[styles.filterDot, { backgroundColor: mainColor }]} />}
           </TouchableOpacity>
         </View>
 
         {currentGameHistory.length > 0 && (
           <TouchableOpacity
-            style={[styles.historyBtn, { borderColor: mainColor + '44' }]}
+            style={[styles.historyBtn, { borderColor: mainColor + '33' }]}
             onPress={() => setHistoryModal(true)}>
             <Text style={styles.historyBtnEmoji}>⏱</Text>
             <Text style={[styles.historyBtnText, { color: mainColor }]}>Geçmiş ({currentGameHistory.length})</Text>
@@ -626,10 +626,10 @@ export default function GenerateScreen() {
         )}
 
         {showFilter && (
-          <View style={[styles.filterPanel, { borderColor: mainColor + '44' }]}>
+          <View style={[styles.filterPanel, { borderColor: mainColor + '33' }]}>
 
             <TouchableOpacity
-              style={[styles.balancedBtn, balanced && { backgroundColor: mainColor + '22', borderColor: mainColor }]}
+              style={[styles.balancedBtn, balanced && { backgroundColor: mainColor + '12', borderColor: mainColor }]}
               onPress={() => { setBalanced(!balanced); if (!balanced) setEvenCount(null); }}>
               <View style={styles.balancedBtnLeft}>
                 <Text style={styles.balancedBtnEmoji}>⚖️</Text>
@@ -671,7 +671,7 @@ export default function GenerateScreen() {
             <View style={styles.divider} />
 
             <TouchableOpacity
-              style={[styles.balancedBtn, noConsecutive && { backgroundColor: mainColor + '22', borderColor: mainColor }]}
+              style={[styles.balancedBtn, noConsecutive && { backgroundColor: mainColor + '12', borderColor: mainColor }]}
               onPress={() => setNoConsecutive(!noConsecutive)}>
               <View style={styles.balancedBtnLeft}>
                 <Text style={styles.balancedBtnEmoji}>🔗</Text>
@@ -699,20 +699,20 @@ export default function GenerateScreen() {
             <Text style={styles.filterDesc}>Sayıların toplamı hangi aralıkta olsun?</Text>
             <View style={styles.sumRow}>
               <TextInput
-                style={[styles.sumInput, { borderColor: mainColor + '44', color: '#fff' }]}
+                style={[styles.sumInput, { borderColor: mainColor + '33', color: '#1a1a2e' }]}
                 value={sumMin}
                 onChangeText={setSumMin}
                 placeholder={`Alt (min ${theoreticalMin})`}
-                placeholderTextColor="#555"
+                placeholderTextColor="#A0A0A5"
                 keyboardType="numeric"
               />
               <Text style={styles.sumSeparator}>—</Text>
               <TextInput
-                style={[styles.sumInput, { borderColor: mainColor + '44', color: '#fff' }]}
+                style={[styles.sumInput, { borderColor: mainColor + '33', color: '#1a1a2e' }]}
                 value={sumMax}
                 onChangeText={setSumMax}
                 placeholder={`Üst (max ${theoreticalMax})`}
-                placeholderTextColor="#555"
+                placeholderTextColor="#A0A0A5"
                 keyboardType="numeric"
               />
             </View>
@@ -729,11 +729,11 @@ export default function GenerateScreen() {
             </View>
             <Text style={styles.filterDesc}>Hangi sayılar mutlaka kuponda olsun? (1-{selectedGame.max} arası, virgülle ayırın)</Text>
             <TextInput
-              style={[styles.sumInput, { borderColor: mainColor + '44', color: '#fff' }]}
+              style={[styles.sumInput, { borderColor: mainColor + '33', color: '#1a1a2e' }]}
               value={includeText}
               onChangeText={setIncludeText}
               placeholder="Örn: 7, 19, 23"
-              placeholderTextColor="#555"
+              placeholderTextColor="#A0A0A5"
               keyboardType="numeric"
             />
 
@@ -749,11 +749,11 @@ export default function GenerateScreen() {
             </View>
             <Text style={styles.filterDesc}>Hangi sayılar asla kuponda olmasın? (1-{selectedGame.max} arası, virgülle ayırın)</Text>
             <TextInput
-              style={[styles.sumInput, { borderColor: mainColor + '44', color: '#fff' }]}
+              style={[styles.sumInput, { borderColor: mainColor + '33', color: '#1a1a2e' }]}
               value={excludeText}
               onChangeText={setExcludeText}
               placeholder="Örn: 13, 42"
-              placeholderTextColor="#555"
+              placeholderTextColor="#A0A0A5"
               keyboardType="numeric"
             />
 
@@ -851,74 +851,74 @@ export default function GenerateScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#F5F5F7' },
   header: { padding: 20, paddingTop: 20 },
-  headerTitle: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
-  headerSub: { color: '#999', fontSize: 14, marginTop: 4 },
-  sectionTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold', paddingHorizontal: 20, marginBottom: 10 },
-  numbersCard: { marginHorizontal: 20, borderRadius: 20, borderWidth: 1, padding: 20, marginBottom: 16, minHeight: 120, justifyContent: 'center' },
+  headerTitle: { color: '#1a1a2e', fontSize: 26, fontWeight: 'bold' },
+  headerSub: { color: '#8E8E93', fontSize: 14, marginTop: 4 },
+  sectionTitle: { color: '#1a1a2e', fontSize: 16, fontWeight: 'bold', paddingHorizontal: 20, marginBottom: 10 },
+  numbersCard: { marginHorizontal: 20, borderRadius: 20, borderWidth: 1, padding: 20, marginBottom: 16, minHeight: 120, justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   emptyNumbers: { alignItems: 'center', gap: 10, paddingVertical: 10 },
   emptyNumbersEmoji: { fontSize: 40 },
-  emptyNumbersText: { color: '#666', fontSize: 13, textAlign: 'center' },
+  emptyNumbersText: { color: '#A0A0A5', fontSize: 13, textAlign: 'center' },
   aiExplanationBox: { backgroundColor: '#6C63FF11', borderWidth: 1, borderColor: '#6C63FF33', borderRadius: 10, padding: 12, marginBottom: 12 },
   aiExplanationTitle: { color: '#6C63FF', fontSize: 13, fontWeight: 'bold', marginBottom: 4 },
-  aiExplanationText: { color: '#ccc', fontSize: 12, lineHeight: 18 },
+  aiExplanationText: { color: '#1a1a2e', fontSize: 12, lineHeight: 18 },
   ballsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
-  ball: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4 },
+  ball: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
   ballText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
-  bonusLabel: { color: '#999', fontSize: 12, marginTop: 12, marginBottom: 8, textAlign: 'center' },
+  bonusLabel: { color: '#8E8E93', fontSize: 12, marginTop: 12, marginBottom: 8, textAlign: 'center' },
   filterBadge: { marginTop: 10, alignItems: 'center' },
   filterBadgeText: { fontSize: 11, fontWeight: 'bold' },
   btnRow: { flexDirection: 'row', marginHorizontal: 20, gap: 10, marginBottom: 10 },
   generateBtn: { flex: 1, padding: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   generateBtnEmoji: { fontSize: 18 },
   generateBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
-  filterToggleBtn: { width: 52, borderRadius: 14, borderWidth: 1.5, borderColor: '#2a2a4a', backgroundColor: '#16213e', justifyContent: 'center', alignItems: 'center' },
+  filterToggleBtn: { width: 52, borderRadius: 14, borderWidth: 1.5, borderColor: '#E5E5EA', backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' },
   filterDot: { width: 7, height: 7, borderRadius: 4, position: 'absolute', top: 8, right: 8 },
-  historyBtn: { marginHorizontal: 20, padding: 14, borderRadius: 12, borderWidth: 1, backgroundColor: '#16213e', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10 },
+  historyBtn: { marginHorizontal: 20, padding: 14, borderRadius: 12, borderWidth: 1, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
   historyBtnEmoji: { fontSize: 18 },
   historyBtnText: { fontSize: 14, fontWeight: 'bold' },
-  filterPanel: { marginHorizontal: 20, borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 12, backgroundColor: '#16213e' },
-  balancedBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 12, borderWidth: 1.5, borderColor: '#2a2a4a' },
+  filterPanel: { marginHorizontal: 20, borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 12, backgroundColor: '#FFFFFF' },
+  balancedBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E5EA' },
   balancedBtnLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   balancedBtnEmoji: { fontSize: 22 },
-  balancedBtnTitle: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
-  balancedBtnDesc: { color: '#666', fontSize: 11, marginTop: 2 },
-  divider: { height: 1, backgroundColor: '#2a2a4a', marginVertical: 12 },
+  balancedBtnTitle: { color: '#1a1a2e', fontSize: 13, fontWeight: 'bold' },
+  balancedBtnDesc: { color: '#A0A0A5', fontSize: 11, marginTop: 2 },
+  divider: { height: 1, backgroundColor: '#E5E5EA', marginVertical: 12 },
   filterSubHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  filterTitle: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
+  filterTitle: { color: '#1a1a2e', fontSize: 13, fontWeight: 'bold' },
   filterClearBtn: { fontSize: 12, fontWeight: '600' },
-  filterDesc: { color: '#999', fontSize: 12, marginBottom: 10 },
+  filterDesc: { color: '#8E8E93', fontSize: 12, marginBottom: 10 },
   filterOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  filterOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, borderColor: '#2a2a4a', alignItems: 'center', minWidth: 60 },
-  filterOptionTop: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  filterOptionBot: { color: '#666', fontSize: 10, marginTop: 2 },
+  filterOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, borderColor: '#E5E5EA', alignItems: 'center', minWidth: 60 },
+  filterOptionTop: { color: '#1a1a2e', fontSize: 12, fontWeight: 'bold' },
+  filterOptionBot: { color: '#8E8E93', fontSize: 10, marginTop: 2 },
   sumRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  sumInput: { flex: 1, backgroundColor: '#0f0f23', borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
-  sumSeparator: { color: '#666', fontSize: 18, fontWeight: 'bold' },
-  filterNote: { color: '#555', fontSize: 11, lineHeight: 16, marginTop: 4 },
+  sumInput: { flex: 1, backgroundColor: '#F5F5F7', borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
+  sumSeparator: { color: '#8E8E93', fontSize: 18, fontWeight: 'bold' },
+  filterNote: { color: '#A0A0A5', fontSize: 11, lineHeight: 16, marginTop: 4 },
   saveBtn: { marginHorizontal: 20, padding: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16 },
   saveBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
-  infoBox: { marginHorizontal: 20, padding: 12, borderRadius: 10, backgroundColor: '#0f0f23', marginBottom: 20 },
-  infoText: { color: '#666', fontSize: 12, textAlign: 'center' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#1a1a2e', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '80%' },
+  infoBox: { marginHorizontal: 20, padding: 12, borderRadius: 10, backgroundColor: '#F5F5F7', marginBottom: 20 },
+  infoText: { color: '#8E8E93', fontSize: 12, textAlign: 'center' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '80%' },
   modalHeader: { marginBottom: 16 },
-  modalTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  modalSubtitle: { color: '#999', fontSize: 13, marginTop: 4 },
-  historyEntry: { backgroundColor: '#16213e', padding: 10, borderRadius: 12, marginBottom: 10, borderLeftWidth: 4 },
+  modalTitle: { color: '#1a1a2e', fontSize: 20, fontWeight: 'bold' },
+  modalSubtitle: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
+  historyEntry: { backgroundColor: '#F5F5F7', padding: 10, borderRadius: 12, marginBottom: 10, borderLeftWidth: 4 },
   historyEntryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  historyEntryGame: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
-  historyEntryTime: { color: '#666', fontSize: 11 },
+  historyEntryGame: { color: '#1a1a2e', fontSize: 13, fontWeight: 'bold' },
+  historyEntryTime: { color: '#A0A0A5', fontSize: 11 },
   historyEntryNumbers: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, alignItems: 'center' },
   historyEntryBall: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   historyEntryBallText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
-  historyEntryBonusLabel: { color: '#666', fontSize: 13, marginHorizontal: 2 },
+  historyEntryBonusLabel: { color: '#8E8E93', fontSize: 13, marginHorizontal: 2 },
   modalActions: { marginTop: 8, gap: 8 },
-  modalSaveAllBtn: { backgroundColor: '#6C63FF22', borderWidth: 1, borderColor: '#6C63FF', padding: 12, borderRadius: 10, alignItems: 'center' },
+  modalSaveAllBtn: { backgroundColor: '#6C63FF15', borderWidth: 1, borderColor: '#6C63FF', padding: 12, borderRadius: 10, alignItems: 'center' },
   modalSaveAllBtnText: { color: '#6C63FF', fontSize: 14, fontWeight: 'bold' },
-  modalClearBtn: { backgroundColor: '#FF6B6B11', borderWidth: 1, borderColor: '#FF6B6B44', padding: 12, borderRadius: 10, alignItems: 'center' },
+  modalClearBtn: { backgroundColor: '#FF6B6B11', borderWidth: 1, borderColor: '#FF6B6B33', padding: 12, borderRadius: 10, alignItems: 'center' },
   modalClearBtnText: { color: '#FF6B6B', fontSize: 13, fontWeight: '600' },
-  modalClose: { backgroundColor: '#2a2a4a', padding: 14, borderRadius: 10, alignItems: 'center' },
-  modalCloseText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  modalClose: { backgroundColor: '#F5F5F7', padding: 14, borderRadius: 10, alignItems: 'center' },
+  modalCloseText: { color: '#1a1a2e', fontSize: 14, fontWeight: 'bold' },
 });

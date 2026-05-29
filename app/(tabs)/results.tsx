@@ -37,7 +37,6 @@ export default function ResultsScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ game?: string }>();
 
-  // Kullanıcının ülkesine ait oyunlar
   const userCountry = getDefaultCountry();
   const countryGames = getGamesByCountry(userCountry);
 
@@ -56,7 +55,6 @@ export default function ResultsScreen() {
   const mainColor = gameColors?.main || '#6C63FF';
   const bonusColor = gameColors?.bonus || '#FF6B6B';
 
-  // Router'dan gelen oyun ID'sini filtreli listede ara
   useEffect(() => {
     if (params.game) {
       const game = getGameByName(
@@ -190,7 +188,7 @@ export default function ResultsScreen() {
             onRefresh={onRefresh}
             tintColor={mainColor}
             colors={[mainColor]}
-            progressBackgroundColor="#1a1a2e"
+            progressBackgroundColor="#FFFFFF"
           />
         }>
 
@@ -240,7 +238,7 @@ export default function ResultsScreen() {
 
         {!error && draws.length > 0 && (
           <>
-            <View style={[styles.latestCard, { borderColor: mainColor + '44' }]}>
+            <View style={[styles.latestCard, { borderColor: mainColor + '33' }]}>
               <View style={styles.latestHeader}>
                 <Text style={[styles.latestBadge, { backgroundColor: mainColor }]}>{t('latestDraw')}</Text>
                 <Text style={styles.latestDate}>📅 {draws[0].draw_date} · No: {draws[0].draw_no}</Text>
@@ -340,44 +338,44 @@ export default function ResultsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#F5F5F7' },
   header: { padding: 20, paddingTop: 20 },
-  headerTitle: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
-  headerSub: { color: '#999', fontSize: 14, marginTop: 4 },
-  sectionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', paddingHorizontal: 20, marginBottom: 12, marginTop: 8 },
-  errorCard: { marginHorizontal: 20, marginBottom: 20, backgroundColor: '#FF6B6B11', borderWidth: 1, borderColor: '#FF6B6B44', borderRadius: 16, padding: 20, alignItems: 'center', gap: 12 },
+  headerTitle: { color: '#1a1a2e', fontSize: 26, fontWeight: 'bold' },
+  headerSub: { color: '#8E8E93', fontSize: 14, marginTop: 4 },
+  sectionTitle: { color: '#1a1a2e', fontSize: 18, fontWeight: 'bold', paddingHorizontal: 20, marginBottom: 12, marginTop: 8 },
+  errorCard: { marginHorizontal: 20, marginBottom: 20, backgroundColor: '#FF6B6B11', borderWidth: 1, borderColor: '#FF6B6B33', borderRadius: 16, padding: 20, alignItems: 'center', gap: 12 },
   errorEmoji: { fontSize: 36 },
   errorText: { color: '#FF6B6B', fontSize: 14, textAlign: 'center' },
   retryBtn: { backgroundColor: '#FF6B6B22', borderWidth: 1, borderColor: '#FF6B6B', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
   retryBtnText: { color: '#FF6B6B', fontSize: 14, fontWeight: 'bold' },
   loadingContainer: { alignItems: 'center', padding: 30, gap: 12 },
-  loadingText: { color: '#999', fontSize: 14 },
-  guideCard: { marginHorizontal: 20, backgroundColor: '#16213e', borderRadius: 20, borderWidth: 1, borderColor: '#2a2a4a', padding: 28, alignItems: 'center', gap: 14, marginBottom: 20 },
+  loadingText: { color: '#8E8E93', fontSize: 14 },
+  guideCard: { marginHorizontal: 20, backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: '#E5E5EA', padding: 28, alignItems: 'center', gap: 14, marginBottom: 20 },
   guideEmoji: { fontSize: 48 },
-  guideTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  guideDesc: { color: '#999', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  guideTitle: { color: '#1a1a2e', fontSize: 20, fontWeight: 'bold' },
+  guideDesc: { color: '#8E8E93', fontSize: 14, textAlign: 'center', lineHeight: 22 },
   guideBtn: { backgroundColor: '#6C63FF', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12 },
   guideBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
-  latestCard: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 20 },
+  latestCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   latestHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   latestBadge: { color: '#fff', fontSize: 11, fontWeight: 'bold', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
-  latestDate: { color: '#999', fontSize: 12 },
-  numbersLabel: { color: '#fff', fontSize: 14, fontWeight: 'bold', marginBottom: 10 },
+  latestDate: { color: '#8E8E93', fontSize: 12 },
+  numbersLabel: { color: '#1a1a2e', fontSize: 14, fontWeight: 'bold', marginBottom: 10 },
   numberBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   ball: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
   ballText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
   smallBall: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   smallBallText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  bonusLabel: { color: '#999', fontSize: 13, marginBottom: 8 },
-  historyCard: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 14, borderRadius: 12, marginBottom: 8 },
+  bonusLabel: { color: '#8E8E93', fontSize: 13, marginBottom: 8 },
+  historyCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 14, borderRadius: 12, marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
   historyHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   historyDot: { width: 8, height: 8, borderRadius: 4 },
-  historyDate: { color: '#fff', fontSize: 14, flex: 1 },
-  historyNo: { color: '#999', fontSize: 12 },
-  historyArrow: { color: '#999', fontSize: 12 },
+  historyDate: { color: '#1a1a2e', fontSize: 14, flex: 1 },
+  historyNo: { color: '#8E8E93', fontSize: 12 },
+  historyArrow: { color: '#8E8E93', fontSize: 12 },
   historyNumbers: { marginTop: 12 },
-  loadMoreBtn: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#2a2a4a' },
+  loadMoreBtn: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#E5E5EA' },
   loadMoreText: { color: '#6C63FF', fontSize: 14, fontWeight: 'bold' },
-  infoBox: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 14, borderRadius: 12, marginBottom: 30 },
-  infoText: { color: '#999', fontSize: 13, lineHeight: 20 },
+  infoBox: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 14, borderRadius: 12, marginBottom: 30 },
+  infoText: { color: '#8E8E93', fontSize: 13, lineHeight: 20 },
 });

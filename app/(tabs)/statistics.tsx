@@ -65,7 +65,6 @@ export default function StatisticsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  // Kullanıcının ülkesine ait oyunlar
   const userCountry = getDefaultCountry();
   const countryGames = getGamesByCountry(userCountry);
 
@@ -281,7 +280,7 @@ export default function StatisticsScreen() {
         )}
 
         {!error && (
-          <View style={[styles.summaryCard, { borderColor: mainColor }]}>
+          <View style={[styles.summaryCard, { borderColor: mainColor + '33' }]}>
             <View style={styles.summaryHeader}>
               <Text style={styles.summaryIcon}>{selectedGame.icon}</Text>
               <View style={styles.summaryInfo}>
@@ -350,7 +349,7 @@ export default function StatisticsScreen() {
           <>
             {displayStats.map((stat, index) => (
               <View key={stat.number} style={styles.statRow}>
-                <View style={[styles.rankBadge, { backgroundColor: '#2a2a4a' }]}>
+                <View style={[styles.rankBadge, { backgroundColor: '#E5E5EA' }]}>
                   <Text style={styles.rankText}>{index + 1}</Text>
                 </View>
                 <View style={[styles.numberBall, { backgroundColor: mainColor }]}>
@@ -373,7 +372,7 @@ export default function StatisticsScreen() {
             <Text style={styles.sectionTitle}>En Uzun Süredir Çıkmayanlar</Text>
             {coldNumbers.map((item, index) => (
               <View key={item.number} style={styles.statRow}>
-                <View style={[styles.rankBadge, { backgroundColor: '#2a2a4a' }]}>
+                <View style={[styles.rankBadge, { backgroundColor: '#E5E5EA' }]}>
                   <Text style={styles.rankText}>{index + 1}</Text>
                 </View>
                 <View style={[styles.numberBall, {
@@ -402,7 +401,7 @@ export default function StatisticsScreen() {
         {!error && !loading && totalDraws > 0 && activeTab === 'distribution' && (
           <View style={styles.distributionContainer}>
 
-            <View style={[styles.distCard, { borderColor: mainColor + '44' }]}>
+            <View style={[styles.distCard, { borderColor: mainColor + '33' }]}>
               <Text style={styles.distCardTitle}>⚖️ Çift / Tek Dağılımı</Text>
               <View style={styles.evenOddRow}>
                 <View style={styles.evenOddItem}>
@@ -419,7 +418,7 @@ export default function StatisticsScreen() {
               </View>
             </View>
 
-            <View style={[styles.distCard, { borderColor: mainColor + '44' }]}>
+            <View style={[styles.distCard, { borderColor: mainColor + '33' }]}>
               <Text style={styles.distCardTitle}>🔢 Sayı Aralığı Dağılımı</Text>
               {rangeStats.map((r, i) => (
                 <View key={i} style={styles.rangeRow}>
@@ -453,7 +452,7 @@ export default function StatisticsScreen() {
 
         {!error && !loading && totalDraws > 0 && activeTab === 'consecutive' && (
           <View style={styles.distributionContainer}>
-            <View style={[styles.distCard, { borderColor: mainColor + '44' }]}>
+            <View style={[styles.distCard, { borderColor: mainColor + '33' }]}>
               <Text style={styles.distCardTitle}>🔗 Ardışık Sayı Analizi</Text>
               <View style={styles.summaryRow}>
                 <View style={styles.summaryItem}>
@@ -489,7 +488,7 @@ export default function StatisticsScreen() {
 
         {!error && !loading && totalDraws > 0 && activeTab === 'sum' && (
           <View style={styles.distributionContainer}>
-            <View style={[styles.distCard, { borderColor: mainColor + '44' }]}>
+            <View style={[styles.distCard, { borderColor: mainColor + '33' }]}>
               <Text style={styles.distCardTitle}>∑ Çekilen Sayıların Toplamı</Text>
               <View style={styles.summaryRow}>
                 <View style={styles.summaryItem}>
@@ -560,7 +559,7 @@ export default function StatisticsScreen() {
                   <Text style={[styles.couponBtnText, { color: mainColor }]}>+</Text>
                 </TouchableOpacity>
               </View>
-              <View style={[styles.adjustedOdds, { backgroundColor: mainColor + '22', borderColor: mainColor + '44' }]}>
+              <View style={[styles.adjustedOdds, { backgroundColor: mainColor + '15', borderColor: mainColor + '33' }]}>
                 <Text style={styles.adjustedLabel}>{count} kupon ile şansın:</Text>
                 <Text style={[styles.adjustedValue, { color: mainColor }]}>{formatOdds(adjustedOdds)}</Text>
               </View>
@@ -589,83 +588,83 @@ export default function StatisticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#F5F5F7' },
   header: { padding: 20, paddingTop: 20 },
-  headerTitle: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
-  headerSub: { color: '#999', fontSize: 14, marginTop: 4 },
-  sectionTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold', paddingHorizontal: 20, marginBottom: 10, marginTop: 8 },
+  headerTitle: { color: '#1a1a2e', fontSize: 26, fontWeight: 'bold' },
+  headerSub: { color: '#8E8E93', fontSize: 14, marginTop: 4 },
+  sectionTitle: { color: '#1a1a2e', fontSize: 16, fontWeight: 'bold', paddingHorizontal: 20, marginBottom: 10, marginTop: 8 },
   filterRow: { paddingLeft: 20, marginBottom: 16 },
-  filterBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#2a2a4a', backgroundColor: '#16213e', marginRight: 8 },
-  filterBtnText: { color: '#999', fontSize: 13, fontWeight: '600' },
-  errorCard: { marginHorizontal: 20, marginBottom: 16, backgroundColor: '#FF6B6B11', borderWidth: 1, borderColor: '#FF6B6B44', borderRadius: 16, padding: 20, alignItems: 'center', gap: 12 },
+  filterBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#E5E5EA', backgroundColor: '#FFFFFF', marginRight: 8 },
+  filterBtnText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
+  errorCard: { marginHorizontal: 20, marginBottom: 16, backgroundColor: '#FF6B6B11', borderWidth: 1, borderColor: '#FF6B6B33', borderRadius: 16, padding: 20, alignItems: 'center', gap: 12 },
   errorEmoji: { fontSize: 36 },
   errorText: { color: '#FF6B6B', fontSize: 14, textAlign: 'center' },
   retryBtn: { backgroundColor: '#FF6B6B22', borderWidth: 1, borderColor: '#FF6B6B', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
   retryBtnText: { color: '#FF6B6B', fontSize: 14, fontWeight: 'bold' },
-  summaryCard: { marginHorizontal: 20, padding: 20, borderRadius: 16, borderWidth: 1, backgroundColor: '#16213e', marginBottom: 16 },
+  summaryCard: { marginHorizontal: 20, padding: 20, borderRadius: 16, borderWidth: 1, backgroundColor: '#FFFFFF', marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   summaryIcon: { fontSize: 28 },
   summaryInfo: { flex: 1 },
   summaryGameName: { fontSize: 16, fontWeight: 'bold' },
-  summaryMeta: { color: '#999', fontSize: 12, marginTop: 2 },
-  summaryCounter: { alignItems: 'center', paddingVertical: 12, backgroundColor: '#0f0f23', borderRadius: 12 },
+  summaryMeta: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
+  summaryCounter: { alignItems: 'center', paddingVertical: 12, backgroundColor: '#F5F5F7', borderRadius: 12 },
   summaryCounterValue: { fontSize: 42, fontWeight: 'bold' },
-  summaryCounterLabel: { color: '#999', fontSize: 13, marginTop: 4 },
+  summaryCounterLabel: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
   summaryEmptyArea: { alignItems: 'center', gap: 12, marginTop: 12 },
-  summaryEmptyHint: { color: '#999', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  summaryEmptyHint: { color: '#8E8E93', fontSize: 13, textAlign: 'center', lineHeight: 20 },
   summaryEmptyBtn: { backgroundColor: '#6C63FF', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
   summaryEmptyBtnText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
   tabScroll: { marginBottom: 16 },
   tabScrollContent: { paddingHorizontal: 20, gap: 8 },
-  tab: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, backgroundColor: '#16213e', alignItems: 'center', borderWidth: 1, borderColor: '#2a2a4a' },
-  tabText: { color: '#999', fontSize: 12, fontWeight: 'bold' },
+  tab: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, backgroundColor: '#FFFFFF', alignItems: 'center', borderWidth: 1, borderColor: '#E5E5EA' },
+  tabText: { color: '#8E8E93', fontSize: 12, fontWeight: 'bold' },
   loadingContainer: { alignItems: 'center', padding: 40, gap: 12 },
-  loadingText: { color: '#999', fontSize: 14 },
+  loadingText: { color: '#8E8E93', fontSize: 14 },
   statRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 10, gap: 10 },
   rankBadge: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  rankText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  rankText: { color: '#1a1a2e', fontSize: 12, fontWeight: 'bold' },
   numberBall: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   numberText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  barContainer: { flex: 1, height: 10, backgroundColor: '#2a2a4a', borderRadius: 5, overflow: 'hidden' },
+  barContainer: { flex: 1, height: 10, backgroundColor: '#E5E5EA', borderRadius: 5, overflow: 'hidden' },
   bar: { height: '100%', borderRadius: 5 },
   countContainer: { alignItems: 'flex-end', width: 50 },
-  countText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
-  percentText: { color: '#999', fontSize: 11 },
+  countText: { color: '#1a1a2e', fontSize: 13, fontWeight: 'bold' },
+  percentText: { color: '#8E8E93', fontSize: 11 },
   emptyContainer: { alignItems: 'center', padding: 40 },
-  emptyText: { color: '#999', fontSize: 14 },
+  emptyText: { color: '#8E8E93', fontSize: 14 },
   distributionContainer: { paddingHorizontal: 20 },
-  distCard: { backgroundColor: '#16213e', padding: 16, borderRadius: 16, borderWidth: 1, marginBottom: 16 },
-  distCardTitle: { color: '#fff', fontSize: 15, fontWeight: 'bold', marginBottom: 16 },
+  distCard: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 16, borderWidth: 1, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  distCardTitle: { color: '#1a1a2e', fontSize: 15, fontWeight: 'bold', marginBottom: 16 },
   evenOddRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', height: 120, gap: 20 },
   evenOddItem: { alignItems: 'center', width: 80 },
   evenOddBar: { width: 60, borderRadius: 6, minHeight: 10 },
   evenOddPct: { fontSize: 20, fontWeight: 'bold', marginTop: 8 },
-  evenOddLabel: { color: '#999', fontSize: 13, marginTop: 2 },
-  evenOddDivider: { width: 1, height: '100%', backgroundColor: '#2a2a4a' },
+  evenOddLabel: { color: '#8E8E93', fontSize: 13, marginTop: 2 },
+  evenOddDivider: { width: 1, height: '100%', backgroundColor: '#E5E5EA' },
   rangeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 },
-  rangeLabel: { color: '#ccc', fontSize: 12, width: 50 },
-  rangeBarBg: { flex: 1, height: 18, backgroundColor: '#2a2a4a', borderRadius: 9, overflow: 'hidden' },
+  rangeLabel: { color: '#1a1a2e', fontSize: 12, width: 50 },
+  rangeBarBg: { flex: 1, height: 18, backgroundColor: '#E5E5EA', borderRadius: 9, overflow: 'hidden' },
   rangeBar: { height: '100%', borderRadius: 9 },
   rangePct: { fontSize: 12, fontWeight: 'bold', width: 36, textAlign: 'right' },
   oddsContainer: { paddingHorizontal: 20 },
-  oddsMainCard: { backgroundColor: '#16213e', padding: 20, borderRadius: 16, borderWidth: 1, alignItems: 'center', marginBottom: 16 },
-  oddsTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
+  oddsMainCard: { backgroundColor: '#FFFFFF', padding: 20, borderRadius: 16, borderWidth: 1, alignItems: 'center', marginBottom: 16 },
+  oddsTitle: { color: '#1a1a2e', fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
   oddsValue: { fontSize: 28, fontWeight: 'bold', marginBottom: 8 },
-  oddsDesc: { color: '#999', fontSize: 13, textAlign: 'center' },
-  couponCalc: { backgroundColor: '#16213e', padding: 16, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: '#2a2a4a' },
-  couponCalcTitle: { color: '#fff', fontSize: 15, fontWeight: 'bold', marginBottom: 14 },
+  oddsDesc: { color: '#8E8E93', fontSize: 13, textAlign: 'center' },
+  couponCalc: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E5EA' },
+  couponCalcTitle: { color: '#1a1a2e', fontSize: 15, fontWeight: 'bold', marginBottom: 14 },
   couponInputRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   couponBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   couponBtnText: { fontSize: 22, fontWeight: 'bold' },
   couponInput: { flex: 1, height: 44, borderWidth: 1, borderRadius: 10, fontSize: 20, fontWeight: 'bold' },
   adjustedOdds: { padding: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
-  adjustedLabel: { color: '#999', fontSize: 13, marginBottom: 4 },
+  adjustedLabel: { color: '#8E8E93', fontSize: 13, marginBottom: 4 },
   adjustedValue: { fontSize: 22, fontWeight: 'bold' },
-  infoBox: { backgroundColor: '#0f0f23', padding: 14, borderRadius: 12, marginTop: 4, marginBottom: 20 },
-  infoText: { color: '#999', fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  infoBox: { backgroundColor: '#F5F5F7', padding: 14, borderRadius: 12, marginTop: 4, marginBottom: 20 },
+  infoText: { color: '#8E8E93', fontSize: 12, lineHeight: 18, textAlign: 'center' },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 },
   summaryItem: { alignItems: 'center' },
   summaryBigNum: { fontSize: 28, fontWeight: 'bold' },
-  summaryItemLabel: { color: '#999', fontSize: 12, marginTop: 4 },
-  distSubTitle: { color: '#ccc', fontSize: 13, marginBottom: 10 },
+  summaryItemLabel: { color: '#8E8E93', fontSize: 12, marginTop: 4 },
+  distSubTitle: { color: '#1a1a2e', fontSize: 13, marginBottom: 10 },
 });

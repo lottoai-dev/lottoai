@@ -179,7 +179,7 @@ export default function AIAssistantScreen() {
           {messages.map((msg, index) => (
             <View key={index}>
               <View style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : styles.aiBubble]}>
-                <Text style={styles.messageText}>{msg.content}</Text>
+                <Text style={[styles.messageText, msg.role === 'user' && { color: '#fff' }]}>{msg.content}</Text>
               </View>
               {msg.coupon && (() => {
                 const c = msg.coupon;
@@ -208,7 +208,7 @@ export default function AIAssistantScreen() {
           {loading && (
             <View style={styles.loadingBubble}>
               <ActivityIndicator size="small" color="#6C63FF" />
-              <Text style={{ color: '#999', marginLeft: 8 }}>Düşünüyor...</Text>
+              <Text style={{ color: '#8E8E93', marginLeft: 8 }}>Düşünüyor...</Text>
             </View>
           )}
         </ScrollView>
@@ -219,7 +219,7 @@ export default function AIAssistantScreen() {
             value={input}
             onChangeText={setInput}
             placeholder="Bir şey yaz..."
-            placeholderTextColor="#666"
+            placeholderTextColor="#A0A0A5"
             multiline
             editable={!loading}
           />
@@ -233,28 +233,28 @@ export default function AIAssistantScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
-  header: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#2a2a4a' },
-  title: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  subtitle: { color: '#999', fontSize: 13, marginTop: 4 },
+  container: { flex: 1, backgroundColor: '#F5F5F7' },
+  header: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#E5E5EA' },
+  title: { color: '#1a1a2e', fontSize: 22, fontWeight: 'bold' },
+  subtitle: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
   messages: { flex: 1, padding: 16 },
-  guideCard: { backgroundColor: '#16213e', padding: 16, borderRadius: 12, marginBottom: 12 },
-  guideText: { color: '#999', fontSize: 13, lineHeight: 20 },
+  guideCard: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#E5E5EA' },
+  guideText: { color: '#8E8E93', fontSize: 13, lineHeight: 20 },
   messageBubble: { padding: 12, borderRadius: 16, marginBottom: 10, maxWidth: '85%' },
   userBubble: { alignSelf: 'flex-end', backgroundColor: '#6C63FF' },
-  aiBubble: { alignSelf: 'flex-start', backgroundColor: '#16213e', borderWidth: 1, borderColor: '#2a2a4a' },
-  messageText: { color: '#fff', fontSize: 14 },
-  loadingBubble: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 16, backgroundColor: '#16213e', borderWidth: 1, borderColor: '#2a2a4a', alignSelf: 'flex-start', marginBottom: 10 },
-  couponCard: { backgroundColor: '#16213e', borderWidth: 1.5, borderRadius: 16, padding: 16, marginBottom: 10, marginLeft: 8 },
+  aiBubble: { alignSelf: 'flex-start', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5EA' },
+  messageText: { color: '#1a1a2e', fontSize: 14 },
+  loadingBubble: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5EA', alignSelf: 'flex-start', marginBottom: 10 },
+  couponCard: { backgroundColor: '#FFFFFF', borderWidth: 1.5, borderRadius: 16, padding: 16, marginBottom: 10, marginLeft: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   couponCardTitle: { fontSize: 15, fontWeight: 'bold', marginBottom: 12 },
   couponNumbers: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   couponBall: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   couponBallText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  couponExplanation: { color: '#999', fontSize: 12, lineHeight: 18, marginBottom: 12 },
+  couponExplanation: { color: '#8E8E93', fontSize: 12, lineHeight: 18, marginBottom: 12 },
   saveCouponBtn: { backgroundColor: '#FFD70022', borderWidth: 1, borderColor: '#FFD700', borderRadius: 10, padding: 12, alignItems: 'center' },
-  saveCouponBtnText: { color: '#FFD700', fontSize: 14, fontWeight: 'bold' },
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', padding: 12, borderTopWidth: 1, borderTopColor: '#2a2a4a', gap: 8 },
-  input: { flex: 1, backgroundColor: '#16213e', color: '#fff', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 100 },
+  saveCouponBtnText: { color: '#1a1a2e', fontSize: 14, fontWeight: 'bold' },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', padding: 12, borderTopWidth: 1, borderTopColor: '#E5E5EA', gap: 8 },
+  input: { flex: 1, backgroundColor: '#FFFFFF', color: '#1a1a2e', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 100, borderWidth: 1, borderColor: '#E5E5EA' },
   sendBtn: { backgroundColor: '#6C63FF', borderRadius: 12, paddingHorizontal: 18, paddingVertical: 12 },
   sendBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
 });

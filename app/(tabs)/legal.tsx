@@ -170,7 +170,6 @@ export default function LegalScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
 
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backText}>‹ Geri</Text>
@@ -179,7 +178,6 @@ export default function LegalScreen() {
         <View style={{ width: 60 }} />
       </View>
 
-      {/* Sekmeler */}
       <View style={styles.tabs}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'privacy' && styles.tabActive]}
@@ -204,7 +202,6 @@ export default function LegalScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* İçerik */}
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -242,23 +239,23 @@ export default function LegalScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#F5F5F7' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16 },
   backBtn: { width: 60 },
   backText: { color: '#6C63FF', fontSize: 16 },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  tabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#16213e', borderRadius: 12, padding: 4, marginBottom: 16 },
+  headerTitle: { color: '#1a1a2e', fontSize: 18, fontWeight: 'bold' },
+  tabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 4, marginBottom: 16, borderWidth: 1, borderColor: '#E5E5EA' },
   tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
   tabActive: { backgroundColor: '#6C63FF' },
-  tabText: { color: '#999', fontSize: 12, fontWeight: '600' },
+  tabText: { color: '#8E8E93', fontSize: 12, fontWeight: '600' },
   tabTextActive: { color: '#fff' },
   content: { flex: 1, paddingHorizontal: 20 },
-  contentText: { color: '#ccc', fontSize: 14, lineHeight: 24 },
+  contentText: { color: '#1a1a2e', fontSize: 14, lineHeight: 24 },
   faqContainer: { gap: 8 },
-  faqTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
-  faqItem: { backgroundColor: '#16213e', borderRadius: 12, padding: 16 },
+  faqTitle: { color: '#1a1a2e', fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
+  faqItem: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#E5E5EA' },
   faqHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  faqQuestion: { color: '#fff', fontSize: 14, fontWeight: 'bold', flex: 1, marginRight: 8 },
-  faqArrow: { color: '#999', fontSize: 12 },
-  faqAnswer: { color: '#999', fontSize: 13, lineHeight: 22, marginTop: 12 },
+  faqQuestion: { color: '#1a1a2e', fontSize: 14, fontWeight: 'bold', flex: 1, marginRight: 8 },
+  faqArrow: { color: '#8E8E93', fontSize: 12 },
+  faqAnswer: { color: '#8E8E93', fontSize: 13, lineHeight: 22, marginTop: 12 },
 });

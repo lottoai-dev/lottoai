@@ -61,9 +61,9 @@ function parseNumbers(str: string): number[] {
   return str.split(' - ').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
 }
 
-// Renkler
-const PENDING_COLOR = '#3a3a5c';
-const MISS_COLOR = '#3a3a5c';
+// Renkler — aydınlık tema
+const PENDING_COLOR = '#E5E5EA';
+const MISS_COLOR = '#E5E5EA';
 
 export default function SavedScreen() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -281,16 +281,15 @@ export default function SavedScreen() {
   };
 
   const getScoreLabel = (score: number, game: string) => {
-    if (score === 0) return { label: 'Hiç tutmadı 😢', color: '#666' };
+    if (score === 0) return { label: 'Hiç tutmadı 😢', color: '#8E8E93' };
     const gc = GAME_COLORS[game as keyof typeof GAME_COLORS];
     const color = gc?.main || '#6C63FF';
     if (score >= 6) return { label: 'BÜYÜK İKRAMİYE! 🏆', color: '#FFD700' };
     if (score >= 4) return { label: `${score} Bildin! 🎉`, color };
     if (score >= 2) return { label: `${score} Bildin 👍`, color };
-    return { label: `${score} Tutturdu`, color: '#999' };
+    return { label: `${score} Tutturdu`, color: '#8E8E93' };
   };
 
-  // İkramiye formatlayıcı (para birimi desteği ile)
   const formatPrize = (amount: number, currency: string = 'TRY') => {
     if (currency === 'USD') {
       if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1)}B`;
@@ -298,7 +297,6 @@ export default function SavedScreen() {
       if (amount >= 1_000) return `$${(amount / 1_000).toFixed(1)}K`;
       return `$${amount}`;
     }
-    // TRY (varsayılan)
     if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)} Milyon TL`;
     if (amount >= 1_000) return `${(amount / 1_000).toFixed(1)} Bin TL`;
     return `${amount} TL`;
@@ -395,7 +393,7 @@ export default function SavedScreen() {
                     style={[
                       styles.gameChip,
                       filterGame === chip.game && {
-                        backgroundColor: chip.color + '22',
+                        backgroundColor: chip.color + '12',
                         borderColor: chip.color,
                       },
                     ]}
@@ -464,7 +462,7 @@ export default function SavedScreen() {
                 <View key={coupon.id}>
                   <View style={[styles.couponCard, { borderLeftColor: mainColor }]}>
                     <View style={styles.couponHeaderRow}>
-                      <View style={[styles.couponNumberBadge, { backgroundColor: mainColor + '22', borderColor: mainColor + '44' }]}>
+                      <View style={[styles.couponNumberBadge, { backgroundColor: mainColor + '15', borderColor: mainColor + '33' }]}>
                         <Text style={[styles.couponNumberText, { color: mainColor }]}>#{couponNumber}</Text>
                       </View>
                       <Text style={styles.couponEmoji}>{coupon.icon}</Text>
@@ -484,7 +482,7 @@ export default function SavedScreen() {
                         }
                         return (
                           <View key={i} style={[styles.ball, { backgroundColor: bgColor }]}>
-                            <Text style={styles.ballText}>{num}</Text>
+                            <Text style={[styles.ballText, !isChecked && { color: '#8E8E93' }]}>{num}</Text>
                           </View>
                         );
                       })}
@@ -503,7 +501,7 @@ export default function SavedScreen() {
                             }
                             return (
                               <View key={i} style={[styles.ball, { backgroundColor: bgColor }]}>
-                                <Text style={styles.ballText}>{num}</Text>
+                                <Text style={[styles.ballText, !isChecked && { color: '#8E8E93' }]}>{num}</Text>
                               </View>
                             );
                           })}
@@ -521,7 +519,7 @@ export default function SavedScreen() {
                               ? (coupon.matchedSuperStar ? '#FFD700' : MISS_COLOR)
                               : PENDING_COLOR
                           }]}>
-                            <Text style={[styles.ballText, (!isChecked || coupon.matchedSuperStar) && { color: '#000' }]}>
+                            <Text style={[styles.ballText, { color: (!isChecked || coupon.matchedSuperStar) ? '#000' : '#8E8E93' }]}>
                               {coupon.superStar}
                             </Text>
                           </View>
@@ -534,14 +532,14 @@ export default function SavedScreen() {
                         <Ionicons name="share-outline" size={18} color={mainColor} />
                         <Text style={[styles.actionBtnText, { color: mainColor }]}>Paylaş</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(coupon.id)}>
+                      <TouchableOpacity style={[styles.actionBtn, { borderColor: '#FF6B6B33' }]} onPress={() => handleDelete(coupon.id)}>
                         <Ionicons name="trash-outline" size={18} color="#FF6B6B" />
                         <Text style={[styles.actionBtnText, { color: '#FF6B6B' }]}>Sil</Text>
                       </TouchableOpacity>
                     </View>
 
                     <TouchableOpacity
-                      style={[styles.historyToggle, { borderColor: mainColor + '33' }]}
+                      style={[styles.historyToggle, { borderColor: mainColor + '22' }]}
                       onPress={() => setExpandedCoupon(isExpanded ? null : coupon.id)}>
                       <Text style={[styles.historyToggleText, { color: mainColor }]}>
                         📊 Geçmiş Performans {isExpanded ? '▲' : '▼'}
@@ -590,7 +588,7 @@ export default function SavedScreen() {
                     <Text style={styles.modalSubtitle}>{checkingCoupon.game} · {checkResult.draw.draw_date}</Text>
                   </View>
 
-                  <View style={[styles.scoreBox, { backgroundColor: scoreLabel.color + '33', borderColor: scoreLabel.color }]}>
+                  <View style={[styles.scoreBox, { backgroundColor: scoreLabel.color + '15', borderColor: scoreLabel.color + '33' }]}>
                     <Text style={[styles.scoreLabel, { color: scoreLabel.color }]}>{scoreLabel.label}</Text>
                   </View>
 
@@ -625,8 +623,8 @@ export default function SavedScreen() {
                   <Text style={styles.modalLabel}>Senin Sayıların</Text>
                   <View style={styles.modalBalls}>
                     {checkingCoupon.numbers.map((num, i) => (
-                      <View key={i} style={[styles.modalBall, { backgroundColor: checkResult.matchedNumbers.includes(num) ? mainColor : '#2a2a4a' }]}>
-                        <Text style={styles.modalBallText}>{num}</Text>
+                      <View key={i} style={[styles.modalBall, { backgroundColor: checkResult.matchedNumbers.includes(num) ? mainColor : '#E5E5EA' }]}>
+                        <Text style={[styles.modalBallText, { color: checkResult.matchedNumbers.includes(num) ? '#fff' : '#8E8E93' }]}>{num}</Text>
                       </View>
                     ))}
                   </View>
@@ -636,9 +634,9 @@ export default function SavedScreen() {
                       <Text style={styles.modalLabel}>⭐ SüperStar</Text>
                       <View style={styles.modalBalls}>
                         <View style={[styles.modalBall, {
-                          backgroundColor: checkResult.matchedSuperStar ? '#FFD700' : '#2a2a4a',
+                          backgroundColor: checkResult.matchedSuperStar ? '#FFD700' : '#E5E5EA',
                         }]}>
-                          <Text style={[styles.modalBallText, { color: checkResult.matchedSuperStar ? '#000' : '#fff' }]}>
+                          <Text style={[styles.modalBallText, { color: checkResult.matchedSuperStar ? '#000' : '#8E8E93' }]}>
                             {checkingCoupon.superStar}
                           </Text>
                         </View>
@@ -651,10 +649,10 @@ export default function SavedScreen() {
                     <View style={styles.modalBalls}>
                       {parseNumbers(checkResult.draw.numbers).map((num, i) => (
                         <View key={i} style={[styles.modalBall, {
-                          backgroundColor: checkResult.matchedNumbers.includes(num) ? mainColor : '#16213e',
+                          backgroundColor: checkResult.matchedNumbers.includes(num) ? mainColor : '#FFFFFF',
                           borderWidth: 1, borderColor: mainColor,
                         }]}>
-                          <Text style={styles.modalBallText}>{num}</Text>
+                          <Text style={[styles.modalBallText, { color: checkResult.matchedNumbers.includes(num) ? '#fff' : mainColor }]}>{num}</Text>
                         </View>
                       ))}
                     </View>
@@ -662,10 +660,10 @@ export default function SavedScreen() {
                       <View style={[styles.modalBalls, { marginTop: 8 }]}>
                         {checkResult.draw.bonus.split(',').map((n, i) => (
                           <View key={i} style={[styles.modalBall, {
-                            backgroundColor: checkResult.matchedBonus.includes(parseInt(n.trim())) ? bonusColor : '#16213e',
+                            backgroundColor: checkResult.matchedBonus.includes(parseInt(n.trim())) ? bonusColor : '#FFFFFF',
                             borderWidth: 1, borderColor: bonusColor,
                           }]}>
-                            <Text style={styles.modalBallText}>{n.trim()}</Text>
+                            <Text style={[styles.modalBallText, { color: checkResult.matchedBonus.includes(parseInt(n.trim())) ? '#fff' : bonusColor }]}>{n.trim()}</Text>
                           </View>
                         ))}
                       </View>
@@ -673,10 +671,10 @@ export default function SavedScreen() {
                     {checkResult.draw.superstar != null && (
                       <View style={[styles.modalBalls, { marginTop: 8 }]}>
                         <View style={[styles.modalBall, {
-                          backgroundColor: checkResult.matchedSuperStar ? '#FFD700' : '#16213e',
+                          backgroundColor: checkResult.matchedSuperStar ? '#FFD700' : '#FFFFFF',
                           borderWidth: 1, borderColor: '#FFD700',
                         }]}>
-                          <Text style={[styles.modalBallText, { color: checkResult.matchedSuperStar ? '#000' : '#fff' }]}>
+                          <Text style={[styles.modalBallText, { color: checkResult.matchedSuperStar ? '#000' : '#8E8E93' }]}>
                             {checkResult.draw.superstar}
                           </Text>
                         </View>
@@ -713,92 +711,92 @@ export default function SavedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#F5F5F7' },
   header: { padding: 20, paddingTop: 20 },
-  headerTitle: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
-  headerSub: { color: '#999', fontSize: 14, marginTop: 4 },
+  headerTitle: { color: '#1a1a2e', fontSize: 26, fontWeight: 'bold' },
+  headerSub: { color: '#8E8E93', fontSize: 14, marginTop: 4 },
   loadingContainer: { alignItems: 'center', padding: 80, gap: 12 },
-  loadingText: { color: '#999', fontSize: 14, marginTop: 8 },
-  statsCard: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: '#2a2a4a' },
-  statsTitle: { color: '#fff', fontSize: 15, fontWeight: 'bold', marginBottom: 14 },
+  loadingText: { color: '#8E8E93', fontSize: 14, marginTop: 8 },
+  statsCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E5EA', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  statsTitle: { color: '#1a1a2e', fontSize: 15, fontWeight: 'bold', marginBottom: 14 },
   statsGrid: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   statItem: { flex: 1, alignItems: 'center' },
   statValue: { color: '#6C63FF', fontSize: 24, fontWeight: 'bold' },
-  statLabel: { color: '#999', fontSize: 11, marginTop: 2 },
-  statDivider: { width: 1, height: 40, backgroundColor: '#2a2a4a' },
-  mostPlayed: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0f0f23', padding: 10, borderRadius: 10 },
-  mostPlayedLabel: { color: '#999', fontSize: 12 },
-  mostPlayedValue: { color: '#fff', fontSize: 12, fontWeight: 'bold', flex: 1 },
+  statLabel: { color: '#8E8E93', fontSize: 11, marginTop: 2 },
+  statDivider: { width: 1, height: 40, backgroundColor: '#E5E5EA' },
+  mostPlayed: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F5F5F7', padding: 10, borderRadius: 10 },
+  mostPlayedLabel: { color: '#8E8E93', fontSize: 12 },
+  mostPlayedValue: { color: '#1a1a2e', fontSize: 12, fontWeight: 'bold', flex: 1 },
   filterRow: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 12, gap: 8 },
-  filterBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: '#16213e', borderWidth: 1, borderColor: '#2a2a4a', alignItems: 'center' },
+  filterBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5EA', alignItems: 'center' },
   filterBtnActive: { backgroundColor: '#6C63FF', borderColor: '#6C63FF' },
-  filterBtnText: { color: '#999', fontSize: 11, fontWeight: '600' },
+  filterBtnText: { color: '#8E8E93', fontSize: 11, fontWeight: '600' },
   filterBtnTextActive: { color: '#fff' },
   gameChipRow: { marginBottom: 14 },
-  gameChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: '#2a2a4a', backgroundColor: '#16213e', gap: 4 },
+  gameChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: '#E5E5EA', backgroundColor: '#FFFFFF', gap: 4 },
   gameChipActive: { backgroundColor: '#6C63FF', borderColor: '#6C63FF' },
   gameChipEmoji: { fontSize: 13 },
-  gameChipText: { color: '#999', fontSize: 11, fontWeight: '600' },
+  gameChipText: { color: '#8E8E93', fontSize: 11, fontWeight: '600' },
   gameChipTextActive: { color: '#fff' },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 },
-  sectionTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  sectionTitle: { color: '#1a1a2e', fontSize: 16, fontWeight: 'bold' },
   deleteAllText: { color: '#FF6B6B', fontSize: 14 },
   emptyContainer: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40 },
   emptyEmoji: { fontSize: 60, marginBottom: 16 },
-  emptyTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', marginBottom: 8 },
-  emptyDesc: { color: '#999', fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  guideCard: { marginHorizontal: 20, backgroundColor: '#16213e', borderRadius: 20, borderWidth: 1, borderColor: '#2a2a4a', padding: 28, alignItems: 'center', gap: 14, marginTop: 40 },
+  emptyTitle: { color: '#1a1a2e', fontSize: 20, fontWeight: 'bold', marginBottom: 8 },
+  emptyDesc: { color: '#8E8E93', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  guideCard: { marginHorizontal: 20, backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: '#E5E5EA', padding: 28, alignItems: 'center', gap: 14, marginTop: 40 },
   guideEmoji: { fontSize: 48 },
-  guideTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  guideDesc: { color: '#999', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  guideTitle: { color: '#1a1a2e', fontSize: 20, fontWeight: 'bold' },
+  guideDesc: { color: '#8E8E93', fontSize: 14, textAlign: 'center', lineHeight: 22 },
   guideBtn: { backgroundColor: '#6C63FF', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12 },
   guideBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
-  couponCard: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 8, borderLeftWidth: 4 },
+  couponCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 8, borderLeftWidth: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   couponHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 10 },
   couponNumberBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
   couponNumberText: { fontSize: 12, fontWeight: 'bold' },
   couponEmoji: { fontSize: 24 },
   couponInfo: { flex: 1 },
-  couponGame: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  couponDate: { color: '#999', fontSize: 12, marginTop: 2 },
+  couponGame: { color: '#1a1a2e', fontSize: 14, fontWeight: 'bold' },
+  couponDate: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
   numberBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  ball: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2 },
+  ball: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
   ballText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  bonusBall: { elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2 },
-  bonusLabel: { color: '#999', fontSize: 12, marginBottom: 6 },
+  bonusBall: { elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
+  bonusLabel: { color: '#8E8E93', fontSize: 12, marginBottom: 6 },
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 12, justifyContent: 'center' },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#2a2a4a', backgroundColor: '#0f0f23' },
+  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#E5E5EA', backgroundColor: '#F5F5F7' },
   actionBtnText: { fontSize: 12, fontWeight: '600' },
   historyToggle: { marginTop: 12, padding: 10, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
   historyToggleText: { fontSize: 13, fontWeight: 'bold' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#1a1a2e', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '80%' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '80%' },
   modalLoading: { alignItems: 'center', padding: 40 },
-  modalLoadingText: { color: '#999', fontSize: 16 },
+  modalLoadingText: { color: '#8E8E93', fontSize: 16 },
   modalHeader: { marginBottom: 16 },
-  modalTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  modalSubtitle: { color: '#999', fontSize: 13, marginTop: 4 },
+  modalTitle: { color: '#1a1a2e', fontSize: 20, fontWeight: 'bold' },
+  modalSubtitle: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
   scoreBox: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 16, alignItems: 'center' },
   scoreLabel: { fontSize: 18, fontWeight: 'bold' },
   prizeCard: { backgroundColor: '#FFD70015', borderWidth: 1.5, borderRadius: 14, padding: 14, marginBottom: 14, gap: 10 },
   prizeCardInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   prizeEmoji: { fontSize: 32 },
-  prizeTitle: { color: '#FFD700', fontSize: 13, fontWeight: 'bold' },
-  prizeAmount: { color: '#FFD700', fontSize: 26, fontWeight: 'bold', marginTop: 2 },
-  prizeNote: { color: '#FFD70099', fontSize: 12, marginTop: 2 },
-  prizeWarning: { color: '#FFD70088', fontSize: 10, lineHeight: 15, textAlign: 'center' },
-  noPrizeBox: { backgroundColor: '#16213e', borderWidth: 1, borderColor: '#2a2a4a', borderRadius: 10, padding: 12, marginBottom: 14 },
-  noPrizeText: { color: '#999', fontSize: 12, textAlign: 'center' },
-  modalLabel: { color: '#999', fontSize: 12, marginBottom: 8 },
+  prizeTitle: { color: '#1a1a2e', fontSize: 13, fontWeight: 'bold' },
+  prizeAmount: { color: '#1a1a2e', fontSize: 26, fontWeight: 'bold', marginTop: 2 },
+  prizeNote: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
+  prizeWarning: { color: '#8E8E93', fontSize: 10, lineHeight: 15, textAlign: 'center' },
+  noPrizeBox: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5EA', borderRadius: 10, padding: 12, marginBottom: 14 },
+  noPrizeText: { color: '#8E8E93', fontSize: 12, textAlign: 'center' },
+  modalLabel: { color: '#8E8E93', fontSize: 12, marginBottom: 8 },
   modalBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
   modalBall: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   modalBallText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  modalClose: { backgroundColor: '#2a2a4a', padding: 14, borderRadius: 10, alignItems: 'center', marginTop: 8 },
-  modalCloseText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  modalClose: { backgroundColor: '#F5F5F7', padding: 14, borderRadius: 10, alignItems: 'center', marginTop: 8 },
+  modalCloseText: { color: '#1a1a2e', fontSize: 14, fontWeight: 'bold' },
   historyLink: {
-    backgroundColor: '#6C63FF15',
+    backgroundColor: '#6C63FF12',
     borderWidth: 1,
-    borderColor: '#6C63FF44',
+    borderColor: '#6C63FF33',
     borderRadius: 10,
     padding: 12,
     alignItems: 'center',

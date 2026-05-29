@@ -25,7 +25,6 @@ function parseNumbers(str: string): number[] {
 export default function AnalyzeScreen() {
   const insets = useSafeAreaInsets();
 
-  // Kullanıcının ülkesine ait oyunlar
   const userCountry = getDefaultCountry();
   const countryGames = getGamesByCountry(userCountry);
 
@@ -129,7 +128,6 @@ export default function AnalyzeScreen() {
         <Text style={styles.sectionTitle}>{t('selectGame')}</Text>
         <GameSelector selectedGame={selectedGame} onSelect={setSelectedGame} />
 
-        {/* Hata Durumu */}
         {error && (
           <View style={styles.errorCard}>
             <Text style={styles.errorEmoji}>⚠️</Text>
@@ -140,7 +138,6 @@ export default function AnalyzeScreen() {
           </View>
         )}
 
-        {/* Yükleniyor */}
         {!error && loading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={mainColor} />
@@ -148,16 +145,15 @@ export default function AnalyzeScreen() {
           </View>
         )}
 
-        {/* Sayı Girişi ve Analiz Butonu */}
         {!error && !loading && (
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>
               Analiz etmek istediğin sayıları gir (1-{selectedGame.max} arası, virgülle ayır):
             </Text>
             <TextInput
-              style={[styles.input, { borderColor: mainColor }]}
+              style={[styles.input, { borderColor: mainColor + '33' }]}
               placeholder={`Örnek: 3, 15, 27, 42`}
-              placeholderTextColor="#555"
+              placeholderTextColor="#A0A0A5"
               value={inputNumbers}
               onChangeText={setInputNumbers}
               keyboardType="numeric"
@@ -170,7 +166,6 @@ export default function AnalyzeScreen() {
           </View>
         )}
 
-        {/* Analiz Sonuçları */}
         {!error && !loading && analysisResult && (
           <>
             <Text style={styles.sectionTitle}>Analiz Sonuçları</Text>
@@ -181,9 +176,9 @@ export default function AnalyzeScreen() {
             </View>
 
             {analysisResult.stats.map((stat) => (
-              <View key={stat.number} style={[styles.statCard, { borderLeftColor: stat.hot ? mainColor : '#666' }]}>
-                <View style={[styles.numberBall, { backgroundColor: stat.hot ? mainColor : '#2a2a4a' }]}>
-                  <Text style={styles.numberText}>{stat.number}</Text>
+              <View key={stat.number} style={[styles.statCard, { borderLeftColor: stat.hot ? mainColor : '#C7C7CC' }]}>
+                <View style={[styles.numberBall, { backgroundColor: stat.hot ? mainColor : '#E5E5EA' }]}>
+                  <Text style={[styles.numberText, { color: stat.hot ? '#fff' : '#8E8E93' }]}>{stat.number}</Text>
                 </View>
                 <View style={styles.statInfo}>
                   <View style={styles.statRow}>
@@ -196,7 +191,7 @@ export default function AnalyzeScreen() {
                   </View>
                   <View style={styles.statRow}>
                     <Text style={styles.statLabel}>Durum:</Text>
-                    <Text style={[styles.statValue, { color: stat.hot ? '#FFD700' : '#999' }]}>
+                    <Text style={[styles.statValue, { color: stat.hot ? '#FFD700' : '#8E8E93' }]}>
                       {stat.hot ? '🔥 Sıcak Sayı' : '❄️ Soğuk Sayı'}
                     </Text>
                   </View>
@@ -213,7 +208,7 @@ export default function AnalyzeScreen() {
                       <Text style={styles.statLabel}>En çok birlikte çıktığı:</Text>
                       <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
                         {stat.topPairs.map((pair, pi) => (
-                          <View key={pi} style={[styles.pairBall, { backgroundColor: mainColor + '33', borderColor: mainColor }]}>
+                          <View key={pi} style={[styles.pairBall, { backgroundColor: mainColor + '15', borderColor: mainColor + '33' }]}>
                             <Text style={[styles.pairBallText, { color: mainColor }]}>{pair}</Text>
                           </View>
                         ))}
@@ -226,13 +221,12 @@ export default function AnalyzeScreen() {
 
             <View style={styles.legendBox}>
               <Text style={[styles.legendItem, { color: '#FFD700' }]}>🔥 Sıcak: Ortalamadan fazla çıkan sayı</Text>
-              <Text style={[styles.legendItem, { color: '#999' }]}>❄️ Soğuk: Ortalamadan az çıkan sayı</Text>
+              <Text style={[styles.legendItem, { color: '#8E8E93' }]}>❄️ Soğuk: Ortalamadan az çıkan sayı</Text>
               <Text style={[styles.legendItem, { color: '#FF9F43' }]}>⏳ Gecikme: Son çıkıştan bu yana geçen çekiliş sayısı</Text>
             </View>
           </>
         )}
 
-        {/* Boş Durum */}
         {!error && !loading && !analysisResult && (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyEmoji}>🔢</Text>
@@ -247,38 +241,38 @@ export default function AnalyzeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#F5F5F7' },
   header: { padding: 20, paddingTop: 20 },
-  headerTitle: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
-  headerSub: { color: '#999', fontSize: 14, marginTop: 4 },
-  sectionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', paddingHorizontal: 20, marginBottom: 12, marginTop: 8 },
-  errorCard: { marginHorizontal: 20, marginBottom: 16, backgroundColor: '#FF6B6B11', borderWidth: 1, borderColor: '#FF6B6B44', borderRadius: 16, padding: 20, alignItems: 'center', gap: 12 },
+  headerTitle: { color: '#1a1a2e', fontSize: 26, fontWeight: 'bold' },
+  headerSub: { color: '#8E8E93', fontSize: 14, marginTop: 4 },
+  sectionTitle: { color: '#1a1a2e', fontSize: 18, fontWeight: 'bold', paddingHorizontal: 20, marginBottom: 12, marginTop: 8 },
+  errorCard: { marginHorizontal: 20, marginBottom: 16, backgroundColor: '#FF6B6B11', borderWidth: 1, borderColor: '#FF6B6B33', borderRadius: 16, padding: 20, alignItems: 'center', gap: 12 },
   errorEmoji: { fontSize: 36 },
   errorText: { color: '#FF6B6B', fontSize: 14, textAlign: 'center' },
   retryBtn: { backgroundColor: '#FF6B6B22', borderWidth: 1, borderColor: '#FF6B6B', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
   retryBtnText: { color: '#FF6B6B', fontSize: 14, fontWeight: 'bold' },
   loadingContainer: { alignItems: 'center', padding: 40, gap: 12 },
-  loadingText: { color: '#999', fontSize: 14 },
-  inputContainer: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: '#2a2a4a' },
-  inputLabel: { color: '#999', fontSize: 13, marginBottom: 10 },
-  input: { backgroundColor: '#0f0f23', color: '#fff', fontSize: 16, padding: 12, borderRadius: 10, borderWidth: 1, marginBottom: 12 },
+  loadingText: { color: '#8E8E93', fontSize: 14 },
+  inputContainer: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E5EA', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  inputLabel: { color: '#8E8E93', fontSize: 13, marginBottom: 10 },
+  input: { backgroundColor: '#F5F5F7', color: '#1a1a2e', fontSize: 16, padding: 12, borderRadius: 10, borderWidth: 1, marginBottom: 12 },
   analyzeBtn: { padding: 14, borderRadius: 12, alignItems: 'center' },
   analyzeBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  infoBox: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 12, borderRadius: 10, marginBottom: 12 },
-  infoText: { color: '#999', fontSize: 13 },
-  statCard: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 16, borderRadius: 12, marginBottom: 10, borderLeftWidth: 4, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  infoBox: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 12, borderRadius: 10, marginBottom: 12 },
+  infoText: { color: '#8E8E93', fontSize: 13 },
+  statCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 12, marginBottom: 10, borderLeftWidth: 4, flexDirection: 'row', alignItems: 'center', gap: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
   numberBall: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
-  numberText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  numberText: { fontSize: 16, fontWeight: 'bold' },
   statInfo: { flex: 1, gap: 4 },
   statRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  statLabel: { color: '#999', fontSize: 13 },
-  statValue: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
-  legendBox: { backgroundColor: '#16213e', marginHorizontal: 20, padding: 14, borderRadius: 12, marginTop: 8, marginBottom: 20, gap: 6 },
+  statLabel: { color: '#8E8E93', fontSize: 13 },
+  statValue: { color: '#1a1a2e', fontSize: 13, fontWeight: 'bold' },
+  legendBox: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 14, borderRadius: 12, marginTop: 8, marginBottom: 20, gap: 6, borderWidth: 1, borderColor: '#E5E5EA' },
   legendItem: { fontSize: 12 },
   emptyContainer: { alignItems: 'center', padding: 40, gap: 8 },
   emptyEmoji: { fontSize: 50 },
-  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  emptyDesc: { color: '#999', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  emptyTitle: { color: '#1a1a2e', fontSize: 18, fontWeight: 'bold' },
+  emptyDesc: { color: '#8E8E93', fontSize: 14, textAlign: 'center', lineHeight: 22 },
   pairBall: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
   pairBallText: { fontSize: 11, fontWeight: 'bold' },
 });
