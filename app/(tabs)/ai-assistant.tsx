@@ -1,38 +1,51 @@
 // app/(tabs)/ai-assistant.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import React, { useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { AppButton } from '../../components/ui/app-button';
+import { NumberBall } from '../../components/ui/number-ball';
+import { PressableScale } from '../../components/ui/surface';
+import { AppTheme, GameAccent } from '../../constants/theme';
 import { chatWithAI } from '../../lib/deepseek';
-import { GAMES, GAME_COLORS } from '../../lib/games';
+import { GameEmblem } from '../../lib/emblems';
+import { GAMES, getGameByName } from '../../lib/games';
+import { AIAssistantIcon, BackIcon, BookmarkIcon, SendIcon } from '../../lib/icons';
+import { useTheme } from '../../lib/theme';
 
 type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
-  coupon?: {
-    game: string;
-    numbers: number[];
-    explanation: string;
-  };
+  coupon?: { game: string; numbers: number[]; explanation: string };
 };
+
+const SUGGESTIONS = [
+  'Şanslı bir Çılgın Sayısal kuponu üret',
+  'Süper Loto nasıl oynanır?',
+  'Bu hafta hangi çekilişler var?',
+  'Sıcak sayılar ne demek?',
+];
 
 const getBasePrompt = (): string => {
   const today = new Date();
   const gunAdi = today.toLocaleDateString('tr-TR', { weekday: 'long' });
   const tarih = today.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-
   return `Sen, Türkiye'deki şans oyunları konusunda uzman bir loto asistanısın. Kullanıcılara güncel oyun kuralları hakkında bilgi verir, istatistiksel yorumlar yapar ve isterlerse rastgele kupon üretirsin.
 Kesinlikle kazanma garantisi vermezsin. Yanıtlarında sohbet havasında, sade bir dil kullan ve gereksiz yere markdown formatı (yıldız, tire gibi) kullanma.
 
@@ -57,56 +70,81 @@ JSON'daki "numbers" dizisi:
 Sayılar, oyunun kendi numara aralığında olmalıdır.`;
 };
 
+/* typing dots */
+function TypingDots({ color }: { color: string }) {
+  const dots = [useRef(new Animated.Value(0.4)).current, useRef(new Animated.Value(0.4)).current, useRef(new Animated.Value(0.4)).current];
+  React.useEffect(() => {
+    const anims = dots.map((d, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 160),
+          Animated.timing(d, { toValue: 1, duration: 320, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(d, { toValue: 0.4, duration: 320, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ])
+      )
+    );
+    anims.forEach((a) => a.start());
+    return () => anims.forEach((a) => a.stop());
+  }, [dots]);
+  return (
+    <View style={{ flexDirection: 'row', gap: 5 }}>
+      {dots.map((d, i) => (
+        <Animated.View key={i} style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color, opacity: d }} />
+      ))}
+    </View>
+  );
+}
+
 export default function AIAssistantScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const theme = useTheme();
+  const c = theme.colors;
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const scrollRef = useRef<ScrollView>(null);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
 
-  // JSON'u hem code block içinde hem de düz metin olarak ara
   const extractJSON = (text: string): any | null => {
     const codeBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
     if (codeBlockMatch) {
-      try { return JSON.parse(codeBlockMatch[1]); } catch (e) {}
+      try { return JSON.parse(codeBlockMatch[1]); } catch {}
     }
     const plainMatch = text.match(/\{[\s\S]*"game"[\s\S]*"numbers"[\s\S]*"explanation"[\s\S]*\}/);
     if (plainMatch) {
-      try { return JSON.parse(plainMatch[0]); } catch (e) {}
+      try { return JSON.parse(plainMatch[0]); } catch {}
     }
     return null;
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || loading) return;
+  const send = async (text?: string) => {
+    const content = (text ?? input).trim();
+    if (!content || loading) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    const userMsg: ChatMessage = { role: 'user', content: input.trim() };
-    setMessages(prev => [...prev, userMsg]);
+    const userMsg: ChatMessage = { role: 'user', content };
+    setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setLoading(true);
 
     const apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
       { role: 'system', content: getBasePrompt() },
-      ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-      { role: 'user', content: input.trim() },
+      ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      { role: 'user', content },
     ];
 
     const reply = await chatWithAI(apiMessages);
 
     if (reply) {
       const parsed = extractJSON(reply);
-
       let cleanReply = reply;
       const codeBlockMatch = reply.match(/```json[\s\S]*?```/);
-      if (codeBlockMatch) {
-        cleanReply = reply.replace(/```json[\s\S]*?```/, '').trim();
-      } else if (parsed) {
-        cleanReply = reply.replace(/\{[\s\S]*"game"[\s\S]*"numbers"[\s\S]*"explanation"[\s\S]*\}/, '').trim();
-      }
+      if (codeBlockMatch) cleanReply = reply.replace(/```json[\s\S]*?```/, '').trim();
+      else if (parsed) cleanReply = reply.replace(/\{[\s\S]*"game"[\s\S]*"numbers"[\s\S]*"explanation"[\s\S]*\}/, '').trim();
 
       const assistantMsg: ChatMessage = { role: 'assistant', content: cleanReply };
-
       if (parsed && parsed.numbers && Array.isArray(parsed.numbers) && parsed.game) {
         assistantMsg.coupon = {
           game: parsed.game,
@@ -114,28 +152,25 @@ export default function AIAssistantScreen() {
           explanation: parsed.explanation || 'AI tarafından önerilen kupon',
         };
       }
-
-      setMessages(prev => [...prev, assistantMsg]);
+      setMessages((prev) => [...prev, assistantMsg]);
     } else {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Üzgünüm, şu anda yanıt veremiyorum.' }]);
+      setMessages((prev) => [...prev, { role: 'assistant', content: 'Üzgünüm, şu anda yanıt veremiyorum.' }]);
     }
-
     setLoading(false);
     scrollRef.current?.scrollToEnd({ animated: true });
   };
 
-  const handleSaveCoupon = async (coupon: ChatMessage['coupon']) => {
+  const saveCoupon = async (coupon: ChatMessage['coupon']) => {
     if (!coupon) return;
     try {
       const existing = await AsyncStorage.getItem('savedCoupons');
       const coupons = existing ? JSON.parse(existing) : [];
-      const gameConfig = GAMES.find(g => g.name === coupon.game);
-      const gameColor = GAME_COLORS[coupon.game as keyof typeof GAME_COLORS]?.main || '#6C63FF';
-
+      const gameConfig = GAMES.find((g) => g.name === coupon.game);
+      const gameColor = GameAccent[gameConfig?.id ?? 'cilgin'] ?? c.brand;
       coupons.unshift({
         id: Date.now(),
         game: coupon.game,
-        icon: gameConfig?.icon || '🎱',
+        icon: gameConfig?.icon || '',
         color: gameColor,
         numbers: coupon.numbers,
         bonus: [],
@@ -145,116 +180,162 @@ export default function AIAssistantScreen() {
         matchedCount: undefined,
         aiExplanation: coupon.explanation,
       });
-
       await AsyncStorage.setItem('savedCoupons', JSON.stringify(coupons));
-      Alert.alert('✅ Kaydedildi!', 'AI kuponu Kuponlarım\'a eklendi.', [
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Kaydedildi', "AI kuponu Kuponlarım'a eklendi.", [
         { text: 'Tamam' },
-        { text: 'Kuponlarıma Git', onPress: () => router.push('/(tabs)/saved') },
+        { text: 'Kuponlarıma git', onPress: () => router.push('/(tabs)/saved') },
       ]);
-    } catch (e) {
-      Alert.alert('Hata', 'Kupon kaydedilemedi!');
+    } catch {
+      Alert.alert('Hata', 'Kupon kaydedilemedi.');
     }
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={styles.header}>
-          <Text style={styles.title}>🤖 AI Asistan</Text>
-          <Text style={styles.subtitle}>Loto hakkında sohbet et, kupon üret</Text>
+    <View style={s.container}>
+      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
+      <View style={{ paddingTop: insets.top + 6 }}>
+        <View style={s.nav}>
+          <Pressable onPress={() => router.back()} style={[s.navBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]} hitSlop={6}>
+            <BackIcon color={c.text2} size={22} />
+          </Pressable>
+          <View style={[s.navAvatar, { backgroundColor: c.brandSoft }]}>
+            <AIAssistantIcon color={c.brand} size={22} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.navTitle}>AI Asistan</Text>
+            <View style={s.navStatus}>
+              <View style={[s.statusDot, { backgroundColor: c.brand }]} />
+              <Text style={[s.navStatusText, { color: c.brand }]}>Çevrimiçi</Text>
+            </View>
+          </View>
         </View>
+      </View>
 
-        <ScrollView
-          ref={scrollRef}
-          style={styles.messages}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
-          {messages.length === 0 && (
-            <View style={styles.guideCard}>
-              <Text style={styles.guideText}>
-                Merhaba! Ben LottoAI asistanınım. Bana loto hakkında sorular sorabilir veya kupon üretmemi isteyebilirsin.{"\n\n"}
-                Örnek: "Bana şanslı bir Çılgın Sayısal Loto kuponu üretir misin?"
-              </Text>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
+        {messages.length === 0 ? (
+          <View style={s.empty}>
+            <View style={[s.emptyIcon, { backgroundColor: c.brandSoft }]}>
+              <AIAssistantIcon color={c.brand} size={34} />
             </View>
-          )}
-          {messages.map((msg, index) => (
-            <View key={index}>
-              <View style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : styles.aiBubble]}>
-                <Text style={[styles.messageText, msg.role === 'user' && { color: '#fff' }]}>{msg.content}</Text>
+            <Text style={s.emptyTitle}>Merhaba, ben LottoAI</Text>
+            <Text style={s.emptyDesc}>Loto hakkında soru sor ya da senin için kupon üreteyim. Şununla başlayabilirsin:</Text>
+            <View style={s.suggestions}>
+              {SUGGESTIONS.map((sug, i) => (
+                <PressableScale key={i} onPress={() => send(sug)} style={[s.suggestion, { backgroundColor: c.surface, borderColor: c.border }]}>
+                  <Text style={s.suggestionText}>{sug}</Text>
+                </PressableScale>
+              ))}
+            </View>
+          </View>
+        ) : (
+          <ScrollView
+            ref={scrollRef}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 16, gap: 12 }}
+            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+            showsVerticalScrollIndicator={false}
+          >
+            {messages.map((msg, index) => (
+              <View key={index} style={{ gap: 12 }}>
+                <View style={[s.bubble, msg.role === 'user' ? [s.userBubble, { backgroundColor: c.brand }] : [s.aiBubble, { backgroundColor: c.surface, borderColor: c.border }]]}>
+                  <Text style={[s.bubbleText, { color: msg.role === 'user' ? c.brandText : c.text }]}>{msg.content}</Text>
+                </View>
+                {msg.coupon ? <AICouponCard coupon={msg.coupon} theme={theme} onSave={() => saveCoupon(msg.coupon)} /> : null}
               </View>
-              {msg.coupon && (() => {
-                const c = msg.coupon;
-                const color = GAME_COLORS[c.game as keyof typeof GAME_COLORS]?.main || '#6C63FF';
-                return (
-                  <View style={[styles.couponCard, { borderColor: color + '44' }]}>
-                    <Text style={[styles.couponCardTitle, { color }]}>
-                      🎲 AI'nin Önerdiği {c.game} Kuponu
-                    </Text>
-                    <View style={styles.couponNumbers}>
-                      {c.numbers.map((num, i) => (
-                        <View key={i} style={[styles.couponBall, { backgroundColor: color }]}>
-                          <Text style={styles.couponBallText}>{num}</Text>
-                        </View>
-                      ))}
-                    </View>
-                    <Text style={styles.couponExplanation}>{c.explanation}</Text>
-                    <TouchableOpacity style={styles.saveCouponBtn} onPress={() => handleSaveCoupon(c)}>
-                      <Text style={styles.saveCouponBtnText}>💾 Kuponu Kaydet</Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              })()}
-            </View>
-          ))}
-          {loading && (
-            <View style={styles.loadingBubble}>
-              <ActivityIndicator size="small" color="#6C63FF" />
-              <Text style={{ color: '#8E8E93', marginLeft: 8 }}>Düşünüyor...</Text>
-            </View>
-          )}
-        </ScrollView>
+            ))}
+            {loading ? (
+              <View style={[s.bubble, s.aiBubble, { backgroundColor: c.surface, borderColor: c.border, paddingVertical: 14 }]}>
+                <TypingDots color={c.text3} />
+              </View>
+            ) : null}
+          </ScrollView>
+        )}
 
-        <View style={styles.inputRow}>
+        {/* Input */}
+        <View style={[s.inputRow, { borderTopColor: c.hairline, paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }]}>
           <TextInput
-            style={styles.input}
+            style={[s.input, { backgroundColor: c.surface, borderColor: c.border, color: c.text }]}
             value={input}
             onChangeText={setInput}
-            placeholder="Bir şey yaz..."
-            placeholderTextColor="#A0A0A5"
+            placeholder="Bir şey yaz…"
+            placeholderTextColor={c.text3}
             multiline
             editable={!loading}
           />
-          <TouchableOpacity style={[styles.sendBtn, loading && { opacity: 0.5 }]} onPress={handleSend} disabled={loading || !input.trim()}>
-            <Text style={styles.sendBtnText}>Gönder</Text>
-          </TouchableOpacity>
+          <Pressable
+            onPress={() => send()}
+            disabled={loading || !input.trim()}
+            style={[s.sendBtn, { backgroundColor: c.brand, opacity: loading || !input.trim() ? 0.5 : 1 }]}
+          >
+            <SendIcon color={c.brandText} size={20} />
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F7' },
-  header: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#E5E5EA' },
-  title: { color: '#1a1a2e', fontSize: 22, fontWeight: 'bold' },
-  subtitle: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
-  messages: { flex: 1, padding: 16 },
-  guideCard: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#E5E5EA' },
-  guideText: { color: '#8E8E93', fontSize: 13, lineHeight: 20 },
-  messageBubble: { padding: 12, borderRadius: 16, marginBottom: 10, maxWidth: '85%' },
-  userBubble: { alignSelf: 'flex-end', backgroundColor: '#6C63FF' },
-  aiBubble: { alignSelf: 'flex-start', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5EA' },
-  messageText: { color: '#1a1a2e', fontSize: 14 },
-  loadingBubble: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5EA', alignSelf: 'flex-start', marginBottom: 10 },
-  couponCard: { backgroundColor: '#FFFFFF', borderWidth: 1.5, borderRadius: 16, padding: 16, marginBottom: 10, marginLeft: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  couponCardTitle: { fontSize: 15, fontWeight: 'bold', marginBottom: 12 },
-  couponNumbers: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  couponBall: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  couponBallText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  couponExplanation: { color: '#8E8E93', fontSize: 12, lineHeight: 18, marginBottom: 12 },
-  saveCouponBtn: { backgroundColor: '#FFD70022', borderWidth: 1, borderColor: '#FFD700', borderRadius: 10, padding: 12, alignItems: 'center' },
-  saveCouponBtnText: { color: '#1a1a2e', fontSize: 14, fontWeight: 'bold' },
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', padding: 12, borderTopWidth: 1, borderTopColor: '#E5E5EA', gap: 8 },
-  input: { flex: 1, backgroundColor: '#FFFFFF', color: '#1a1a2e', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 100, borderWidth: 1, borderColor: '#E5E5EA' },
-  sendBtn: { backgroundColor: '#6C63FF', borderRadius: 12, paddingHorizontal: 18, paddingVertical: 12 },
-  sendBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-});
+function AICouponCard({ coupon, theme, onSave }: { coupon: NonNullable<ChatMessage['coupon']>; theme: AppTheme; onSave: () => void }) {
+  const c = theme.colors;
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const id = getGameByName(coupon.game)?.id ?? 'cilgin';
+  const color = GameAccent[id] ?? c.brand;
+  return (
+    <View style={[s.couponCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+      <View style={s.couponHead}>
+        <GameEmblem game={id} size={34} />
+        <View>
+          <Text style={s.couponGame}>{coupon.game}</Text>
+          <Text style={s.couponTag}>AI önerisi</Text>
+        </View>
+      </View>
+      <View style={s.couponBalls}>
+        {coupon.numbers.map((n, i) => (
+          <NumberBall key={i} value={n} color={color} size={38} />
+        ))}
+      </View>
+      <Text style={s.couponExp}>{coupon.explanation}</Text>
+      <AppButton label="Kuponu kaydet" onPress={onSave} iconLeft={(cl, sz) => <BookmarkIcon color={cl} size={sz} />} style={{ marginTop: 13 }} />
+    </View>
+  );
+}
+
+function makeStyles(theme: AppTheme) {
+  const c = theme.colors;
+  const { spacing, radius, typography: ty } = theme;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    nav: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: c.hairline },
+    navBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+    navAvatar: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+    navTitle: { ...ty.h3, color: c.text },
+    navStatus: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 },
+    statusDot: { width: 6, height: 6, borderRadius: 3 },
+    navStatusText: { ...ty.caption, fontFamily: theme.font.semibold },
+
+    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xxl },
+    emptyIcon: { width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+    emptyTitle: { ...ty.h2, color: c.text },
+    emptyDesc: { ...ty.body, color: c.text2, textAlign: 'center', maxWidth: 290, marginTop: 8 },
+    suggestions: { width: '100%', gap: 9, marginTop: 22 },
+    suggestion: { paddingHorizontal: 16, paddingVertical: 13, borderRadius: radius.md, borderWidth: 1 },
+    suggestionText: { ...ty.bodySemibold, color: c.text },
+
+    bubble: { maxWidth: '86%', paddingHorizontal: 15, paddingVertical: 12 },
+    userBubble: { alignSelf: 'flex-end', borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomLeftRadius: 18, borderBottomRightRadius: 5 },
+    aiBubble: { alignSelf: 'flex-start', borderWidth: 1, borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomRightRadius: 18, borderBottomLeftRadius: 5 },
+    bubbleText: { ...ty.body, lineHeight: 21 },
+
+    couponCard: { alignSelf: 'flex-start', maxWidth: '92%', borderRadius: radius.xl, borderWidth: 1, padding: 16, ...theme.shadowSm },
+    couponHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 13 },
+    couponGame: { ...ty.title, color: c.text },
+    couponTag: { ...ty.caption, color: c.text3 },
+    couponBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+    couponExp: { ...ty.caption, color: c.text2, lineHeight: 18, marginTop: 13, paddingTop: 13, borderTopWidth: 1, borderTopColor: c.hairline },
+
+    inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1 },
+    input: { flex: 1, minHeight: 48, maxHeight: 110, borderRadius: 24, borderWidth: 1, paddingHorizontal: 18, paddingTop: 13, paddingBottom: 13, ...ty.body },
+    sendBtn: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  });
+}

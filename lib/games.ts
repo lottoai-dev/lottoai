@@ -51,9 +51,9 @@ export const GAMES: Game[] = [
     notifyAfterMinute: 0,
     url: 'https://www.millipiyangoonline.com/sayisal-loto/sonuclar',
     colors: {
-      main: '#E53935',
-      bonus: '#1E88E5',
-      gradient: ['#E53935', '#B71C1C'],
+      main: '#DB463C',
+      bonus: '#3F7FD1',
+      gradient: ['#DB463C', '#A5362E'],
     },
     country: 'TR',
     currency: 'TRY',
@@ -77,9 +77,9 @@ export const GAMES: Game[] = [
     notifyAfterMinute: 0,
     url: 'https://www.millipiyangoonline.com/super-loto/sonuclar',
     colors: {
-      main: '#FF6D00',
-      bonus: '#FF6D00',
-      gradient: ['#FF6D00', '#E65100'],
+      main: '#E0851F',
+      bonus: '#E0851F',
+      gradient: ['#E0851F', '#B5681A'],
     },
     country: 'TR',
     currency: 'TRY',
@@ -103,9 +103,9 @@ export const GAMES: Game[] = [
     notifyAfterMinute: 30,
     url: 'https://www.millipiyangoonline.com/sans-topu/sonuclar',
     colors: {
-      main: '#E91E8C',
-      bonus: '#00BCD4',
-      gradient: ['#E91E8C', '#880E4F'],
+      main: '#D14F8E',
+      bonus: '#3FB4C4',
+      gradient: ['#D14F8E', '#9C3A68'],
     },
     country: 'TR',
     currency: 'TRY',
@@ -129,9 +129,9 @@ export const GAMES: Game[] = [
     notifyAfterMinute: 30,
     url: 'https://www.millipiyangoonline.com/on-numara/sonuclar',
     colors: {
-      main: '#7B1FA2',
-      bonus: '#7B1FA2',
-      gradient: ['#7B1FA2', '#4A148C'],
+      main: '#7E5CC2',
+      bonus: '#7E5CC2',
+      gradient: ['#7E5CC2', '#5E43A0'],
     },
     country: 'TR',
     currency: 'TRY',
@@ -160,15 +160,15 @@ export const GAME_COLORS = Object.fromEntries(
 ) as Record<string, { main: string; bonus: string; gradient: [string, string]; superstar: string }>;
 
 export function getGameColor(gameName: string): string {
-  return getGameByName(gameName)?.colors.main ?? '#6C63FF';
+  return getGameByName(gameName)?.colors.main ?? '#1C9E73';
 }
 
 export function getGameGradient(gameName: string): [string, string] {
-  return getGameByName(gameName)?.colors.gradient ?? ['#6C63FF', '#4834d4'];
+  return getGameByName(gameName)?.colors.gradient ?? ['#1C9E73', '#157E5C'];
 }
 
 export function getBonusColor(gameName: string): string {
-  return getGameByName(gameName)?.colors.bonus ?? '#FF6B6B';
+  return getGameByName(gameName)?.colors.bonus ?? '#C29A2B';
 }
 
 // Ülkeye göre oyunları filtrele

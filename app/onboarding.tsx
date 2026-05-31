@@ -1,266 +1,142 @@
-// app_onboarding.tsx
+// app/onboarding.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
-import {
-  Animated,
-  Dimensions,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import React, { useMemo, useRef, useState } from 'react';
+import { Animated, Dimensions, FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { AppButton } from '../components/ui/app-button';
+import { AppTheme } from '../constants/theme';
+import { BrandMark } from '../lib/emblems';
 import { t } from '../lib/i18n';
+import { DiceIcon, ResultsIcon, ShieldIcon, StatsIcon, type IconProps } from '../lib/icons';
+import { useTheme } from '../lib/theme';
 
 const { width } = Dimensions.get('window');
 
-const SLIDES = [
-  {
-    emoji: '🍀',
-    titleKey: 'onboarding_welcome_title' as const,
-    descKey: 'onboarding_welcome_desc' as const,
-    color: '#6C63FF',
-    skippable: true,
-  },
-  {
-    emoji: '🎲',
-    titleKey: 'onboarding_generate_title' as const,
-    descKey: 'onboarding_generate_desc' as const,
-    color: '#FF6B6B',
-    skippable: true,
-  },
-  {
-    emoji: '📡',
-    titleKey: 'onboarding_results_title' as const,
-    descKey: 'onboarding_results_desc' as const,
-    color: '#6BCB77',
-    skippable: true,
-  },
-  {
-    emoji: '📊',
-    titleKey: 'onboarding_stats_title' as const,
-    descKey: 'onboarding_stats_desc' as const,
-    color: '#FFD93D',
-    skippable: true,
-  },
-  {
-    emoji: '⚠️',
-    titleKey: 'onboarding_warning_title' as const,
-    descKey: 'onboarding_warning_desc' as const,
-    color: '#FF9F43',
-    isWarning: true,
-    skippable: false,
-  },
+type Slide = {
+  Icon: 'brand' | ((p: IconProps) => React.ReactNode);
+  titleKey: string;
+  descKey: string;
+  skippable: boolean;
+  isWarning?: boolean;
+};
+
+const SLIDES: Slide[] = [
+  { Icon: 'brand', titleKey: 'onboarding_welcome_title', descKey: 'onboarding_welcome_desc', skippable: true },
+  { Icon: DiceIcon, titleKey: 'onboarding_generate_title', descKey: 'onboarding_generate_desc', skippable: true },
+  { Icon: ResultsIcon, titleKey: 'onboarding_results_title', descKey: 'onboarding_results_desc', skippable: true },
+  { Icon: StatsIcon, titleKey: 'onboarding_stats_title', descKey: 'onboarding_stats_desc', skippable: true },
+  { Icon: ShieldIcon, titleKey: 'onboarding_warning_title', descKey: 'onboarding_warning_desc', skippable: false, isWarning: true },
 ];
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const theme = useTheme();
+  const c = theme.colors;
+  const insets = useSafeAreaInsets();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+
   const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
+  const listRef = useRef<FlatList>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
 
   const slide = SLIDES[currentIndex];
   const isLast = currentIndex === SLIDES.length - 1;
 
   const goToSlide = (index: number) => {
-    flatListRef.current?.scrollToIndex({ index, animated: true });
+    listRef.current?.scrollToIndex({ index, animated: true });
     setCurrentIndex(index);
   };
 
   const handleNext = async () => {
-    if (!isLast) {
-      goToSlide(currentIndex + 1);
-    } else {
+    if (!isLast) goToSlide(currentIndex + 1);
+    else {
       await AsyncStorage.setItem('onboardingCompleted', 'true');
       router.replace('/(tabs)/home');
     }
   };
 
-  const handleSkip = async () => {
-    goToSlide(SLIDES.length - 1);
-  };
-
-  const handleMomentumScrollEnd = (e: any) => {
-    const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
-    if (newIndex >= SLIDES.length) return;
-    setCurrentIndex(newIndex);
-  };
-
   return (
-    <View style={styles.container}>
+    <View style={[s.container, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 20 }]}>
+      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
 
-      {slide.skippable && (
-        <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
-          <Text style={styles.skipText}>{t('onboardingSkip')} →</Text>
-        </TouchableOpacity>
-      )}
+      <View style={s.topBar}>
+        {slide.skippable ? (
+          <Pressable onPress={() => goToSlide(SLIDES.length - 1)} hitSlop={8}>
+            <Text style={s.skip}>Geç</Text>
+          </Pressable>
+        ) : (
+          <View />
+        )}
+      </View>
 
       <Animated.FlatList
-        ref={flatListRef}
+        ref={listRef}
         data={SLIDES}
         keyExtractor={(_, i) => String(i)}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        scrollEnabled={true}
-        onMomentumScrollEnd={handleMomentumScrollEnd}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: false }
-        )}
+        onMomentumScrollEnd={(e) => {
+          const i = Math.round(e.nativeEvent.contentOffset.x / width);
+          if (i < SLIDES.length) setCurrentIndex(i);
+        }}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
         scrollEventThrottle={16}
         renderItem={({ item }) => (
-          <View style={[styles.slide, { width }]}>
-            <View style={[styles.emojiContainer, { backgroundColor: item.color + '22' }]}>
-              <Text style={styles.emoji}>{item.emoji}</Text>
+          <View style={[s.slide, { width }]}>
+            <View style={[s.iconWrap, { backgroundColor: item.isWarning ? c.goldSoft : c.brandSoft }]}>
+              {item.Icon === 'brand' ? (
+                <BrandMark size={76} bg={c.brand} fg={c.brandText} />
+              ) : (
+                (item.Icon as (p: IconProps) => React.ReactNode)({ color: item.isWarning ? c.gold : c.brand, size: 56 })
+              )}
             </View>
-
-            <Text style={[styles.title, item.isWarning && { color: '#FF9F43' }]}>
-              {t(item.titleKey)}
-            </Text>
-            <Text style={styles.description}>{t(item.descKey)}</Text>
-
-            {item.isWarning && (
-              <View style={styles.warningBox}>
-                <Text style={styles.warningText}>
-                  🎰 {t('onboarding_warning_text_1')}{'\n'}
-                  {t('onboarding_warning_text_2')}{'\n'}
+            <Text style={s.title}>{t(item.titleKey)}</Text>
+            <Text style={s.desc}>{t(item.descKey)}</Text>
+            {item.isWarning ? (
+              <View style={[s.warningBox, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+                <Text style={s.warningText}>{t('onboarding_warning_text_1')}</Text>
+                <Text style={s.warningText}>{t('onboarding_warning_text_2')}</Text>
+                <Text style={[s.warningText, { color: c.brand, fontFamily: theme.font.bold }]} onPress={() => Linking.openURL('tel:115')}>
                   {t('onboarding_warning_text_3')}
                 </Text>
               </View>
-            )}
+            ) : null}
           </View>
         )}
       />
 
-      <View style={styles.dots}>
-        {SLIDES.map((s, index) => {
-          const inputRange = [
-            (index - 1) * width,
-            index * width,
-            (index + 1) * width,
-          ];
-          const dotWidth = scrollX.interpolate({
-            inputRange,
-            outputRange: [8, 24, 8],
-            extrapolate: 'clamp',
-          });
-          const opacity = scrollX.interpolate({
-            inputRange,
-            outputRange: [0.4, 1, 0.4],
-            extrapolate: 'clamp',
-          });
-          return (
-            <Animated.View
-              key={index}
-              style={[
-                styles.dot,
-                {
-                  width: dotWidth,
-                  opacity,
-                  backgroundColor: s.color,
-                },
-              ]}
-            />
-          );
+      <View style={s.dots}>
+        {SLIDES.map((_, index) => {
+          const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
+          const dotWidth = scrollX.interpolate({ inputRange, outputRange: [8, 24, 8], extrapolate: 'clamp' });
+          const opacity = scrollX.interpolate({ inputRange, outputRange: [0.3, 1, 0.3], extrapolate: 'clamp' });
+          return <Animated.View key={index} style={[s.dot, { width: dotWidth, opacity, backgroundColor: c.brand }]} />;
         })}
       </View>
 
-      <TouchableOpacity
-        style={[styles.nextBtn, { backgroundColor: slide.color }]}
-        onPress={handleNext}
-        activeOpacity={0.85}>
-        <Text style={styles.nextBtnText}>
-          {isLast ? t('onboardingStart') : t('onboardingNext')}
-        </Text>
-      </TouchableOpacity>
-
+      <AppButton label={isLast ? t('onboardingStart') : t('onboardingNext')} onPress={handleNext} style={{ marginHorizontal: 24 }} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    paddingTop: 60,
-    paddingBottom: 40,
-  },
-  skipBtn: {
-    alignSelf: 'flex-end',
-    paddingHorizontal: 24,
-    paddingVertical: 8,
-    marginBottom: 8,
-  },
-  skipText: {
-    color: '#8E8E93',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  slide: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 20,
-    flex: 1,
-  },
-  emojiContainer: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  emoji: { fontSize: 70 },
-  title: {
-    color: '#1a1a2e',
-    fontSize: 26,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  description: {
-    color: '#8E8E93',
-    fontSize: 16,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  warningBox: {
-    backgroundColor: '#FF9F4322',
-    borderWidth: 1,
-    borderColor: '#FF9F43',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 8,
-  },
-  warningText: {
-    color: '#FF9F43',
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  dots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 24,
-    paddingHorizontal: 24,
-  },
-  dot: {
-    height: 8,
-    borderRadius: 4,
-  },
-  nextBtn: {
-    marginHorizontal: 24,
-    padding: 18,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  nextBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-});
+function makeStyles(theme: AppTheme) {
+  const c = theme.colors;
+  const { typography: ty } = theme;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    topBar: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 24, height: 32 },
+    skip: { ...ty.label, color: c.text2 },
+    slide: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 18, flex: 1 },
+    iconWrap: { width: 132, height: 132, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+    title: { ...ty.h1, color: c.text, textAlign: 'center' },
+    desc: { ...ty.body, fontSize: 16, lineHeight: 24, color: c.text2, textAlign: 'center' },
+    warningBox: { borderWidth: 1, borderRadius: 16, padding: 16, marginTop: 8, gap: 8, width: '100%' },
+    warningText: { ...ty.bodyMedium, color: c.text2, textAlign: 'center', lineHeight: 20 },
+    dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 24 },
+    dot: { height: 8, borderRadius: 4 },
+  });
+}

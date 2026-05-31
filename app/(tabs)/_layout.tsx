@@ -1,79 +1,139 @@
-// tabs_layout.tsx
+// app/(tabs)/_layout.tsx
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import * as Haptics from 'expo-haptics';
 import { Tabs } from 'expo-router';
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { FontFamily } from '../../constants/theme';
 import { t } from '../../lib/i18n';
 import {
-  AIAssistantIcon,
-  GenerateIcon,
   HomeIcon,
+  PlusIcon,
   ProfileIcon,
   ResultsIcon,
   SavedIcon,
+  type IconProps,
 } from '../../lib/icons';
+import { useTheme } from '../../lib/theme';
 
-export default function TabLayout() {
+type TabDef = {
+  name: string;
+  label: string;
+  Icon?: (p: IconProps) => React.ReactNode;
+  center?: boolean;
+};
+
+const TAB_ORDER: TabDef[] = [
+  { name: 'home', label: t('home'), Icon: HomeIcon },
+  { name: 'results', label: t('results'), Icon: ResultsIcon },
+  { name: 'generate', label: t('generate'), center: true },
+  { name: 'saved', label: t('saved'), Icon: SavedIcon },
+  { name: 'profile', label: t('profile'), Icon: ProfileIcon },
+];
+
+function LottoTabBar({ state, navigation }: BottomTabBarProps) {
+  const theme = useTheme();
+  const c = theme.colors;
   const insets = useSafeAreaInsets();
+  const currentRoute = state.routes[state.index]?.name;
+
+  const go = (name: string) => {
+    Haptics.selectionAsync();
+    navigation.navigate(name as never);
+  };
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: '#6C63FF',
-        tabBarInactiveTintColor: '#8E8E93',
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E5E5EA',
-          height: 60 + insets.bottom,
-          paddingBottom: insets.bottom + 6,
-          paddingTop: 6,
+    <View
+      style={[
+        styles.bar,
+        {
+          backgroundColor: c.tabBg,
+          borderTopColor: c.tabBorder,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
+          height: 62 + (insets.bottom > 0 ? insets.bottom : 10),
         },
-        headerShown: false,
-      }}>
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: t('home'),
-          tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="generate"
-        options={{
-          title: t('generate'),
-          tabBarIcon: ({ color, size }) => <GenerateIcon color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="ai-assistant"
-        options={{
-          title: t('aiAssistant'),
-          tabBarIcon: ({ color, size }) => <AIAssistantIcon color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="results"
-        options={{
-          title: t('results'),
-          tabBarIcon: ({ color, size }) => <ResultsIcon color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="saved"
-        options={{
-          title: t('saved'),
-          tabBarIcon: ({ color, size }) => <SavedIcon color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: t('profile'),
-          tabBarIcon: ({ color, size }) => <ProfileIcon color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen name="analyze" options={{ href: null }} />
-      <Tabs.Screen name="statistics" options={{ href: null }} />
+      ]}
+    >
+      {TAB_ORDER.map((tab) => {
+        const focused = currentRoute === tab.name;
+
+        if (tab.center) {
+          return (
+            <View key={tab.name} style={styles.centerSlot}>
+              <Pressable
+                onPress={() => go(tab.name)}
+                style={[styles.fab, { backgroundColor: c.brand, shadowColor: c.brand }]}
+              >
+                <PlusIcon color={c.brandText} size={28} />
+              </Pressable>
+              <Text style={[styles.centerLabel, { color: focused ? c.brand : c.text3 }]} allowFontScaling={false}>
+                {tab.label}
+              </Text>
+            </View>
+          );
+        }
+
+        const tint = focused ? c.brand : c.text3;
+        const Icon = tab.Icon!;
+        return (
+          <Pressable key={tab.name} style={styles.tab} onPress={() => go(tab.name)}>
+            <Icon color={tint} size={24} active={focused} />
+            <Text
+              style={[styles.label, { color: tint, fontFamily: focused ? FontFamily.bold : FontFamily.medium }]}
+              allowFontScaling={false}
+            >
+              {tab.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+export default function TabLayout() {
+  return (
+    <Tabs
+      tabBar={(props) => <LottoTabBar {...props} />}
+      screenOptions={{ headerShown: false, animation: 'fade' }}
+    >
+      <Tabs.Screen name="home" />
+      <Tabs.Screen name="results" />
+      <Tabs.Screen name="generate" />
+      <Tabs.Screen name="saved" />
+      <Tabs.Screen name="profile" />
+
+      {/* Secondary screens reachable via navigation, hidden from the bar */}
+      <Tabs.Screen name="ai-assistant" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="legal" options={{ href: null }} />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  bar: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderTopWidth: 1,
+    paddingTop: 9,
+  },
+  tab: { flex: 1, alignItems: 'center', gap: 4 },
+  label: { fontSize: 10.5 },
+  centerSlot: { flex: 1, alignItems: 'center' },
+  centerLabel: { fontSize: 10.5, fontFamily: FontFamily.semibold, marginTop: 7 },
+  fab: {
+    width: 56,
+    height: 56,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -22,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+});

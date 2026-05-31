@@ -1,318 +1,312 @@
-// tabs_profile.tsx
+// app/(tabs)/profile.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
-import {
-  Alert,
-  Linking,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GAME_COLORS } from '../../lib/games';
-import { t } from '../../lib/i18n';
+
+import Svg, { Circle, Path } from 'react-native-svg';
+import { PressableScale, Surface } from '../../components/ui/surface';
+import { AppTheme } from '../../constants/theme';
+import { BrandMark } from '../../lib/emblems';
 import {
-  AnalyzeIcon,
+  BellIcon,
+  CheckIcon,
   ChevronRightIcon,
-  ContactIcon,
+  CloseIcon,
+  DocIcon,
   EditIcon,
   InfoIcon,
-  NotificationIcon,
-  PrivacyIcon,
+  MailIcon,
+  SearchIcon,
+  ShieldIcon,
   StatsIcon,
-  TermsIcon,
   TrashIcon,
 } from '../../lib/icons';
+import { useTheme, useThemeControls } from '../../lib/theme';
+
+/* small theme-mode glyphs */
+function SunGlyph({ color }: { color: string }) {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={4} stroke={color} strokeWidth={1.8} />
+      <Path d="M12 2.5v2.5M12 19v2.5M4.5 12H2M22 12h-2.5M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
+  );
+}
+function MoonGlyph({ color }: { color: string }) {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path d="M20 13.5A8 8 0 1110.5 4a6.5 6.5 0 009.5 9.5z" stroke={color} strokeWidth={1.8} strokeLinejoin="round" />
+    </Svg>
+  );
+}
+function AutoGlyph({ color }: { color: string }) {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={8.5} stroke={color} strokeWidth={1.8} />
+      <Path d="M12 3.5v17a8.5 8.5 0 000-17z" fill={color} />
+    </Svg>
+  );
+}
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const theme = useTheme();
+  const c = theme.colors;
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const { pref, setPref } = useThemeControls();
+
   const [name, setName] = useState('');
-  const [editingName, setEditingName] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [tempName, setTempName] = useState('');
   const [totalCoupons, setTotalCoupons] = useState(0);
   const [bestResult, setBestResult] = useState(0);
-  const [mostPlayedGame, setMostPlayedGame] = useState('');
+  const [totalMatched, setTotalMatched] = useState(0);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   const loadData = async () => {
     try {
       const savedName = await AsyncStorage.getItem('userName');
       if (savedName) setName(savedName);
-
       const couponsData = await AsyncStorage.getItem('savedCoupons');
       if (couponsData) {
         const coupons = JSON.parse(couponsData);
         setTotalCoupons(coupons.length);
-        const best = coupons.reduce((max: number, c: any) => Math.max(max, c.matchedCount || 0), 0);
-        setBestResult(best);
-        const gameCounts = coupons.reduce((acc: any, c: any) => {
-          acc[c.game] = (acc[c.game] || 0) + 1;
-          return acc;
-        }, {});
-        const topGame = Object.entries(gameCounts).sort((a: any, b: any) => b[1] - a[1])[0];
-        if (topGame) setMostPlayedGame(topGame[0] as string);
+        setBestResult(coupons.reduce((max: number, cp: any) => Math.max(max, cp.matchedCount || 0), 0));
+        setTotalMatched(coupons.reduce((acc: number, cp: any) => acc + (cp.matchedCount || 0), 0));
       }
-
       const notifData = await AsyncStorage.getItem('notificationSettings_v2');
       if (notifData) {
         const settings = JSON.parse(notifData);
-        const anyEnabled = Object.values(settings).some(
-          (v: any) => v?.before === true || v?.after === true
-        );
-        setNotificationsEnabled(anyEnabled);
+        setNotificationsEnabled(Object.values(settings).some((v: any) => v?.before === true || v?.after === true));
       }
-    } catch (e) {}
+    } catch {}
   };
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
-  const handleSaveName = async () => {
+  const saveName = async () => {
     if (tempName.trim() === '') {
-      Alert.alert('Uyarı', 'İsim boş olamaz!');
+      Alert.alert('Uyarı', 'İsim boş olamaz.');
       return;
     }
     await AsyncStorage.setItem('userName', tempName.trim());
     setName(tempName.trim());
-    setEditingName(false);
+    setEditing(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const handleClearData = () => {
-    Alert.alert('⚠️ Tüm Verileri Sil', 'Tüm kuponlarınız, ayarlarınız ve verileriniz silinecek. Bu işlem geri alınamaz!', [
-      { text: 'İptal', style: 'cancel' },
+  const clearData = () => {
+    Alert.alert('Tüm verileri sil', 'Tüm kuponların, ayarların ve verilerin silinecek. Bu işlem geri alınamaz.', [
+      { text: 'Vazgeç', style: 'cancel' },
       {
-        text: 'Sil', style: 'destructive',
+        text: 'Sil',
+        style: 'destructive',
         onPress: async () => {
           await AsyncStorage.clear();
           setTotalCoupons(0);
           setBestResult(0);
-          setMostPlayedGame('');
+          setTotalMatched(0);
           setName('');
-          Alert.alert('✅ Silindi', 'Tüm veriler temizlendi. Uygulamayı kapatıp açın.');
+          Alert.alert('Silindi', 'Tüm veriler temizlendi. Uygulamayı kapatıp açın.');
         },
       },
     ]);
   };
 
-  const getGameColor = (gameName: string) => {
-    const gc = GAME_COLORS[gameName as keyof typeof GAME_COLORS];
-    return gc?.main || '#6C63FF';
-  };
+  const themeOptions: { key: 'light' | 'system' | 'dark'; label: string; Glyph: (p: { color: string }) => React.ReactNode }[] = [
+    { key: 'light', label: 'Açık', Glyph: SunGlyph },
+    { key: 'system', label: 'Sistem', Glyph: AutoGlyph },
+    { key: 'dark', label: 'Koyu', Glyph: MoonGlyph },
+  ];
+
+  const MenuRow = ({ Icon, color, title, sub, onPress, last }: { Icon: (p: any) => React.ReactNode; color: string; title: string; sub: string; onPress?: () => void; last?: boolean }) => (
+    <PressableScale onPress={onPress} style={[s.menuRow, !last && { borderBottomWidth: 1, borderBottomColor: c.hairline }]}>
+      <View style={[s.menuIcon, { backgroundColor: color + '1A' }]}>
+        <Icon color={color} size={20} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={s.menuTitle}>{title}</Text>
+        <Text style={s.menuSub}>{sub}</Text>
+      </View>
+      <ChevronRightIcon color={c.text3} size={18} />
+    </PressableScale>
+  );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
+    <View style={s.container}>
+      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}>
+        <View style={s.header}>
+          <Text style={s.title}>Profil</Text>
+        </View>
 
-        <LinearGradient colors={['#F0EEFF', '#FFFFFF']} style={styles.headerGradient}>
-          <View style={styles.avatarContainer}>
-            <LinearGradient colors={['#6C63FF', '#4834d4']} style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {name ? name.charAt(0).toUpperCase() : '👤'}
-              </Text>
-            </LinearGradient>
-            {editingName ? (
-              <View style={styles.nameEditRow}>
+        {/* Avatar */}
+        <Surface style={s.avatarCard}>
+          <View style={[s.avatar, { backgroundColor: c.brand }]}>
+            <Text style={s.avatarText}>{name ? name.charAt(0).toUpperCase() : 'L'}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            {editing ? (
+              <View style={s.editRow}>
                 <TextInput
-                  style={styles.nameInput}
+                  style={[s.nameInput, { backgroundColor: c.surfaceAlt, borderColor: c.brandBorder, color: c.text }]}
                   value={tempName}
                   onChangeText={setTempName}
-                  placeholder={t('addName')}
-                  placeholderTextColor="#A0A0A5"
+                  placeholder="İsmini gir"
+                  placeholderTextColor={c.text3}
                   autoFocus
                 />
-                <TouchableOpacity style={styles.nameSaveBtn} onPress={handleSaveName}>
-                  <Text style={styles.nameSaveBtnText}>✓</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.nameCancelBtn} onPress={() => setEditingName(false)}>
-                  <Text style={styles.nameCancelBtnText}>✕</Text>
-                </TouchableOpacity>
+                <Pressable onPress={saveName} style={[s.editBtn, { backgroundColor: c.brand }]} hitSlop={6}>
+                  <CheckIcon color={c.brandText} size={18} />
+                </Pressable>
+                <Pressable onPress={() => setEditing(false)} style={[s.editBtn, { backgroundColor: c.surfaceAlt }]} hitSlop={6}>
+                  <CloseIcon color={c.text2} size={18} />
+                </Pressable>
               </View>
             ) : (
-              <TouchableOpacity
-                style={styles.nameRow}
-                onPress={() => { setTempName(name); setEditingName(true); }}>
-                <Text style={styles.nameText}>{name || t('addName')}</Text>
-                <EditIcon color="#8E8E93" size={16} />
-              </TouchableOpacity>
+              <Pressable style={s.nameRow} onPress={() => { setTempName(name); setEditing(true); }}>
+                <Text style={s.nameText}>{name || 'İsim ekle'}</Text>
+                <EditIcon color={c.text3} size={16} />
+              </Pressable>
             )}
-            <Text style={styles.memberText}>{t('luckyPickUser')}</Text>
+            {!editing ? <Text style={s.memberText}>LottoAI kullanıcısı</Text> : null}
           </View>
-        </LinearGradient>
+        </Surface>
 
-        <View style={styles.statsCard}>
-          <Text style={styles.cardTitle}>{t('myStats')}</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: '#6C63FF' }]}>{totalCoupons}</Text>
-              <Text style={styles.statLabel}>{t('savedCoupons')}</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: '#FFD700' }]}>{bestResult}</Text>
-              <Text style={styles.statLabel}>En İyi</Text>
-            </View>
+        {/* Stats */}
+        <Surface style={s.statsCard}>
+          <Stat value={String(totalCoupons)} label="Kupon" color={c.brand} theme={theme} divider />
+          <Stat value={String(bestResult)} label="En iyi" color={c.gold} theme={theme} divider />
+          <Stat value={String(totalMatched)} label="Tutuşan" color={c.brand} theme={theme} />
+        </Surface>
+
+        {/* Theme selector */}
+        <Surface style={s.card}>
+          <Text style={s.cardLabel}>GÖRÜNÜM</Text>
+          <View style={[s.themeSeg, { backgroundColor: theme.mode === 'dark' ? c.surfaceAlt : '#ECEEF1' }]}>
+            {themeOptions.map((opt) => {
+              const active = pref === opt.key;
+              return (
+                <Pressable
+                  key={opt.key}
+                  onPress={() => { setPref(opt.key); Haptics.selectionAsync(); }}
+                  style={[s.themeOpt, active && [{ backgroundColor: c.surface }, theme.shadowSm]]}
+                >
+                  {opt.Glyph({ color: active ? c.text : c.text2 })}
+                  <Text style={[s.themeOptText, { color: active ? c.text : c.text2, fontFamily: active ? theme.font.bold : theme.font.semibold }]}>{opt.label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
-          {mostPlayedGame !== '' && (
-            <View style={[styles.mostPlayedRow, { backgroundColor: getGameColor(mostPlayedGame) + '15', borderColor: getGameColor(mostPlayedGame) + '33' }]}>
-              <Text style={styles.mostPlayedText}>⭐ En çok oynadığın: </Text>
-              <Text style={[styles.mostPlayedGame, { color: getGameColor(mostPlayedGame) }]}>{mostPlayedGame}</Text>
-            </View>
-          )}
-        </View>
+        </Surface>
 
-        <View style={styles.menuCard}>
-          <Text style={styles.cardTitle}>🛠 Araçlar</Text>
+        {/* Tools */}
+        <Surface style={s.card}>
+          <Text style={s.cardLabel}>ARAÇLAR</Text>
+          <MenuRow Icon={BellIcon} color={c.brand} title="Hatırlatıcılar" sub={notificationsEnabled ? 'Açık' : 'Çekiliş öncesi/sonrası bildirim'} onPress={() => router.push('/notifications')} />
+          <MenuRow Icon={StatsIcon} color={c.gold} title="İstatistikler" sub="Sıcak/soğuk sayılar, dağılım" onPress={() => router.push('/(tabs)/results?tab=stats')} />
+          <MenuRow Icon={SearchIcon} color={c.brand} title="Sayı analizi" sub="Sayılarını sorgula" onPress={() => router.push('/(tabs)/results?tab=analyze')} last />
+        </Surface>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/notifications' as any)}>
-            <View style={[styles.menuIcon, { backgroundColor: '#6C63FF15' }]}>
-              <NotificationIcon color="#6C63FF" size={20} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuItemText}>{t('notifications')}</Text>
-              <Text style={styles.menuItemSub}>{notificationsEnabled ? 'Açık' : 'Kapalı'}</Text>
-            </View>
-            <ChevronRightIcon color="#C7C7CC" size={18} />
-          </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/statistics' as any)}>
-            <View style={[styles.menuIcon, { backgroundColor: '#FFD93D22' }]}>
-              <StatsIcon color="#FFD93D" size={20} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuItemText}>{t('statsTitle')}</Text>
-              <Text style={styles.menuItemSub}>{t('statsSub')}</Text>
-            </View>
-            <ChevronRightIcon color="#C7C7CC" size={18} />
-          </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/analyze' as any)}>
-            <View style={[styles.menuIcon, { backgroundColor: '#6BCB7715' }]}>
-              <AnalyzeIcon color="#6BCB77" size={20} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuItemText}>{t('analyzeTitle')}</Text>
-              <Text style={styles.menuItemSub}>{t('analyzeSub')}</Text>
-            </View>
-            <ChevronRightIcon color="#C7C7CC" size={18} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.menuCard}>
-          <Text style={styles.cardTitle}>ℹ️ Hakkında</Text>
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/legal' as any)}>
-            <View style={[styles.menuIcon, { backgroundColor: '#FF6B6B15' }]}>
-              <PrivacyIcon color="#FF6B6B" size={20} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuItemText}>{t('privacy')}</Text>
-              <Text style={styles.menuItemSub}>Kişisel verileriniz</Text>
-            </View>
-            <ChevronRightIcon color="#C7C7CC" size={18} />
-          </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(tabs)/legal' as any)}>
-            <View style={[styles.menuIcon, { backgroundColor: '#FF9F4315' }]}>
-              <TermsIcon color="#FF9F43" size={20} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuItemText}>{t('terms')}</Text>
-              <Text style={styles.menuItemSub}>Uygulama kuralları</Text>
-            </View>
-            <ChevronRightIcon color="#C7C7CC" size={18} />
-          </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => Linking.openURL('mailto:lottoai.destek@gmail.com')}>
-            <View style={[styles.menuIcon, { backgroundColor: '#6C63FF15' }]}>
-              <ContactIcon color="#6C63FF" size={20} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuItemText}>{t('contactUs')}</Text>
-              <Text style={styles.menuItemSub}>lottoai.destek@gmail.com</Text>
-            </View>
-            <ChevronRightIcon color="#C7C7CC" size={18} />
-          </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
-          <View style={styles.menuItem}>
-            <View style={[styles.menuIcon, { backgroundColor: '#E5E5EA' }]}>
-              <InfoIcon color="#8E8E93" size={20} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuItemText}>Versiyon</Text>
-              <Text style={styles.menuItemSub}>1.0.0</Text>
-            </View>
+        {/* Responsible gaming */}
+        <View style={[s.responsible, { backgroundColor: c.brandSoft, borderColor: c.brandBorder }]}>
+          <View style={s.responsibleHead}>
+            <ShieldIcon color={c.brand} size={20} />
+            <Text style={s.responsibleTitle}>Sorumlu oyun</Text>
           </View>
+          <Text style={s.responsibleText}>
+            Şans oyunları eğlence amaçlıdır, gelir kaynağı değildir. 18 yaş ve üzeri içindir. Oyun kontrolden çıktıysa{' '}
+            <Text style={{ fontFamily: theme.font.bold, color: c.brand }} onPress={() => Linking.openURL('tel:115')}>Yeşilay 115</Text>{' '}
+            danışma hattını arayabilirsin.
+          </Text>
         </View>
 
-        <View style={styles.dangerCard}>
-          <TouchableOpacity style={styles.dangerBtn} onPress={handleClearData}>
-            <TrashIcon color="#FF6B6B" size={20} />
-            <Text style={styles.dangerBtnText}>{t('clearAllData')}</Text>
-          </TouchableOpacity>
-        </View>
+        {/* About */}
+        <Surface style={s.card}>
+          <Text style={s.cardLabel}>HAKKINDA</Text>
+          <MenuRow Icon={ShieldIcon} color={c.text2} title="Gizlilik politikası" sub="Kişisel verilerin" onPress={() => router.push('/legal')} />
+          <MenuRow Icon={DocIcon} color={c.text2} title="Kullanım koşulları" sub="Uygulama kuralları" onPress={() => router.push('/legal')} />
+          <MenuRow Icon={MailIcon} color={c.text2} title="Bize ulaş" sub="lottoai.destek@gmail.com" onPress={() => Linking.openURL('mailto:lottoai.destek@gmail.com')} />
+          <MenuRow Icon={InfoIcon} color={c.text3} title="Versiyon" sub="1.0.0" last />
+        </Surface>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>🍀 LottoAI v1.0.0</Text>
-          <Text style={styles.footerSub}>Şans oyunları asistanınız</Text>
-          <Text style={styles.footerWarning}>⚠️ Bu uygulama 18 yaş ve üzeri içindir.</Text>
-        </View>
+        {/* Danger */}
+        <PressableScale onPress={clearData} haptic={false} style={[s.danger, { backgroundColor: c.dangerSoft, borderColor: c.danger + '33' }]}>
+          <TrashIcon color={c.danger} size={20} />
+          <Text style={[s.dangerText, { color: c.danger }]}>Tüm verileri sil</Text>
+        </PressableScale>
 
+        {/* Footer */}
+        <View style={s.footer}>
+          <BrandMark size={34} bg={c.brand} fg={c.brandText} />
+          <Text style={s.footerText}>LottoAI · v1.0.0</Text>
+          <Text style={s.footerSub}>18+ · Şans oyunları asistanı</Text>
+        </View>
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F7' },
-  headerGradient: { paddingBottom: 30 },
-  avatarContainer: { alignItems: 'center', paddingTop: 40, gap: 10 },
-  avatar: { width: 90, height: 90, borderRadius: 45, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontSize: 40 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  nameText: { color: '#1a1a2e', fontSize: 22, fontWeight: 'bold' },
-  nameEditRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  nameInput: { backgroundColor: '#FFFFFF', color: '#1a1a2e', fontSize: 18, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#6C63FF33', minWidth: 180 },
-  nameSaveBtn: { backgroundColor: '#6C63FF', padding: 10, borderRadius: 10 },
-  nameSaveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  nameCancelBtn: { backgroundColor: '#E5E5EA', padding: 10, borderRadius: 10 },
-  nameCancelBtnText: { color: '#8E8E93', fontSize: 16 },
-  memberText: { color: '#6C63FF', fontSize: 13 },
-  statsCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 16, marginTop: 20, marginBottom: 12, borderWidth: 1, borderColor: '#E5E5EA', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  cardTitle: { color: '#1a1a2e', fontSize: 16, fontWeight: 'bold', marginBottom: 16 },
-  statsGrid: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  statItem: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 28, fontWeight: 'bold' },
-  statLabel: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
-  statDivider: { width: 1, height: 40, backgroundColor: '#E5E5EA' },
-  mostPlayedRow: { flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 10, borderWidth: 1 },
-  mostPlayedText: { color: '#8E8E93', fontSize: 13 },
-  mostPlayedGame: { fontSize: 13, fontWeight: 'bold', flex: 1 },
-  menuCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E5E5EA', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
-  menuIcon: { width: 38, height: 38, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  menuItemText: { color: '#1a1a2e', fontSize: 15 },
-  menuItemSub: { color: '#8E8E93', fontSize: 12, marginTop: 1 },
-  menuDivider: { height: 1, backgroundColor: '#E5E5EA', marginVertical: 4 },
-  dangerCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#FF6B6B22' },
-  dangerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: '#FF6B6B11' },
-  dangerBtnText: { color: '#FF6B6B', fontSize: 15, fontWeight: 'bold' },
-  footer: { alignItems: 'center', padding: 20, gap: 4 },
-  footerText: { color: '#1a1a2e', fontSize: 14, fontWeight: 'bold' },
-  footerSub: { color: '#8E8E93', fontSize: 12 },
-  footerWarning: { color: '#FF9F43', fontSize: 11, marginTop: 4 },
-});
+function Stat({ value, label, color, theme, divider }: { value: string; label: string; color: string; theme: AppTheme; divider?: boolean }) {
+  const c = theme.colors;
+  return (
+    <>
+      <View style={{ flex: 1, alignItems: 'center' }}>
+        <Text style={{ fontFamily: theme.font.extrabold, fontSize: 26, color, fontVariant: ['tabular-nums'] }}>{value}</Text>
+        <Text style={{ ...theme.typography.caption, color: c.text2, marginTop: 3 }}>{label}</Text>
+      </View>
+      {divider ? <View style={{ width: 1, height: 40, backgroundColor: c.hairline, alignSelf: 'center' }} /> : null}
+    </>
+  );
+}
+
+function makeStyles(theme: AppTheme) {
+  const c = theme.colors;
+  const { spacing, radius, typography: ty } = theme;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    header: { paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
+    title: { ...ty.h1, color: c.text },
+
+    avatarCard: { marginHorizontal: spacing.xl, marginBottom: spacing.md, padding: 22, flexDirection: 'row', alignItems: 'center', gap: 16, borderRadius: radius.xxl },
+    avatar: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+    avatarText: { fontFamily: theme.font.extrabold, fontSize: 28, color: '#fff' },
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    nameText: { ...ty.h2, color: c.text },
+    memberText: { ...ty.caption, color: c.text2, marginTop: 3 },
+    editRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    nameInput: { flex: 1, height: 42, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 12, fontFamily: theme.font.bold, fontSize: 16 },
+    editBtn: { width: 42, height: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+
+    statsCard: { flexDirection: 'row', marginHorizontal: spacing.xl, padding: 18, marginBottom: spacing.md },
+
+    card: { marginHorizontal: spacing.xl, marginBottom: spacing.md, paddingHorizontal: 18, paddingVertical: 16 },
+    cardLabel: { ...ty.micro, color: c.text2, marginBottom: 10 },
+
+    themeSeg: { flexDirection: 'row', gap: 3, padding: 4, borderRadius: 13 },
+    themeOpt: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10 },
+    themeOptText: { fontSize: 13 },
+
+    menuRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13 },
+    menuIcon: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+    menuTitle: { ...ty.bodySemibold, color: c.text },
+    menuSub: { ...ty.caption, color: c.text3, marginTop: 1 },
+
+    responsible: { marginHorizontal: spacing.xl, marginBottom: spacing.md, padding: 16, borderRadius: radius.xl, borderWidth: 1 },
+    responsibleHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+    responsibleTitle: { ...ty.title, color: c.text },
+    responsibleText: { ...ty.caption, color: c.text2, lineHeight: 19 },
+
+    danger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginHorizontal: spacing.xl, marginBottom: spacing.md, padding: 14, borderRadius: radius.md, borderWidth: 1 },
+    dangerText: { ...ty.title },
+
+    footer: { alignItems: 'center', gap: 5, paddingTop: 18, paddingBottom: 28 },
+    footerText: { ...ty.label, color: c.text2, marginTop: 4 },
+    footerSub: { ...ty.caption, color: c.text3 },
+  });
+}

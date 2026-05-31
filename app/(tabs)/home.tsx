@@ -1,27 +1,49 @@
-// tabs_home.tsx
+// app/(tabs)/home.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
+  Pressable,
   RefreshControl,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GAME_COLORS, getDayLabel, getDefaultCountry, getGameByName, getGamesByCountry } from '../../lib/games';
-import { t } from '../../lib/i18n';
+
+import { AppButton } from '../../components/ui/app-button';
+import { NumberBall } from '../../components/ui/number-ball';
+import { PressableScale, Surface } from '../../components/ui/surface';
+import { AppTheme, GameAccent } from '../../constants/theme';
+import { BrandMark, GameEmblem } from '../../lib/emblems';
+import {
+  getDayLabel,
+  getDefaultCountry,
+  getGameByName,
+  getGamesByCountry,
+} from '../../lib/games';
+import {
+  AIAssistantIcon,
+  ArrowRightIcon,
+  BellIcon,
+  CalendarIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  SparkIcon,
+  TicketIcon,
+  WifiOffIcon,
+} from '../../lib/icons';
 import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../lib/theme';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = width - 40;
+const CARD_WIDTH = width - 64;
 
+/* ----------------------------- helpers ----------------------------- */
 function getTodayIndex(): number {
   const jsDay = new Date().getDay();
   return jsDay === 0 ? 6 : jsDay - 1;
@@ -34,24 +56,14 @@ type LastDraw = {
   superstar?: number | null;
   draw_date: string;
   draw_no: string;
-  created_at: string;
   estimated_prize?: number | null;
-};
-
-type NewDrawNotif = {
-  game: string;
-  icon: string;
-  color: string;
-  draw_date: string;
 };
 
 function getNextDraw() {
   const now = new Date();
-  let nextGame = null;
+  let nextGame: any = null;
   let minDiff = Infinity;
-
   const countryGames = getGamesByCountry(getDefaultCountry());
-
   for (const game of countryGames) {
     for (const day of game.drawDays) {
       const next = new Date();
@@ -71,45 +83,67 @@ function getNextDraw() {
   return nextGame;
 }
 
-function formatCountdown(ms: number) {
-  const totalSeconds = Math.floor(ms / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
+function countdownParts(ms: number) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  if (hours > 24) {
-    const days = Math.floor(hours / 24);
-    return `${days} gün ${hours % 24} saat`;
-  }
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  return { days, hours, minutes, seconds };
 }
+
+const pad = (n: number) => n.toString().padStart(2, '0');
 
 function parseNumbers(str: string): number[] {
-  return str.split(' - ').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+  return str.split(' - ').map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
 }
 
-function formatPrize(amount: number, currency: string = 'TRY'): string {
+function formatPrize(amount: number, currency = 'TRY'): string {
   if (currency === 'USD') {
-    if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1)} Billion`;
-    if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)} Million`;
-    if (amount >= 1_000) return `$${(amount / 1_000).toFixed(1)}K`;
+    if (amount >= 1e9) return `$${(amount / 1e9).toFixed(1)}B`;
+    if (amount >= 1e6) return `$${(amount / 1e6).toFixed(1)}M`;
+    if (amount >= 1e3) return `$${(amount / 1e3).toFixed(1)}K`;
     return `$${amount}`;
   }
-  if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(1)} Milyar TL`;
-  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)} Milyon TL`;
-  if (amount >= 1_000) return `${(amount / 1_000).toFixed(1)} Bin TL`;
+  if (amount >= 1e9) return `${(amount / 1e9).toFixed(1)} Milyar TL`;
+  if (amount >= 1e6) return `${(amount / 1e6).toFixed(1)} Milyon TL`;
+  if (amount >= 1e3) return `${(amount / 1e3).toFixed(0)} Bin TL`;
   return `${amount} TL`;
 }
 
+function gameMeta(name: string) {
+  const game = getGameByName(name);
+  const id = game?.id ?? 'cilgin';
+  return { game, id, color: GameAccent[id] ?? '#1C9E73' };
+}
+
+/* ----------------------------- section ----------------------------- */
+function SectionHeader({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  const theme = useTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  return (
+    <View style={s.sectionHeader}>
+      <Text style={s.sectionTitle}>{title}</Text>
+      {action ? (
+        <Pressable onPress={onAction} hitSlop={8}>
+          <Text style={s.sectionAction}>{action}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+/* ------------------------------ screen ----------------------------- */
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const c = theme.colors;
+  const s = useMemo(() => makeStyles(theme), [theme]);
+
   const [nextDraw, setNextDraw] = useState(getNextDraw());
-  const [countdown, setCountdown] = useState('');
-  const [newDrawNotifs, setNewDrawNotifs] = useState<NewDrawNotif[]>([]);
+  const [parts, setParts] = useState(countdownParts(nextDraw?.diff ?? 0));
   const [lastDraws, setLastDraws] = useState<LastDraw[]>([]);
-  const fadeAnim = useState(new Animated.Value(0))[0];
-  const scaleAnim = useState(new Animated.Value(0.95))[0];
-  const todayIndex = getTodayIndex();
   const [userName, setUserName] = useState('');
   const [pendingCoupons, setPendingCoupons] = useState(0);
   const [todayDrawCount, setTodayDrawCount] = useState(0);
@@ -117,21 +151,21 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const fade = useRef(new Animated.Value(0)).current;
+  const rise = useRef(new Animated.Value(16)).current;
+  const todayIndex = getTodayIndex();
+
   const userCountry = getDefaultCountry();
   const countryGames = useMemo(() => getGamesByCountry(userCountry), [userCountry]);
   const locale = countryGames[0]?.locale || 'tr-TR';
 
   const weekSchedule = useMemo(() => {
-    const schedule: { day: number; label: string; games: { name: string; icon: string; time: string }[] }[] = [];
+    const schedule: { day: number; label: string; games: { id: string; name: string; time: string }[] }[] = [];
     for (let d = 0; d < 7; d++) {
       const jsDay = d === 6 ? 0 : d + 1;
       const gamesOfDay = countryGames
-        .filter(g => g.drawDays.includes(jsDay))
-        .map(g => ({
-          name: g.name,
-          icon: g.icon,
-          time: `${g.drawHour}:${String(g.drawMinute).padStart(2, '0')}`,
-        }));
+        .filter((g) => g.drawDays.includes(jsDay))
+        .map((g) => ({ id: g.id, name: g.name, time: `${g.drawHour}:${pad(g.drawMinute)}` }));
       schedule.push({ day: d, label: getDayLabel(d, locale), games: gamesOfDay });
     }
     return schedule;
@@ -139,49 +173,43 @@ export default function HomeScreen() {
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, friction: 8, useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(rise, { toValue: 0, friction: 9, useNativeDriver: true }),
     ]).start();
-
     const interval = setInterval(() => {
       const next = getNextDraw();
       setNextDraw(next);
-      if (next) setCountdown(formatCountdown(next.diff));
+      if (next) setParts(countdownParts(next.diff));
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fade, rise]);
 
   const loadSmartSummary = useCallback(async () => {
     try {
       const savedName = await AsyncStorage.getItem('userName');
       if (savedName) setUserName(savedName);
-
       const couponsRaw = await AsyncStorage.getItem('savedCoupons');
       if (couponsRaw) {
         const coupons = JSON.parse(couponsRaw);
-        const pending = coupons.filter((c: any) => 
-          c.matchedCount === undefined || c.matchedCount === null
+        const pending = coupons.filter(
+          (cp: any) => cp.matchedCount === undefined || cp.matchedCount === null
         ).length;
         setPendingCoupons(pending);
       }
-
       const now = new Date();
       const today = now.getDay();
-      const currentHour = now.getHours();
-      const currentMinute = now.getMinutes();
-      const count = countryGames.filter(g => {
+      const currentTime = now.getHours() * 60 + now.getMinutes();
+      const count = countryGames.filter((g) => {
         if (!g.drawDays.includes(today)) return false;
-        const drawTime = g.drawHour * 60 + g.drawMinute;
-        const currentTime = currentHour * 60 + currentMinute;
-        return drawTime > currentTime;
+        return g.drawHour * 60 + g.drawMinute > currentTime;
       }).length;
       setTodayDrawCount(count);
-    } catch (e) {}
+    } catch {}
   }, [countryGames]);
 
   const fetchLastDraws = useCallback(async () => {
     try {
-      const gameNames = countryGames.map(g => g.name);
+      const gameNames = countryGames.map((g) => g.name);
       const settled = await Promise.allSettled(
         gameNames.map((gameName) =>
           supabase
@@ -194,344 +222,268 @@ export default function HomeScreen() {
         )
       );
       const results: LastDraw[] = settled
-        .filter((r) => r.status === 'fulfilled' && r.value.data)
+        .filter((r) => r.status === 'fulfilled' && (r as any).value.data)
         .map((r) => (r as PromiseFulfilledResult<any>).value.data as LastDraw);
       results.sort((a, b) => {
-        const dateA = a.draw_date.split('.').reverse().join('-');
-        const dateB = b.draw_date.split('.').reverse().join('-');
-        return dateB.localeCompare(dateA);
+        const da = a.draw_date.split('.').reverse().join('-');
+        const db = b.draw_date.split('.').reverse().join('-');
+        return db.localeCompare(da);
       });
       setLastDraws(results);
-    } catch (e) {}
+    } catch {}
   }, [countryGames]);
 
-  const checkNewDraws = useCallback(async () => {
-    try {
-      const lastSeenKey = 'lastSeenDrawDate';
-      const lastSeen = await AsyncStorage.getItem(lastSeenKey);
-      const today = new Date().toLocaleDateString('tr-TR');
-      if (lastSeen === today) return;
-
-      const settled = await Promise.allSettled(
-        countryGames.map((game) =>
-          supabase
-            .from('draws')
-            .select('game, draw_date')
-            .eq('game', game.name)
-            .order('draw_date_parsed', { ascending: false })
-            .limit(1)
-            .single()
-        )
-      );
-
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-
-      const notifs: NewDrawNotif[] = [];
-      settled.forEach((result, index) => {
-        if (result.status !== 'fulfilled' || !result.value.data) return;
-        const data = result.value.data;
-        const game = countryGames[index];
-        const gc = GAME_COLORS[game.name as keyof typeof GAME_COLORS];
-        const drawDate = new Date(data.draw_date.split('.').reverse().join('-'));
-        if (drawDate >= yesterday) {
-          notifs.push({ game: game.name, icon: game.icon, color: gc?.main || '#6C63FF', draw_date: data.draw_date });
-        }
-      });
-
-      if (notifs.length > 0) {
-        setNewDrawNotifs(notifs);
-        await AsyncStorage.setItem(lastSeenKey, today);
-      }
-    } catch (e) {}
-  }, [countryGames]);
-
-  const loadAllData = useCallback(async () => {
+  const loadAll = useCallback(async () => {
     setError(null);
     setLoading(true);
     try {
-      await Promise.all([
-        checkNewDraws(),
-        fetchLastDraws(),
-        loadSmartSummary(),
-      ]);
-    } catch (e) {
+      await Promise.all([fetchLastDraws(), loadSmartSummary()]);
+    } catch {
       setError('Veriler yüklenirken bir sorun oluştu.');
     } finally {
       setLoading(false);
     }
-  }, [checkNewDraws, fetchLastDraws, loadSmartSummary]);
+  }, [fetchLastDraws, loadSmartSummary]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadAllData();
-    }, [loadAllData])
-  );
+  useFocusEffect(useCallback(() => { loadAll(); }, [loadAll]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadAllData();
+    await loadAll();
     setRefreshing(false);
-  }, [loadAllData]);
+  }, [loadAll]);
 
-  const dismissNotif = useCallback((index: number) => {
-    setNewDrawNotifs(prev => prev.filter((_, i) => i !== index));
-  }, []);
+  const next = nextDraw ? gameMeta(nextDraw.game.name) : null;
+  const showDays = parts.days > 0;
 
-  const getGameIcon = useCallback((gameName: string) => {
-    return getGameByName(gameName)?.icon || '🎱';
-  }, []);
-
-  const getGameId = useCallback((gameName: string): string => {
-    const game = getGameByName(gameName);
-    return game?.id || 'cilgin';
-  }, []);
+  const blocks = showDays
+    ? [
+        { v: pad(parts.days), l: 'Gün' },
+        { v: pad(parts.hours), l: 'Saat' },
+        { v: pad(parts.minutes), l: 'Dakika' },
+      ]
+    : [
+        { v: pad(parts.hours), l: 'Saat' },
+        { v: pad(parts.minutes), l: 'Dakika' },
+        { v: pad(parts.seconds), l: 'Saniye' },
+      ];
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <View style={s.container}>
+      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 30 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#6C63FF"
-            colors={['#6C63FF']}
-          />
-        }>
-
+        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: 28 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.brand} colors={[c.brand]} />}
+      >
         {/* Header */}
-        <LinearGradient colors={['#F0EEFF', '#FFFFFF']} style={styles.headerGradient}>
-          <Animated.View style={[styles.header, { opacity: fadeAnim, paddingTop: insets.top + 12 }]}>
+        <Animated.View style={[s.header, { opacity: fade, transform: [{ translateY: rise }] }]}>
+          <View style={s.headerLeft}>
+            <BrandMark size={42} bg={c.brand} fg={c.brandText} />
             <View>
-              <Text style={styles.greeting}>
-                {userName ? `Merhaba, ${userName}! 👋` : t('welcome')}
-              </Text>
-              <Text style={styles.appName}>{t('appName')}</Text>
-              <Text style={styles.appSubtitle}>{t('smartCoupon')}</Text>
+              <Text style={s.greeting}>{userName ? `Merhaba, ${userName}` : 'Merhaba'}</Text>
+              <Text style={s.brand}>LottoAI</Text>
             </View>
-            <LinearGradient colors={['#6C63FF', '#4834d4']} style={styles.logoGradient}>
-              <Text style={styles.logoEmoji}>🍀</Text>
-            </LinearGradient>
-          </Animated.View>
+          </View>
+          <View style={s.headerActions}>
+            <PressableScale style={s.iconBtn} onPress={() => router.push('/(tabs)/ai-assistant' as any)}>
+              <AIAssistantIcon color={c.brand} size={20} />
+            </PressableScale>
+            <PressableScale style={s.iconBtn} onPress={() => router.push('/notifications' as any)}>
+              <BellIcon color={c.text2} size={20} />
+              <View style={[s.dot, { borderColor: c.surface }]} />
+            </PressableScale>
+          </View>
+        </Animated.View>
 
-          {error && (
-            <View style={styles.errorCard}>
-              <Text style={styles.errorEmoji}>⚠️</Text>
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryBtn} onPress={loadAllData}>
-                <Text style={styles.retryBtnText}>{t('retry')}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+        {error ? (
+          <Surface style={s.errorCard}>
+            <WifiOffIcon color={c.danger} size={30} />
+            <Text style={s.errorText}>{error}</Text>
+            <AppButton label="Tekrar dene" variant="secondary" size="md" fullWidth={false} onPress={loadAll} />
+          </Surface>
+        ) : null}
 
-          {!error && (pendingCoupons > 0 || todayDrawCount > 0) && (
-            <View style={styles.smartSummaryCard}>
-              {pendingCoupons > 0 && (
-                <TouchableOpacity
-                  style={styles.smartSummaryRow}
-                  onPress={() => router.push('/(tabs)/saved' as any)}>
-                  <Text style={styles.smartSummaryEmoji}>🎯</Text>
-                  <Text style={styles.smartSummaryText}>
-                    <Text style={styles.smartSummaryHighlight}>{pendingCoupons} kuponun</Text>
-                    {' '}sonuç bekliyor
+        {/* Countdown hero */}
+        {!error && next ? (
+          <Animated.View style={{ opacity: fade, transform: [{ translateY: rise }] }}>
+            <Surface elevated style={s.hero}>
+              <View style={[s.heroAccent, { backgroundColor: next.color }]} />
+              <View style={s.heroBody}>
+                <View style={s.heroTop}>
+                  <Text style={s.heroLabel}>SONRAKİ ÇEKİLİŞ</Text>
+                  <View style={[s.gamePill, { backgroundColor: next.color + '14' }]}>
+                    <View style={[s.gameDot, { backgroundColor: next.color }]} />
+                    <Text style={[s.gamePillText, { color: next.color }]}>{nextDraw.game.name}</Text>
+                  </View>
+                </View>
+
+                <View style={s.timerRow}>
+                  {blocks.map((b, i) => (
+                    <React.Fragment key={b.l}>
+                      <View style={s.timerBlock}>
+                        <Text style={s.timerNum}>{b.v}</Text>
+                        <Text style={s.timerUnit}>{b.l.toUpperCase()}</Text>
+                      </View>
+                      {i < blocks.length - 1 ? <Text style={s.timerColon}>:</Text> : null}
+                    </React.Fragment>
+                  ))}
+                </View>
+
+                <View style={s.heroDateRow}>
+                  <ClockIcon color={c.text2} size={15} />
+                  <Text style={s.heroDate}>
+                    {nextDraw.next.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })} ·{' '}
+                    {nextDraw.game.drawHour}:{pad(nextDraw.game.drawMinute)}
                   </Text>
-                  <Text style={styles.smartSummaryArrow}>→</Text>
-                </TouchableOpacity>
-              )}
-              {todayDrawCount > 0 && (
-                <TouchableOpacity
-                  style={[styles.smartSummaryRow, pendingCoupons > 0 && { borderTopWidth: 1, borderTopColor: '#E5E5EA' }]}
-                  onPress={() => router.push('/(tabs)/generate' as any)}>
-                  <Text style={styles.smartSummaryEmoji}>🎰</Text>
-                  <Text style={styles.smartSummaryText}>
-                    Bugün{' '}
-                    <Text style={styles.smartSummaryHighlight}>{todayDrawCount} çekiliş</Text>
-                    {' '}var
-                  </Text>
-                  <Text style={styles.smartSummaryArrow}>→</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+                </View>
 
-          {!error && newDrawNotifs.map((notif, index) => (
-            <View key={index} style={[styles.notifBanner, { borderLeftColor: notif.color }]}>
-              <Text style={styles.notifEmoji}>{notif.icon}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.notifTitle}>🆕 Yeni Sonuç!</Text>
-                <Text style={styles.notifText}>{notif.game} · {notif.draw_date}</Text>
+                <AppButton
+                  label="Kupon üret"
+                  onPress={() => router.push(`/(tabs)/generate?game=${nextDraw.game.id}` as any)}
+                  iconRight={(color, size) => <ArrowRightIcon color={color} size={size} />}
+                  style={{ marginTop: 16 }}
+                />
               </View>
-              <TouchableOpacity
-                style={[styles.notifBtn, { backgroundColor: notif.color }]}
-                onPress={() => { dismissNotif(index); router.push(`/results?game=${getGameId(notif.game)}` as any); }}>
-                <Text style={styles.notifBtnText}>Gör →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => dismissNotif(index)} style={styles.notifClose}>
-                <Text style={styles.notifCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+            </Surface>
+          </Animated.View>
+        ) : null}
 
-          {!error && nextDraw && (() => {
-            const gc = GAME_COLORS[nextDraw.game.name as keyof typeof GAME_COLORS];
-            const color = gc?.main || '#6C63FF';
-            return (
-              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => router.push(`/(tabs)/generate?game=${nextDraw.game.id}` as any)}>
-                  <LinearGradient
-                    colors={[color + '18', color + '08']}
-                    style={[styles.countdownCard, { borderColor: color + '33' }]}>
-                    <Text style={styles.countdownLabel}>{t('nextDraw')}</Text>
-                    <Text style={[styles.countdownGame, { color }]}>
-                      {nextDraw.game.icon} {nextDraw.game.name}
-                    </Text>
-                    <Text style={styles.countdownTimer}>{countdown}</Text>
-                    <Text style={styles.countdownDate}>
-                      📅 {nextDraw.next.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })} · {nextDraw.game.drawHour}:{nextDraw.game.drawMinute.toString().padStart(2, '0')}
-                    </Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </Animated.View>
-            );
-          })()}
-        </LinearGradient>
+        {/* Smart summary */}
+        {!error && (pendingCoupons > 0 || todayDrawCount > 0) ? (
+          <Surface style={s.summary}>
+            {pendingCoupons > 0 ? (
+              <PressableScale style={s.summaryRow} onPress={() => router.push('/(tabs)/saved' as any)}>
+                <View style={[s.summaryIcon, { backgroundColor: c.brandSoft }]}>
+                  <TicketIcon color={c.brand} size={20} />
+                </View>
+                <Text style={s.summaryText}>
+                  <Text style={s.summaryStrong}>{pendingCoupons} kuponun</Text> sonuç bekliyor
+                </Text>
+                <ChevronRightIcon color={c.text3} size={18} />
+              </PressableScale>
+            ) : null}
+            {pendingCoupons > 0 && todayDrawCount > 0 ? <View style={s.divider} /> : null}
+            {todayDrawCount > 0 ? (
+              <PressableScale style={s.summaryRow} onPress={() => router.push('/(tabs)/generate' as any)}>
+                <View style={[s.summaryIcon, { backgroundColor: c.goldSoft }]}>
+                  <SparkIcon color={c.gold} size={20} />
+                </View>
+                <Text style={s.summaryText}>
+                  Bugün <Text style={s.summaryStrong}>{todayDrawCount} çekiliş</Text> var
+                </Text>
+                <ChevronRightIcon color={c.text3} size={18} />
+              </PressableScale>
+            ) : null}
+          </Surface>
+        ) : null}
 
-        {/* Son Çekilişler */}
-        {!error && lastDraws.length > 0 && (
+        {/* Last draws */}
+        {!error && lastDraws.length > 0 ? (
           <>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Son Çekilişler 📡</Text>
-              <TouchableOpacity onPress={() => router.push('/results' as any)}>
-                <Text style={styles.seeAll}>Tümü →</Text>
-              </TouchableOpacity>
-            </View>
+            <SectionHeader title="Son çekilişler" action="Tümü" onAction={() => router.push('/results' as any)} />
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              pagingEnabled
               decelerationRate="fast"
-              snapToInterval={CARD_WIDTH + 16}
-              snapToAlignment="start"
-              contentContainerStyle={{ paddingLeft: 20, paddingRight: 20 }}>
+              snapToInterval={CARD_WIDTH + 14}
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}
+            >
               {lastDraws.map((draw, index) => {
-                const gc = GAME_COLORS[draw.game as keyof typeof GAME_COLORS];
-                const mainColor = gc?.main || '#6C63FF';
-                const bonusColor = gc?.bonus || '#FF6B6B';
-                const icon = getGameIcon(draw.game);
+                const meta = gameMeta(draw.game);
                 const nums = parseNumbers(draw.numbers);
-                const gameCurrency = getGameByName(draw.game)?.currency || 'TRY';
-
+                const currency = meta.game?.currency || 'TRY';
                 return (
-                  <TouchableOpacity key={index} activeOpacity={0.9} onPress={() => router.push(`/results?game=${getGameId(draw.game)}` as any)}>
-                    <LinearGradient
-                      colors={['#FFFFFF', '#F9F9FB']}
-                      style={[styles.lastDrawCard, { borderColor: mainColor + '33', width: CARD_WIDTH }]}>
-                      <View style={styles.lastDrawHeader}>
-                        <Text style={styles.lastDrawEmoji}>{icon}</Text>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.lastDrawGame}>{draw.game}</Text>
-                          <Text style={styles.lastDrawDate}>📅 {draw.draw_date}</Text>
+                  <PressableScale
+                    key={index}
+                    onPress={() => router.push(`/results?game=${meta.id}` as any)}
+                    style={[s.drawCard, { width: CARD_WIDTH }]}
+                  >
+                    <View style={s.drawHeader}>
+                      <GameEmblem game={meta.id} size={40} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.drawGame}>{draw.game}</Text>
+                        <View style={s.drawDateRow}>
+                          <CalendarIcon color={c.text3} size={14} />
+                          <Text style={s.drawDate}>{draw.draw_date} · {draw.draw_no}. çekiliş</Text>
                         </View>
                       </View>
-                      <View style={styles.lastDrawNumbers}>
-                        {nums.map((num, i) => (
-                          <View key={i} style={[styles.lastDrawBall, { backgroundColor: mainColor }]}>
-                            <Text style={styles.lastDrawBallText}>{num}</Text>
-                          </View>
-                        ))}
+                    </View>
+                    <View style={s.drawNumbers}>
+                      {nums.map((n, i) => (
+                        <NumberBall key={i} value={n} color={meta.color} size={34} />
+                      ))}
+                      {draw.bonus && draw.bonus !== '-' ? (
+                        <>
+                          <View style={s.ballDivider} />
+                          <NumberBall value={draw.bonus} variant="bonus" size={34} />
+                        </>
+                      ) : null}
+                      {draw.superstar != null && draw.superstar > 0 ? (
+                        <NumberBall value={draw.superstar} variant="star" size={34} />
+                      ) : null}
+                    </View>
+                    {draw.estimated_prize != null && draw.estimated_prize > 0 ? (
+                      <View style={s.prizeRow}>
+                        <Text style={s.prizeLabel}>Büyük ikramiye</Text>
+                        <Text style={s.prizeAmount}>{formatPrize(draw.estimated_prize, currency)}</Text>
                       </View>
-                      {draw.bonus && draw.bonus !== '-' && (
-                        <View style={styles.lastDrawBonus}>
-                          <Text style={styles.lastDrawBonusLabel}>🎯 </Text>
-                          <View style={[styles.lastDrawBall, { backgroundColor: bonusColor }]}>
-                            <Text style={styles.lastDrawBallText}>{draw.bonus}</Text>
-                          </View>
-                        </View>
-                      )}
-                      {draw.superstar != null && draw.superstar > 0 && (
-                        <View style={styles.lastDrawBonus}>
-                          <Text style={styles.lastDrawBonusLabel}>⭐ </Text>
-                          <View style={[styles.lastDrawBall, { backgroundColor: '#FFD700' }]}>
-                            <Text style={[styles.lastDrawBallText, { color: '#000' }]}>{draw.superstar}</Text>
-                          </View>
-                        </View>
-                      )}
-                      {draw.estimated_prize != null && draw.estimated_prize > 0 && (
-                        <View style={styles.prizeRow}>
-                          <Text style={styles.prizeLabel}>💰 Büyük İkramiye</Text>
-                          <Text style={[styles.prizeAmount, { color: '#E53935' }]}>
-                            {formatPrize(draw.estimated_prize, gameCurrency)}
-                          </Text>
-                        </View>
-                      )}
-                    </LinearGradient>
-                  </TouchableOpacity>
+                    ) : null}
+                  </PressableScale>
                 );
               })}
             </ScrollView>
           </>
-        )}
+        ) : null}
 
-        {!error && !loading && lastDraws.length === 0 && (
-          <View style={styles.guideCard}>
-            <Text style={styles.guideEmoji}>🎉</Text>
-            <Text style={styles.guideTitle}>Hoş Geldin!</Text>
-            <Text style={styles.guideDesc}>
-              Henüz bir çekiliş verisi yok.{'\n'}
-              Şimdi ilk adımını at, kuponunu üret!
-            </Text>
-            <View style={styles.guideButtons}>
-              <TouchableOpacity
-                style={styles.guideBtn}
-                onPress={() => router.push('/(tabs)/generate' as any)}>
-                <Text style={styles.guideBtnEmoji}>🎲</Text>
-                <Text style={styles.guideBtnText}>Kupon Üret</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.guideBtn, { backgroundColor: '#6C63FF12', borderColor: '#6C63FF33' }]}
-                onPress={() => router.push('/(tabs)/notifications' as any)}>
-                <Text style={styles.guideBtnEmoji}>🔔</Text>
-                <Text style={[styles.guideBtnText, { color: '#6C63FF' }]}>Hatırlatıcıları Ayarla</Text>
-              </TouchableOpacity>
+        {/* Empty welcome */}
+        {!error && !loading && lastDraws.length === 0 ? (
+          <Surface style={s.emptyCard}>
+            <View style={[s.emptyIcon, { backgroundColor: c.brandSoft }]}>
+              <SparkIcon color={c.brand} size={28} />
             </View>
-            <Text style={styles.guideFootnote}>
-              Çekiliş sonuçları sisteme girildiğinde burada görünecek.
-            </Text>
-          </View>
-        )}
+            <Text style={s.emptyTitle}>Hoş geldin</Text>
+            <Text style={s.emptyDesc}>Henüz çekiliş verisi yok. İlk kuponunu üreterek başla.</Text>
+            <AppButton
+              label="Kupon üret"
+              onPress={() => router.push('/(tabs)/generate' as any)}
+              style={{ marginTop: 4 }}
+            />
+          </Surface>
+        ) : null}
 
-        {!error && (
+        {/* Weekly schedule */}
+        {!error ? (
           <>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Haftalık Takvim 📅</Text>
-            </View>
-            <View style={styles.scheduleContainer}>
-              {weekSchedule.map((dayItem) => {
-                const isToday = dayItem.day === todayIndex;
+            <SectionHeader title="Haftalık takvim" />
+            <Surface style={s.schedule}>
+              {weekSchedule.map((row, i) => {
+                const isToday = row.day === todayIndex;
                 return (
-                  <View key={dayItem.day} style={[styles.scheduleRow, isToday && styles.scheduleTodayRow]}>
-                    <View style={styles.scheduleDayBadge}>
-                      <Text style={[styles.scheduleDayText, isToday && { color: '#6C63FF', fontWeight: 'bold' }]}>
-                        {dayItem.label}
+                  <View
+                    key={row.day}
+                    style={[
+                      s.scheduleRow,
+                      i < weekSchedule.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.hairline },
+                      isToday && { backgroundColor: c.brandSoft },
+                    ]}
+                  >
+                    <View style={s.scheduleDay}>
+                      <Text style={[s.scheduleDayText, isToday && { color: c.brand, fontFamily: theme.font.extrabold }]}>
+                        {row.label}
                       </Text>
-                      {isToday && <Text style={styles.scheduleTodayDot}>●</Text>}
+                      {isToday ? <View style={[s.scheduleDot, { backgroundColor: c.brand }]} /> : null}
                     </View>
-                    <View style={styles.scheduleGames}>
-                      {dayItem.games.length === 0 ? (
-                        <Text style={{ color: '#C7C7CC', fontSize: 12 }}>—</Text>
+                    <View style={s.scheduleGames}>
+                      {row.games.length === 0 ? (
+                        <Text style={s.scheduleEmpty}>—</Text>
                       ) : (
-                        dayItem.games.map((g, i) => {
-                          const gc2 = GAME_COLORS[g.name as keyof typeof GAME_COLORS];
-                          const color = gc2?.main || '#6C63FF';
+                        row.games.map((g) => {
+                          const color = GameAccent[g.id] ?? c.brand;
                           return (
-                            <View key={i} style={[styles.scheduleGameChip, { backgroundColor: color + '15', borderColor: color + '33' }]}>
-                              <Text style={styles.scheduleGameEmoji}>{g.icon}</Text>
-                              <Text style={[styles.scheduleGameTime, { color }]}>{g.time}</Text>
+                            <View key={g.id} style={[s.gameChip, { backgroundColor: color + '12', borderColor: color + '22' }]}>
+                              <GameEmblem game={g.id} size={20} />
+                              <Text style={[s.gameChipText, { color }]}>{g.name}</Text>
                             </View>
                           );
                         })
@@ -540,81 +492,83 @@ export default function HomeScreen() {
                   </View>
                 );
               })}
-            </View>
+            </Surface>
           </>
-        )}
-
+        ) : null}
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F7' },
-  headerGradient: { paddingBottom: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 50 },
-  greeting: { color: '#8E8E93', fontSize: 14 },
-  appName: { color: '#1a1a2e', fontSize: 32, fontWeight: 'bold', letterSpacing: 1 },
-  appSubtitle: { color: '#6C63FF', fontSize: 12, marginTop: 2 },
-  logoGradient: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' },
-  logoEmoji: { fontSize: 28 },
-  errorCard: { marginHorizontal: 20, marginBottom: 12, backgroundColor: '#FF6B6B11', borderWidth: 1, borderColor: '#FF6B6B33', borderRadius: 16, padding: 20, alignItems: 'center', gap: 12 },
-  errorEmoji: { fontSize: 36 },
-  errorText: { color: '#FF6B6B', fontSize: 14, textAlign: 'center' },
-  retryBtn: { backgroundColor: '#FF6B6B22', borderWidth: 1, borderColor: '#FF6B6B', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
-  retryBtnText: { color: '#FF6B6B', fontSize: 14, fontWeight: 'bold' },
-  notifBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', marginHorizontal: 20, marginBottom: 10, padding: 12, borderRadius: 12, borderLeftWidth: 4, gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  notifEmoji: { fontSize: 24 },
-  notifTitle: { color: '#1a1a2e', fontSize: 13, fontWeight: 'bold' },
-  notifText: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
-  notifBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  notifBtnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  notifClose: { padding: 4 },
-  notifCloseText: { color: '#A0A0A5', fontSize: 14 },
-  countdownCard: { marginHorizontal: 20, padding: 20, borderRadius: 20, borderWidth: 1, alignItems: 'center', gap: 6, backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  countdownLabel: { color: '#8E8E93', fontSize: 13 },
-  countdownGame: { fontSize: 16, fontWeight: 'bold' },
-  countdownTimer: { color: '#1a1a2e', fontSize: 42, fontWeight: 'bold', fontVariant: ['tabular-nums'], letterSpacing: 2 },
-  countdownDate: { color: '#8E8E93', fontSize: 12 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 20, marginBottom: 12 },
-  sectionTitle: { color: '#1a1a2e', fontSize: 18, fontWeight: 'bold' },
-  seeAll: { color: '#6C63FF', fontSize: 14, fontWeight: 'bold' },
-  lastDrawCard: { marginRight: 16, padding: 20, borderRadius: 20, borderWidth: 1.5, minHeight: 200, justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  lastDrawHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  lastDrawEmoji: { fontSize: 32 },
-  lastDrawGame: { color: '#1a1a2e', fontSize: 16, fontWeight: 'bold' },
-  lastDrawDate: { color: '#8E8E93', fontSize: 12, marginTop: 3 },
-  lastDrawNumbers: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12, justifyContent: 'center' },
-  lastDrawBall: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
-  lastDrawBallText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  lastDrawBonus: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' },
-  lastDrawBonusLabel: { color: '#8E8E93', fontSize: 14 },
-  prizeRow: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#E5E5EA', alignItems: 'center' },
-  prizeLabel: { color: '#8E8E93', fontSize: 12 },
-  prizeAmount: { fontSize: 18, fontWeight: 'bold', marginTop: 4 },
-  guideCard: { marginHorizontal: 20, backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: '#E5E5EA', padding: 28, alignItems: 'center', gap: 14, marginBottom: 24 },
-  guideEmoji: { fontSize: 48 },
-  guideTitle: { color: '#1a1a2e', fontSize: 20, fontWeight: 'bold' },
-  guideDesc: { color: '#8E8E93', fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  guideButtons: { flexDirection: 'row', gap: 10, width: '100%' },
-  guideBtn: { flex: 1, backgroundColor: '#F5F5F7', borderWidth: 1, borderColor: '#E5E5EA', borderRadius: 14, padding: 14, alignItems: 'center', gap: 6 },
-  guideBtnEmoji: { fontSize: 22 },
-  guideBtnText: { color: '#1a1a2e', fontSize: 12, fontWeight: 'bold' },
-  guideFootnote: { color: '#A0A0A5', fontSize: 11, textAlign: 'center' },
-  scheduleContainer: { marginHorizontal: 20, marginBottom: 30, backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E5EA' },
-  scheduleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E5EA' },
-  scheduleTodayRow: { backgroundColor: '#6C63FF08' },
-  scheduleDayBadge: { width: 70, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  scheduleDayText: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
-  scheduleTodayDot: { color: '#6C63FF', fontSize: 8 },
-  scheduleGames: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  scheduleGameChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, gap: 4 },
-  scheduleGameEmoji: { fontSize: 14 },
-  scheduleGameTime: { fontSize: 12, fontWeight: 'bold' },
-  smartSummaryCard: { marginHorizontal: 20, marginBottom: 12, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E5EA', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  smartSummaryRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
-  smartSummaryEmoji: { fontSize: 20 },
-  smartSummaryText: { flex: 1, color: '#8E8E93', fontSize: 14 },
-  smartSummaryHighlight: { color: '#1a1a2e', fontWeight: 'bold' },
-  smartSummaryArrow: { color: '#6C63FF', fontSize: 16, fontWeight: 'bold' },
-});
+/* ------------------------------ styles ----------------------------- */
+function makeStyles(theme: AppTheme) {
+  const c = theme.colors;
+  const { spacing, radius, typography: ty } = theme;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 2 },
+    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    greeting: { ...ty.caption, color: c.text2 },
+    brand: { ...ty.h2, color: c.text },
+    headerActions: { flexDirection: 'row', gap: spacing.sm },
+    iconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', ...theme.shadowSm },
+    dot: { position: 'absolute', top: 9, right: 10, width: 8, height: 8, borderRadius: 4, backgroundColor: c.danger, borderWidth: 2 },
+
+    errorCard: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.xxl, alignItems: 'center', gap: spacing.md },
+    errorText: { ...ty.bodyMedium, color: c.text2, textAlign: 'center' },
+
+    hero: { marginHorizontal: spacing.xl, marginTop: spacing.lg, borderRadius: radius.xxl, overflow: 'hidden' },
+    heroAccent: { height: 4, width: '100%' },
+    heroBody: { padding: spacing.xl },
+    heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    heroLabel: { ...ty.micro, color: c.text2 },
+    gamePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill },
+    gameDot: { width: 7, height: 7, borderRadius: 4 },
+    gamePillText: { ...ty.label, fontSize: 12 },
+    timerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: spacing.md },
+    timerBlock: { alignItems: 'center' },
+    timerNum: { fontFamily: theme.font.extrabold, fontSize: 46, lineHeight: 48, color: c.text, fontVariant: ['tabular-nums'], letterSpacing: -1.4, includeFontPadding: false },
+    timerUnit: { ...ty.micro, color: c.text3, marginTop: 6 },
+    timerColon: { fontFamily: theme.font.bold, fontSize: 34, color: c.text3, marginBottom: 12 },
+    heroDateRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: spacing.md },
+    heroDate: { ...ty.caption, color: c.text2, textTransform: 'capitalize' },
+
+    summary: { marginHorizontal: spacing.xl, marginTop: spacing.md, overflow: 'hidden' },
+    summaryRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: 14 },
+    summaryIcon: { width: 38, height: 38, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+    summaryText: { flex: 1, ...ty.bodyMedium, color: c.text2 },
+    summaryStrong: { fontFamily: theme.font.bold, color: c.text },
+    divider: { height: 1, backgroundColor: c.hairline, marginHorizontal: spacing.lg },
+
+    sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, marginTop: spacing.xxl, marginBottom: 13 },
+    sectionTitle: { ...ty.h2, color: c.text },
+    sectionAction: { ...ty.label, color: c.brand },
+
+    drawCard: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: radius.xxl, padding: 18, ...theme.shadowSm },
+    drawHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: spacing.lg },
+    drawGame: { ...ty.h3, color: c.text },
+    drawDateRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
+    drawDate: { ...ty.caption, color: c.text3 },
+    drawNumbers: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7 },
+    ballDivider: { width: 1, height: 30, backgroundColor: c.hairline, marginHorizontal: 2 },
+    prizeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg, paddingTop: 14, borderTopWidth: 1, borderTopColor: c.hairline },
+    prizeLabel: { ...ty.caption, color: c.text2 },
+    prizeAmount: { fontFamily: theme.font.extrabold, fontSize: 15, color: c.text, fontVariant: ['tabular-nums'] },
+
+    emptyCard: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.xxl, alignItems: 'center', gap: spacing.md },
+    emptyIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+    emptyTitle: { ...ty.h2, color: c.text },
+    emptyDesc: { ...ty.body, color: c.text2, textAlign: 'center', maxWidth: 260 },
+
+    schedule: { marginHorizontal: spacing.xl, marginBottom: spacing.xxl, overflow: 'hidden' },
+    scheduleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: 13 },
+    scheduleDay: { width: 58, flexDirection: 'row', alignItems: 'center', gap: 6 },
+    scheduleDayText: { ...ty.label, color: c.text2 },
+    scheduleDot: { width: 6, height: 6, borderRadius: 3 },
+    scheduleGames: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+    scheduleEmpty: { ...ty.caption, color: c.text3 },
+    gameChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 5, paddingLeft: 6, paddingRight: 10, borderRadius: radius.pill, borderWidth: 1 },
+    gameChipText: { ...ty.caption, fontFamily: theme.font.semibold },
+  });
+}

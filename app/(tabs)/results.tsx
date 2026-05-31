@@ -1,77 +1,65 @@
-// tabs_results.tsx
+// app/(tabs)/results.tsx
+// Sonuçlar hub — merges the old Results, Statistics and Analyze screens
+// behind a segmented control. Each segment is a self-contained component.
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GAME_COLORS, getDefaultCountry, getGameByName, getGamesByCountry } from '../../lib/games';
-import GameSelector from '../../lib/GameSelector';
-import { t } from '../../lib/i18n';
-import { supabase } from '../../lib/supabase';
 
-type DrawResult = {
-  id: number;
-  game: string;
-  numbers: string;
-  bonus: string;
-  superstar?: number | null;
-  draw_date: string;
-  draw_no: string;
-};
+import { AnalyzeTab } from '../../components/results/AnalyzeTab';
+import { ResultsTab } from '../../components/results/ResultsTab';
+import { StatisticsTab } from '../../components/results/StatisticsTab';
+import { Segmented } from '../../components/ui/segmented';
+import { AppTheme } from '../../constants/theme';
+import GameSelector from '../../lib/GameSelector';
+import { getDefaultCountry, getGamesByCountry, type Game } from '../../lib/games';
+import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../lib/theme';
 
 const LAST_SEEN_PREFIX = 'lastSeenResult_';
+type Segment = 'results' | 'stats' | 'analyze';
 
-function parseNumbers(str: string): number[] {
-  return str.split(' - ').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
-}
+const SEGMENTS = [
+  { key: 'results', label: 'Sonuçlar' },
+  { key: 'stats', label: 'İstatistik' },
+  { key: 'analyze', label: 'Analiz' },
+];
 
-export default function ResultsScreen() {
+export default function ResultsHub() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ game?: string }>();
+  const theme = useTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const params = useLocalSearchParams<{ game?: string; tab?: string }>();
 
-  const userCountry = getDefaultCountry();
-  const countryGames = getGamesByCountry(userCountry);
-
-  const [selectedGame, setSelectedGame] = useState(countryGames[0]);
-  const [draws, setDraws] = useState<DrawResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [expanded, setExpanded] = useState<number | null>(null);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const countryGames = useMemo(() => getGamesByCountry(getDefaultCountry()), []);
+  const [selectedGame, setSelectedGame] = useState<Game>(countryGames[0]);
+  const [segment, setSegment] = useState<Segment>('results');
   const [newResults, setNewResults] = useState<string[]>([]);
-  const PAGE_SIZE = 20;
 
-  const gameColors = GAME_COLORS[selectedGame.name as keyof typeof GAME_COLORS];
-  const mainColor = gameColors?.main || '#6C63FF';
-  const bonusColor = gameColors?.bonus || '#FF6B6B';
+  // fade between segments
+  const fade = useMemo(() => new Animated.Value(1), []);
+  const switchSegment = useCallback(
+    (next: string) => {
+      Animated.timing(fade, { toValue: 0, duration: 110, useNativeDriver: true }).start(() => {
+        setSegment(next as Segment);
+        Animated.timing(fade, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+      });
+    },
+    [fade]
+  );
 
   useEffect(() => {
     if (params.game) {
-      const game = getGameByName(
-        countryGames.find(g => g.id === params.game)?.name || ''
-      );
-      if (game) {
-        setDraws([]);
-        setExpanded(null);
-        setPage(0);
-        setHasMore(true);
-        setError(null);
-        setSelectedGame(game);
-        fetchResults(game, 0, false);
-        markAsSeen(game.name);
-      }
+      const g = countryGames.find((x) => x.id === params.game);
+      if (g) setSelectedGame(g);
     }
-  }, [params.game]);
+    if (params.tab === 'stats' || params.tab === 'analyze' || params.tab === 'results') {
+      setSegment(params.tab);
+    }
+  }, [params.game, params.tab, countryGames]);
 
   const checkNewResults = useCallback(async () => {
     try {
@@ -79,7 +67,6 @@ export default function ResultsScreen() {
       const today = new Date();
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-
       for (const game of countryGames) {
         const { data } = await supabase
           .from('draws')
@@ -88,294 +75,58 @@ export default function ResultsScreen() {
           .order('draw_date_parsed', { ascending: false })
           .limit(1)
           .single();
-
         if (!data) continue;
-
-        const lastSeenKey = LAST_SEEN_PREFIX + game.name;
-        const lastSeen = await AsyncStorage.getItem(lastSeenKey);
-        const drawDateStr = data.draw_date;
-
-        if (lastSeen !== drawDateStr) {
-          const drawDate = new Date(drawDateStr.split('.').reverse().join('-'));
-          if (drawDate >= yesterday) {
-            newGames.push(game.name);
-          }
+        const lastSeen = await AsyncStorage.getItem(LAST_SEEN_PREFIX + game.name);
+        if (lastSeen !== data.draw_date) {
+          const drawDate = new Date(data.draw_date.split('.').reverse().join('-'));
+          if (drawDate >= yesterday) newGames.push(game.name);
         }
       }
       setNewResults(newGames);
-    } catch (e) {}
+    } catch {}
   }, [countryGames]);
 
-  const markAsSeen = useCallback(async (gameName: string) => {
-    setNewResults(prev => prev.filter(g => g !== gameName));
-    const { data } = await supabase
-      .from('draws')
-      .select('draw_date')
-      .eq('game', gameName)
-      .order('draw_date_parsed', { ascending: false })
-      .limit(1)
-      .single();
-    if (data) {
-      await AsyncStorage.setItem(LAST_SEEN_PREFIX + gameName, data.draw_date);
-    }
+  useFocusEffect(useCallback(() => { checkNewResults(); }, [checkNewResults]));
+
+  const markSeen = useCallback((gameName: string) => {
+    setNewResults((prev) => prev.filter((g) => g !== gameName));
   }, []);
 
-  const fetchResults = async (game: typeof countryGames[0], pageNum = 0, append = false) => {
-    setError(null);
-    setLoading(true);
-    try {
-      const from = pageNum * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-      const { data, error: supabaseError } = await supabase
-        .from('draws')
-        .select('*')
-        .eq('game', game.name)
-        .order('draw_date_parsed', { ascending: false })
-        .range(from, to);
-      if (supabaseError) throw supabaseError;
-      if (data) {
-        setDraws(prev => append ? [...prev, ...data] : data);
-        setHasMore(data.length === PAGE_SIZE);
-        setPage(pageNum);
-      }
-    } catch (e) {
-      setError('Sonuçlar yüklenirken bir sorun oluştu.');
-      if (!append) setDraws([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadMore = () => {
-    if (!loading && hasMore) fetchResults(selectedGame, page + 1, true);
-  };
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    setExpanded(null);
-    setPage(0);
-    setHasMore(true);
-    await fetchResults(selectedGame, 0, false);
-    setRefreshing(false);
-  }, [selectedGame]);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchResults(selectedGame);
-      checkNewResults();
-    }, [selectedGame])
-  );
-
-  const handleGameSelect = async (game: typeof countryGames[0]) => {
-    setDraws([]);
-    setExpanded(null);
-    setPage(0);
-    setHasMore(true);
-    setError(null);
-    setSelectedGame(game);
-    await fetchResults(game, 0, false);
-    markAsSeen(game.name);
-  };
-
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={s.container}>
+      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={mainColor}
-            colors={[mainColor]}
-            progressBackgroundColor="#FFFFFF"
-          />
-        }>
-
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{t('drawResults')}</Text>
-          <Text style={styles.headerSub}>{t('drawResultsSub')}</Text>
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}
+      >
+        <View style={s.header}>
+          <Text style={s.title}>Sonuçlar</Text>
+          <Text style={s.subtitle}>Çekiliş sonuçları ve istatistikler</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>{t('selectGame')}</Text>
-        <GameSelector
-          selectedGame={selectedGame}
-          onSelect={handleGameSelect}
-          newResults={newResults}
-        />
+        <Segmented options={SEGMENTS} value={segment} onChange={switchSegment} />
 
-        {error && (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorEmoji}>⚠️</Text>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => fetchResults(selectedGame)}>
-              <Text style={styles.retryBtnText}>Tekrar Dene</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        <GameSelector selectedGame={selectedGame} onSelect={setSelectedGame} newResults={newResults} />
+        <View style={{ height: 16 }} />
 
-        {!error && loading && draws.length === 0 && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={mainColor} />
-            <Text style={styles.loadingText}>Sonuçlar yükleniyor...</Text>
-          </View>
-        )}
-
-        {!error && !loading && draws.length === 0 && (
-          <View style={styles.guideCard}>
-            <Text style={styles.guideEmoji}>📅</Text>
-            <Text style={styles.guideTitle}>Henüz Sonuç Yok</Text>
-            <Text style={styles.guideDesc}>
-              Bu oyun için sisteme henüz çekiliş sonucu girilmemiş. Haftalık takvimden hangi günler çekiliş olduğunu görebilirsin.
-            </Text>
-            <TouchableOpacity
-              style={styles.guideBtn}
-              onPress={() => fetchResults(selectedGame)}>
-              <Text style={styles.guideBtnText}>🔄 Yenile</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {!error && draws.length > 0 && (
-          <>
-            <View style={[styles.latestCard, { borderColor: mainColor + '33' }]}>
-              <View style={styles.latestHeader}>
-                <Text style={[styles.latestBadge, { backgroundColor: mainColor }]}>{t('latestDraw')}</Text>
-                <Text style={styles.latestDate}>📅 {draws[0].draw_date} · No: {draws[0].draw_no}</Text>
-              </View>
-              <Text style={styles.numbersLabel}>{t('drawnNumbers')}</Text>
-              <View style={styles.numberBalls}>
-                {parseNumbers(draws[0].numbers).map((num, index) => (
-                  <View key={index} style={[styles.ball, { backgroundColor: mainColor }]}>
-                    <Text style={styles.ballText}>{num}</Text>
-                  </View>
-                ))}
-              </View>
-              {draws[0].bonus && draws[0].bonus !== '-' && (
-                <>
-                  <Text style={styles.bonusLabel}>
-                    {selectedGame.name === 'Çılgın Sayısal Loto' ? 'Joker' : 'Şans Topu'}
-                  </Text>
-                  <View style={styles.numberBalls}>
-                    <View style={[styles.ball, { backgroundColor: bonusColor }]}>
-                      <Text style={styles.ballText}>{draws[0].bonus}</Text>
-                    </View>
-                  </View>
-                </>
-              )}
-              {draws[0].superstar != null && draws[0].superstar > 0 && (
-                <>
-                  <Text style={styles.bonusLabel}>⭐ SüperStar</Text>
-                  <View style={styles.numberBalls}>
-                    <View style={[styles.ball, { backgroundColor: '#FFD700' }]}>
-                      <Text style={[styles.ballText, { color: '#000' }]}>{draws[0].superstar}</Text>
-                    </View>
-                  </View>
-                </>
-              )}
-            </View>
-
-            <Text style={styles.sectionTitle}>{t('pastDraws')}</Text>
-            {draws.slice(1).map((draw) => (
-              <TouchableOpacity
-                key={draw.id}
-                style={styles.historyCard}
-                onPress={() => setExpanded(expanded === draw.id ? null : draw.id)}>
-                <View style={styles.historyHeader}>
-                  <View style={[styles.historyDot, { backgroundColor: mainColor }]} />
-                  <Text style={styles.historyDate}>📅 {draw.draw_date}</Text>
-                  <Text style={styles.historyNo}>No: {draw.draw_no}</Text>
-                  <Text style={styles.historyArrow}>{expanded === draw.id ? '▲' : '▼'}</Text>
-                </View>
-                {expanded === draw.id && (
-                  <View style={styles.historyNumbers}>
-                    <View style={styles.numberBalls}>
-                      {parseNumbers(draw.numbers).map((num, index) => (
-                        <View key={index} style={[styles.smallBall, { backgroundColor: mainColor }]}>
-                          <Text style={styles.smallBallText}>{num}</Text>
-                        </View>
-                      ))}
-                    </View>
-                    {draw.bonus && draw.bonus !== '-' && (
-                      <View style={[styles.numberBalls, { marginTop: 8 }]}>
-                        <View style={[styles.smallBall, { backgroundColor: bonusColor }]}>
-                          <Text style={styles.smallBallText}>{draw.bonus}</Text>
-                        </View>
-                      </View>
-                    )}
-                    {draw.superstar != null && draw.superstar > 0 && (
-                      <View style={[styles.numberBalls, { marginTop: 8 }]}>
-                        <View style={[styles.smallBall, { backgroundColor: '#FFD700' }]}>
-                          <Text style={[styles.smallBallText, { color: '#000' }]}>{draw.superstar}</Text>
-                        </View>
-                      </View>
-                    )}
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
-
-        {!error && hasMore && draws.length > 0 && (
-          <TouchableOpacity
-            style={styles.loadMoreBtn}
-            onPress={loadMore}
-            disabled={loading}>
-            <Text style={styles.loadMoreText}>
-              {loading ? 'Yükleniyor...' : '↓ Daha Fazla Göster'}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>{t('resultsNote')}</Text>
-        </View>
-
+        <Animated.View style={{ opacity: fade }}>
+          {segment === 'results' ? <ResultsTab game={selectedGame} onSeen={markSeen} /> : null}
+          {segment === 'stats' ? <StatisticsTab game={selectedGame} /> : null}
+          {segment === 'analyze' ? <AnalyzeTab game={selectedGame} /> : null}
+        </Animated.View>
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F7' },
-  header: { padding: 20, paddingTop: 20 },
-  headerTitle: { color: '#1a1a2e', fontSize: 26, fontWeight: 'bold' },
-  headerSub: { color: '#8E8E93', fontSize: 14, marginTop: 4 },
-  sectionTitle: { color: '#1a1a2e', fontSize: 18, fontWeight: 'bold', paddingHorizontal: 20, marginBottom: 12, marginTop: 8 },
-  errorCard: { marginHorizontal: 20, marginBottom: 20, backgroundColor: '#FF6B6B11', borderWidth: 1, borderColor: '#FF6B6B33', borderRadius: 16, padding: 20, alignItems: 'center', gap: 12 },
-  errorEmoji: { fontSize: 36 },
-  errorText: { color: '#FF6B6B', fontSize: 14, textAlign: 'center' },
-  retryBtn: { backgroundColor: '#FF6B6B22', borderWidth: 1, borderColor: '#FF6B6B', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
-  retryBtnText: { color: '#FF6B6B', fontSize: 14, fontWeight: 'bold' },
-  loadingContainer: { alignItems: 'center', padding: 30, gap: 12 },
-  loadingText: { color: '#8E8E93', fontSize: 14 },
-  guideCard: { marginHorizontal: 20, backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: '#E5E5EA', padding: 28, alignItems: 'center', gap: 14, marginBottom: 20 },
-  guideEmoji: { fontSize: 48 },
-  guideTitle: { color: '#1a1a2e', fontSize: 20, fontWeight: 'bold' },
-  guideDesc: { color: '#8E8E93', fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  guideBtn: { backgroundColor: '#6C63FF', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12 },
-  guideBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
-  latestCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  latestHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  latestBadge: { color: '#fff', fontSize: 11, fontWeight: 'bold', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
-  latestDate: { color: '#8E8E93', fontSize: 12 },
-  numbersLabel: { color: '#1a1a2e', fontSize: 14, fontWeight: 'bold', marginBottom: 10 },
-  numberBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  ball: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
-  ballText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
-  smallBall: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  smallBallText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  bonusLabel: { color: '#8E8E93', fontSize: 13, marginBottom: 8 },
-  historyCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 14, borderRadius: 12, marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
-  historyHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  historyDot: { width: 8, height: 8, borderRadius: 4 },
-  historyDate: { color: '#1a1a2e', fontSize: 14, flex: 1 },
-  historyNo: { color: '#8E8E93', fontSize: 12 },
-  historyArrow: { color: '#8E8E93', fontSize: 12 },
-  historyNumbers: { marginTop: 12 },
-  loadMoreBtn: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#E5E5EA' },
-  loadMoreText: { color: '#6C63FF', fontSize: 14, fontWeight: 'bold' },
-  infoBox: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 14, borderRadius: 12, marginBottom: 30 },
-  infoText: { color: '#8E8E93', fontSize: 13, lineHeight: 20 },
-});
+function makeStyles(theme: AppTheme) {
+  const c = theme.colors;
+  const { spacing, typography: ty } = theme;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    header: { paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
+    title: { ...ty.h1, color: c.text },
+    subtitle: { ...ty.bodyMedium, color: c.text2, marginTop: 3 },
+  });
+}

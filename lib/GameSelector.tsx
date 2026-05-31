@@ -1,13 +1,11 @@
 // lib/GameSelector.tsx
 import React from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { GAME_COLORS, getDefaultCountry, getGamesByCountry, type Game } from './games';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { PressableScale } from '../components/ui/surface';
+import { GameAccent } from '../constants/theme';
+import { GameEmblem } from './emblems';
+import { getDefaultCountry, getGamesByCountry, type Game } from './games';
+import { useTheme } from './theme';
 
 type Props = {
   selectedGame: Game;
@@ -16,79 +14,66 @@ type Props = {
 };
 
 export default function GameSelector({ selectedGame, onSelect, newResults = [] }: Props) {
-  const country = getDefaultCountry();
-  const countryGames = getGamesByCountry(country);
+  const theme = useTheme();
+  const c = theme.colors;
+  const countryGames = getGamesByCountry(getDefaultCountry());
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.selector}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
       {countryGames.map((game) => {
-        const gc = GAME_COLORS[game.name as keyof typeof GAME_COLORS];
-        const color = gc?.main || '#6C63FF';
-        const isSelected = selectedGame.id === game.id;
+        const color = GameAccent[game.id] ?? c.brand;
+        const selected = selectedGame.id === game.id;
         const hasNew = newResults.includes(game.name);
         return (
-          <View key={game.id} style={styles.tabWrapper}>
-            {hasNew && <View style={styles.newDot} />}
-            <TouchableOpacity
-              style={[styles.tab, isSelected && { backgroundColor: color, borderColor: color }]}
-              onPress={() => onSelect(game)}>
-              <Text style={styles.emoji}>{game.icon}</Text>
-              <Text style={[styles.name, isSelected && { color: '#fff' }]}>
-                {game.name}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <PressableScale key={game.id} onPress={() => onSelect(game)}>
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: selected ? color : c.surface, borderColor: selected ? color : c.border },
+                theme.shadowSm,
+              ]}
+            >
+              {hasNew ? <View style={[styles.newDot, { backgroundColor: c.danger, borderColor: selected ? color : c.surface }]} /> : null}
+              {selected ? (
+                <View style={styles.embWrap}>
+                  <GameEmblem game={game.id} size={36} />
+                </View>
+              ) : (
+                <GameEmblem game={game.id} size={36} />
+              )}
+              <View style={{ alignItems: 'center' }}>
+                <Text style={[styles.name, { color: selected ? '#fff' : c.text }]} allowFontScaling={false}>
+                  {game.name}
+                </Text>
+                <Text
+                  style={[styles.meta, { color: selected ? 'rgba(255,255,255,0.82)' : c.text3 }]}
+                  allowFontScaling={false}
+                >
+                  {game.count} / {game.max}
+                </Text>
+              </View>
+            </View>
+          </PressableScale>
         );
       })}
+      <View style={{ width: 8 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  selector: {
-    paddingLeft: 20,
-    marginBottom: 16,
-  },
-  tabWrapper: {
-    position: 'relative',
-    marginRight: 10,
-  },
-  newDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#FF6B6B',
-    position: 'absolute',
-    top: 0,
-    right: 2,
-    zIndex: 1,
-    shadowColor: '#FF6B6B',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  tab: {
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 14,
+  row: { paddingHorizontal: 20, gap: 10 },
+  card: {
+    minWidth: 118,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E5E5EA',
-    backgroundColor: '#FFFFFF',
-    minWidth: 100,
+    alignItems: 'center',
+    gap: 8,
   },
-  emoji: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  name: {
-    color: '#8E8E93',
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
+  embWrap: { backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 11 },
+  newDot: { position: 'absolute', top: 8, right: 8, width: 10, height: 10, borderRadius: 5, borderWidth: 2, zIndex: 2 },
+  name: { fontFamily: 'PlusJakarta-Bold', fontSize: 12.5, textAlign: 'center' },
+  meta: { fontFamily: 'PlusJakarta-SemiBold', fontSize: 10.5, marginTop: 2 },
 });

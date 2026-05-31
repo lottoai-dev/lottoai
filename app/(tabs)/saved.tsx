@@ -1,25 +1,42 @@
-// tabs_saved.tsx
-import { Ionicons } from '@expo/vector-icons';
+// app/(tabs)/saved.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
+  LayoutAnimation,
   Modal,
+  Platform,
+  Pressable,
   ScrollView,
   Share,
   StyleSheet,
   Text,
-  TouchableOpacity,
+  UIManager,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { AppButton } from '../../components/ui/app-button';
+import { NumberBall } from '../../components/ui/number-ball';
+import { EmptyState, LoadingState } from '../../components/ui/states';
+import { PressableScale, Surface } from '../../components/ui/surface';
+import { AppTheme, GameAccent } from '../../constants/theme';
 import CouponHistory from '../../lib/CouponHistory';
-import { GAME_COLORS, getGameByName } from '../../lib/games';
-import { t } from '../../lib/i18n';
-import { type PrizeEstimate } from '../../lib/prizeEstimates';
+import { GameEmblem } from '../../lib/emblems';
+import { getGameByName } from '../../lib/games';
+import { ChevronDownIcon, CloseIcon, ShareIcon, TicketIcon, TrashIcon, TrophyIcon } from '../../lib/icons';
+import { getPrizeTable, type PrizeEstimate } from '../../lib/prizeEstimates';
 import { supabase } from '../../lib/supabase';
+import { useTheme } from '../../lib/theme';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type Coupon = {
   id: number;
@@ -37,14 +54,7 @@ type Coupon = {
   matchedSuperStar?: boolean;
 };
 
-type DrawResult = {
-  numbers: string;
-  bonus: string;
-  superstar?: number | null;
-  draw_date: string;
-  draw_no: string;
-};
-
+type DrawResult = { numbers: string; bonus: string; superstar?: number | null; draw_date: string; draw_no: string };
 type CheckResult = {
   draw: DrawResult;
   matchedNumbers: number[];
@@ -54,18 +64,20 @@ type CheckResult = {
   prize: PrizeEstimate | null;
   score: number;
 };
-
 type FilterStatus = 'all' | 'pending' | 'checked';
 
 function parseNumbers(str: string): number[] {
-  return str.split(' - ').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+  return str.split(' - ').map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
 }
 
-// Renkler — aydınlık tema
-const PENDING_COLOR = '#E5E5EA';
-const MISS_COLOR = '#E5E5EA';
-
 export default function SavedScreen() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const theme = useTheme();
+  const c = theme.colors;
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const scrollRef = useRef<ScrollView>(null);
+
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [checkModal, setCheckModal] = useState(false);
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
@@ -75,16 +87,12 @@ export default function SavedScreen() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [filterGame, setFilterGame] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const insets = useSafeAreaInsets();
-  const scrollRef = useRef<ScrollView>(null);
-  const router = useRouter();
 
   const loadCoupons = async () => {
     try {
       const data = await AsyncStorage.getItem('savedCoupons');
-      if (data) setCoupons(JSON.parse(data));
-      else setCoupons([]);
-    } catch (error) {
+      setCoupons(data ? JSON.parse(data) : []);
+    } catch {
       setCoupons([]);
     }
   };
@@ -93,7 +101,7 @@ export default function SavedScreen() {
     const saved = await AsyncStorage.getItem('savedCoupons');
     if (!saved) return;
     const allCoupons: Coupon[] = JSON.parse(saved);
-    const pending = allCoupons.filter(c => c.matchedCount === undefined || c.matchedCount === null);
+    const pending = allCoupons.filter((cp) => cp.matchedCount === undefined || cp.matchedCount === null);
     if (pending.length === 0) return;
 
     let updated = [...allCoupons];
@@ -102,13 +110,11 @@ export default function SavedScreen() {
     for (const coupon of pending) {
       try {
         let couponTimestamp: string;
-        if (coupon.timestamp) {
-          couponTimestamp = coupon.timestamp;
-        } else {
+        if (coupon.timestamp) couponTimestamp = coupon.timestamp;
+        else {
           const [d, m, y] = coupon.date.split('.').map(Number);
           couponTimestamp = new Date(y, m - 1, d, 23, 59, 59).toISOString();
         }
-
         const { data: latestDraw } = await supabase
           .from('draws')
           .select('draw_date, draw_date_parsed, superstar')
@@ -118,13 +124,11 @@ export default function SavedScreen() {
           .single();
 
         let latestIso = '';
-        if (latestDraw?.draw_date_parsed) {
-          latestIso = latestDraw.draw_date_parsed.substring(0, 10);
-        } else if (latestDraw?.draw_date) {
+        if (latestDraw?.draw_date_parsed) latestIso = latestDraw.draw_date_parsed.substring(0, 10);
+        else if (latestDraw?.draw_date) {
           const [dd, mm, yyyy] = latestDraw.draw_date.split('.').map(Number);
-          latestIso = `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+          latestIso = `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
         }
-
         if (!latestDraw || latestIso < couponTimestamp.split('T')[0]) continue;
 
         const { data } = await supabase
@@ -135,34 +139,24 @@ export default function SavedScreen() {
           .order('draw_date_parsed', { ascending: true })
           .limit(1)
           .single();
-
         if (!data) continue;
 
-        const targetDraw = data;
-        const drawnNumbers = parseNumbers(targetDraw.numbers);
-        const drawnBonus = targetDraw.bonus && targetDraw.bonus !== '-'
-          ? targetDraw.bonus.split(',').map((n: string) => parseInt(n.trim())).filter((n: number) => !isNaN(n))
-          : [];
-
+        const drawnNumbers = parseNumbers(data.numbers);
+        const drawnBonus =
+          data.bonus && data.bonus !== '-'
+            ? data.bonus.split(',').map((n: string) => parseInt(n.trim(), 10)).filter((n: number) => !isNaN(n))
+            : [];
         const matchedNumbers = coupon.numbers.filter((n) => drawnNumbers.includes(n));
         const matchedBonus = coupon.bonus.filter((n) => drawnBonus.includes(n));
-        const matchedSuperStar = coupon.superStar != null && targetDraw.superstar != null && coupon.superStar === targetDraw.superstar;
-        const mainMatchCount = matchedNumbers.length;
-        const score = mainMatchCount + matchedBonus.length + (matchedSuperStar ? 1 : 0);
+        const matchedSuperStar = coupon.superStar != null && data.superstar != null && coupon.superStar === data.superstar;
+        const score = matchedNumbers.length + matchedBonus.length + (matchedSuperStar ? 1 : 0);
 
-        updated = updated.map(c =>
-          c.id === coupon.id ? {
-            ...c,
-            matchedCount: score,
-            matchedNumbers: matchedNumbers,
-            matchedBonus: matchedBonus,
-            matchedSuperStar: matchedSuperStar,
-          } : c
+        updated = updated.map((cp) =>
+          cp.id === coupon.id ? { ...cp, matchedCount: score, matchedNumbers, matchedBonus, matchedSuperStar } : cp
         );
         hasChanges = true;
-      } catch (e) {}
+      } catch {}
     }
-
     if (hasChanges) {
       setCoupons(updated);
       await AsyncStorage.setItem('savedCoupons', JSON.stringify(updated));
@@ -172,537 +166,311 @@ export default function SavedScreen() {
   useEffect(() => {
     const channel = supabase
       .channel('draws-changes')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'draws' },
-        () => {
-          autoCheckAllPending();
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'draws' }, () => {
+        autoCheckAllPending();
+      })
       .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
   }, [autoCheckAllPending]);
 
-  useFocusEffect(useCallback(() => {
-    setIsLoading(true);
-    loadCoupons().then(() => {
-      autoCheckAllPending();
-      setIsLoading(false);
-    });
-  }, [autoCheckAllPending]));
+  useFocusEffect(
+    useCallback(() => {
+      setIsLoading(true);
+      loadCoupons().then(() => {
+        autoCheckAllPending();
+        setIsLoading(false);
+      });
+    }, [autoCheckAllPending])
+  );
 
   const gameChips = useMemo(() => {
-    const map = new Map<string, { game: string; icon: string; color: string; count: number }>();
-    coupons.forEach(c => {
-      const existing = map.get(c.game);
-      if (existing) {
-        existing.count++;
-      } else {
-        const gc = GAME_COLORS[c.game as keyof typeof GAME_COLORS];
-        map.set(c.game, {
-          game: c.game,
-          icon: c.icon,
-          color: gc?.main || c.color || '#6C63FF',
-          count: 1,
-        });
+    const map = new Map<string, { game: string; id: string; color: string; count: number }>();
+    coupons.forEach((cp) => {
+      const existing = map.get(cp.game);
+      if (existing) existing.count++;
+      else {
+        const id = getGameByName(cp.game)?.id ?? 'cilgin';
+        map.set(cp.game, { game: cp.game, id, color: GameAccent[id] ?? c.brand, count: 1 });
       }
     });
     return Array.from(map.values());
-  }, [coupons]);
+  }, [coupons, c.brand]);
 
   const filteredCoupons = useMemo(() => {
     let result = coupons;
-
-    if (filterGame) {
-      result = result.filter(c => c.game === filterGame);
-    }
-
-    if (filterStatus === 'pending') {
-      result = result.filter(c => c.matchedCount === undefined || c.matchedCount === null);
-    } else if (filterStatus === 'checked') {
-      result = result.filter(c => c.matchedCount !== undefined && c.matchedCount !== null);
-    }
-
+    if (filterGame) result = result.filter((cp) => cp.game === filterGame);
+    if (filterStatus === 'pending') result = result.filter((cp) => cp.matchedCount === undefined || cp.matchedCount === null);
+    else if (filterStatus === 'checked') result = result.filter((cp) => cp.matchedCount !== undefined && cp.matchedCount !== null);
     return result;
   }, [coupons, filterStatus, filterGame]);
 
   const totalCoupons = filteredCoupons.length;
-  const gameCounts = coupons.reduce((acc, c) => {
-    acc[c.game] = (acc[c.game] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  const mostPlayedGame = Object.entries(gameCounts).sort((a, b) => b[1] - a[1])[0];
-  const totalMatched = coupons.reduce((acc, c) => acc + (c.matchedCount || 0), 0);
-  const bestResult = coupons.reduce((max, c) => Math.max(max, c.matchedCount || 0), 0);
+  const totalMatched = coupons.reduce((acc, cp) => acc + (cp.matchedCount || 0), 0);
+  const bestResult = coupons.reduce((max, cp) => Math.max(max, cp.matchedCount || 0), 0);
+  const pendingCount = coupons.filter((cp) => cp.matchedCount === undefined || cp.matchedCount === null).length;
+  const checkedCount = coupons.length - pendingCount;
 
   const handleDelete = (id: number) => {
-    Alert.alert(t('deleteCoupon'), t('deleteCouponMsg'), [
-      { text: t('cancel'), style: 'cancel' },
-      { text: t('delete'), style: 'destructive', onPress: async () => {
-        const updated = coupons.filter((c) => c.id !== id);
-        setCoupons(updated);
-        await AsyncStorage.setItem('savedCoupons', JSON.stringify(updated));
-      }},
+    Alert.alert('Kuponu sil', 'Bu kupon kalıcı olarak silinecek.', [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'Sil',
+        style: 'destructive',
+        onPress: async () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          const updated = coupons.filter((cp) => cp.id !== id);
+          setCoupons(updated);
+          await AsyncStorage.setItem('savedCoupons', JSON.stringify(updated));
+        },
+      },
     ]);
   };
 
   const handleDeleteAll = () => {
-    Alert.alert(t('deleteAll'), t('deleteAllMsg'), [
-      { text: t('cancel'), style: 'cancel' },
-      { text: t('delete'), style: 'destructive', onPress: async () => {
-        setCoupons([]);
-        await AsyncStorage.removeItem('savedCoupons');
-      }},
+    Alert.alert('Tümünü sil', 'Tüm kayıtlı kuponlar silinecek.', [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'Sil',
+        style: 'destructive',
+        onPress: async () => {
+          setCoupons([]);
+          await AsyncStorage.removeItem('savedCoupons');
+        },
+      },
     ]);
   };
 
   const handleShare = async (coupon: Coupon) => {
     try {
       const numbersText = coupon.numbers.join(' - ');
-      const bonusText = coupon.bonus && coupon.bonus.length > 0
-        ? `\nŞans Topu/Joker: ${coupon.bonus.join(' - ')}` : '';
-      const superStarText = coupon.superStar
-        ? `\n⭐ SüperStar: ${coupon.superStar}` : '';
+      const bonusText = coupon.bonus && coupon.bonus.length > 0 ? `\nŞans Topu/Joker: ${coupon.bonus.join(' - ')}` : '';
+      const superStarText = coupon.superStar ? `\nSüperStar: ${coupon.superStar}` : '';
       const message =
-        `🍀 LottoAI Kuponu\n` +
-        `━━━━━━━━━━━━━━━\n` +
-        `🎮 Oyun: ${coupon.game}\n` +
-        `📅 Tarih: ${coupon.date}\n` +
-        `🎱 Sayılar: ${numbersText}${bonusText}${superStarText}\n` +
-        `━━━━━━━━━━━━━━━\n` +
-        `LottoAI ile üretildi 🍀`;
+        `LottoAI Kuponu\n` +
+        `———————————\n` +
+        `Oyun: ${coupon.game}\n` +
+        `Tarih: ${coupon.date}\n` +
+        `Sayılar: ${numbersText}${bonusText}${superStarText}\n` +
+        `———————————\n` +
+        `LottoAI ile üretildi`;
       await Share.share({ message });
-    } catch (error) {
-      Alert.alert('Hata', 'Paylaşım yapılamadı!');
+    } catch {
+      Alert.alert('Hata', 'Paylaşım yapılamadı.');
     }
   };
 
-  const getScoreLabel = (score: number, game: string) => {
-    if (score === 0) return { label: 'Hiç tutmadı 😢', color: '#8E8E93' };
-    const gc = GAME_COLORS[game as keyof typeof GAME_COLORS];
-    const color = gc?.main || '#6C63FF';
-    if (score >= 6) return { label: 'BÜYÜK İKRAMİYE! 🏆', color: '#FFD700' };
-    if (score >= 4) return { label: `${score} Bildin! 🎉`, color };
-    if (score >= 2) return { label: `${score} Bildin 👍`, color };
-    return { label: `${score} Tutturdu`, color: '#8E8E93' };
+  const getScoreLabel = (score: number) => {
+    if (score === 0) return { label: 'Tutmadı', color: c.text3, sub: 'Bir sonrakine!' };
+    if (score >= 6) return { label: 'Büyük ikramiye!', color: c.gold, sub: 'Tebrikler!' };
+    if (score >= 4) return { label: `${score} sayı tutturdun`, color: c.brand, sub: 'Harika sonuç!' };
+    if (score >= 2) return { label: `${score} sayı tutturdun`, color: c.brand, sub: 'İyi gidiyorsun!' };
+    return { label: `${score} sayı tutturdun`, color: c.text2, sub: 'Bir sonrakine!' };
   };
 
-  const formatPrize = (amount: number, currency: string = 'TRY') => {
+  const formatPrize = (amount: number, currency = 'TRY') => {
     if (currency === 'USD') {
-      if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1)}B`;
-      if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
-      if (amount >= 1_000) return `$${(amount / 1_000).toFixed(1)}K`;
+      if (amount >= 1e9) return `$${(amount / 1e9).toFixed(1)}B`;
+      if (amount >= 1e6) return `$${(amount / 1e6).toFixed(1)}M`;
+      if (amount >= 1e3) return `$${(amount / 1e3).toFixed(1)}K`;
       return `$${amount}`;
     }
-    if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)} Milyon TL`;
-    if (amount >= 1_000) return `${(amount / 1_000).toFixed(1)} Bin TL`;
+    if (amount >= 1e6) return `${(amount / 1e6).toFixed(1)} Milyon TL`;
+    if (amount >= 1e3) return `${(amount / 1e3).toFixed(1)} Bin TL`;
     return `${amount} TL`;
   };
 
-  return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}>
+  const openCheckResult = (coupon: Coupon) => {
+    if (coupon.matchedCount === undefined || coupon.matchedCount === null) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const prizeTable = getPrizeTable(coupon.game);
+    const prize = prizeTable && coupon.matchedNumbers ? prizeTable[coupon.matchedNumbers.length] ?? null : null;
+    setCheckingCoupon(coupon);
+    setCheckResult({
+      draw: { numbers: '', bonus: '', superstar: null, draw_date: coupon.date, draw_no: '' },
+      matchedNumbers: coupon.matchedNumbers ?? [],
+      matchedBonus: coupon.matchedBonus ?? [],
+      matchedSuperStar: !!coupon.matchedSuperStar,
+      mainMatchCount: coupon.matchedNumbers?.length ?? 0,
+      prize,
+      score: coupon.matchedCount,
+    });
+    setChecking(false);
+    setCheckModal(true);
+  };
 
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{t('savedTitle')}</Text>
-          <Text style={styles.headerSub}>{t('savedSub')}</Text>
+  const toggleExpand = (id: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.create(180, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
+    setExpandedCoupon(expandedCoupon === id ? null : id);
+  };
+
+  return (
+    <View style={s.container}>
+      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}>
+        <View style={s.header}>
+          <Text style={s.title}>Kuponlarım</Text>
+          <Text style={s.subtitle}>Kayıtlı kuponların ve sonuçları</Text>
         </View>
 
         {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#6C63FF" />
-            <Text style={styles.loadingText}>Kuponların yükleniyor...</Text>
+          <LoadingState label="Kuponların yükleniyor…" />
+        ) : coupons.length === 0 ? (
+          <View style={{ paddingTop: 40 }}>
+            <EmptyState
+              icon={<TicketIcon color={c.brand} size={30} />}
+              title="Henüz kuponun yok"
+              desc="Kupon üret ekranında sayılarını seç ve kaydet. Sonuçlar açıklanınca otomatik kontrol edip burada gösterelim."
+              action="İlk kuponunu üret"
+              onAction={() => router.push('/(tabs)/generate')}
+            />
           </View>
         ) : (
           <>
-            {coupons.length > 0 && (
-              <View style={styles.statsCard}>
-                <Text style={styles.statsTitle}>📊 Kupon İstatistiklerin</Text>
-                <View style={styles.statsGrid}>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statValue}>{coupons.length}</Text>
-                    <Text style={styles.statLabel}>Toplam Kupon</Text>
-                  </View>
-                  <View style={styles.statDivider} />
-                  <View style={styles.statItem}>
-                    <Text style={styles.statValue}>{bestResult}</Text>
-                    <Text style={styles.statLabel}>En İyi Sonuç</Text>
-                  </View>
-                  <View style={styles.statDivider} />
-                  <View style={styles.statItem}>
-                    <Text style={styles.statValue}>{totalMatched}</Text>
-                    <Text style={styles.statLabel}>Toplam Tutuşan</Text>
-                  </View>
-                </View>
-                {mostPlayedGame && (
-                  <View style={styles.mostPlayed}>
-                    <Text style={styles.mostPlayedLabel}>⭐ En çok oynanan:</Text>
-                    <Text style={styles.mostPlayedValue}>{mostPlayedGame[0]} ({mostPlayedGame[1]} kez)</Text>
-                  </View>
-                )}
-              </View>
-            )}
+            {/* Stats */}
+            <Surface style={s.stats}>
+              <Stat value={String(coupons.length)} label="Toplam" color={c.brand} theme={theme} />
+              <View style={[s.statDivider, { backgroundColor: c.hairline }]} />
+              <Stat value={String(bestResult)} label="En iyi" color={c.gold} theme={theme} />
+              <View style={[s.statDivider, { backgroundColor: c.hairline }]} />
+              <Stat value={String(totalMatched)} label="Tutuşan" color={c.brand} theme={theme} />
+            </Surface>
 
-            {coupons.length > 0 && (
-              <View style={styles.filterRow}>
-                <TouchableOpacity
-                  style={[styles.filterBtn, filterStatus === 'all' && styles.filterBtnActive]}
-                  onPress={() => setFilterStatus('all')}>
-                  <Text style={[styles.filterBtnText, filterStatus === 'all' && styles.filterBtnTextActive]}>
-                    Tümü ({coupons.length})
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.filterBtn, filterStatus === 'pending' && styles.filterBtnActive]}
-                  onPress={() => setFilterStatus('pending')}>
-                  <Text style={[styles.filterBtnText, filterStatus === 'pending' && styles.filterBtnTextActive]}>
-                    ⏳ Bekleyen ({coupons.filter(c => c.matchedCount === undefined || c.matchedCount === null).length})
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.filterBtn, filterStatus === 'checked' && styles.filterBtnActive]}
-                  onPress={() => setFilterStatus('checked')}>
-                  <Text style={[styles.filterBtnText, filterStatus === 'checked' && styles.filterBtnTextActive]}>
-                    ✅ Kontrol ({coupons.filter(c => c.matchedCount !== undefined && c.matchedCount !== null).length})
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {gameChips.length > 1 && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.gameChipRow}
-                contentContainerStyle={{ paddingLeft: 20, paddingRight: 4, gap: 8 }}>
-                <TouchableOpacity
-                  style={[styles.gameChip, !filterGame && styles.gameChipActive]}
-                  onPress={() => setFilterGame(null)}>
-                  <Text style={[styles.gameChipText, !filterGame && styles.gameChipTextActive]}>
-                    Tümü ({coupons.length})
-                  </Text>
-                </TouchableOpacity>
-                {gameChips.map(chip => (
-                  <TouchableOpacity
-                    key={chip.game}
-                    style={[
-                      styles.gameChip,
-                      filterGame === chip.game && {
-                        backgroundColor: chip.color + '12',
-                        borderColor: chip.color,
-                      },
-                    ]}
-                    onPress={() => setFilterGame(filterGame === chip.game ? null : chip.game)}>
-                    <Text style={styles.gameChipEmoji}>{chip.icon}</Text>
-                    <Text
-                      style={[
-                        styles.gameChipText,
-                        filterGame === chip.game && { color: chip.color },
-                      ]}>
-                      {chip.game} ({chip.count})
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-
-            <View style={styles.topRow}>
-              <Text style={styles.sectionTitle}>Toplam {totalCoupons} Kupon</Text>
-              {coupons.length > 0 && (
-                <TouchableOpacity onPress={handleDeleteAll}>
-                  <Text style={styles.deleteAllText}>{t('deleteAll')}</Text>
-                </TouchableOpacity>
-              )}
+            {/* Status filter */}
+            <View style={s.statusRow}>
+              {([['all', `Tümü (${coupons.length})`], ['pending', `Bekleyen (${pendingCount})`], ['checked', `Kontrol (${checkedCount})`]] as [FilterStatus, string][]).map(([key, label]) => {
+                const active = filterStatus === key;
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => { setFilterStatus(key); Haptics.selectionAsync(); }}
+                    style={[s.statusBtn, { backgroundColor: active ? c.brand : c.surface, borderColor: active ? c.brand : c.border }]}
+                  >
+                    <Text style={[s.statusBtnText, { color: active ? c.brandText : c.text2 }]} numberOfLines={1}>{label}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
-            {coupons.length === 0 ? (
-              <View style={styles.guideCard}>
-                <Text style={styles.guideEmoji}>🎲</Text>
-                <Text style={styles.guideTitle}>İlk Kuponunu Üret!</Text>
-                <Text style={styles.guideDesc}>
-                  Henüz kayıtlı kuponun yok. Kupon Üret ekranına git, sayılarını seç ve kaydet.
-                </Text>
-                <TouchableOpacity
-                  style={styles.guideBtn}
-                  onPress={() => router.push('/(tabs)/generate' as any)}>
-                  <Text style={styles.guideBtnText}>🎲 Kupon Üret</Text>
-                </TouchableOpacity>
-              </View>
-            ) : filteredCoupons.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyEmoji}>🎫</Text>
-                <Text style={styles.emptyTitle}>
-                  {filterStatus === 'pending' ? 'Bekleyen kupon yok' :
-                   filterStatus === 'checked' ? 'Kontrol edilmiş kupon yok' :
-                   t('noCoupons')}
-                </Text>
-                <Text style={styles.emptyDesc}>
-                  {filterStatus === 'all' ? t('noCouponsDesc') :
-                   filterStatus === 'pending' ? 'Tüm kuponlarını kontrol ettin. Yeni kupon üretip kaydedebilirsin.' :
-                   'Henüz hiçbir kuponu kontrol etmedin. Bekleyen kuponlarını kontrol edebilirsin.'}
-                </Text>
-              </View>
+            {/* Game chips */}
+            {gameChips.length > 1 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow}>
+                <PressableScale onPress={() => setFilterGame(null)} style={[s.chip, { backgroundColor: !filterGame ? c.brand : c.surface, borderColor: !filterGame ? c.brand : c.border }]}>
+                  <Text style={[s.chipText, { color: !filterGame ? c.brandText : c.text2 }]}>Tümü</Text>
+                </PressableScale>
+                {gameChips.map((chip) => {
+                  const active = filterGame === chip.game;
+                  return (
+                    <PressableScale key={chip.game} onPress={() => setFilterGame(active ? null : chip.game)} style={[s.chip, { backgroundColor: active ? chip.color + '14' : c.surface, borderColor: active ? chip.color : c.border }]}>
+                      <GameEmblem game={chip.id} size={18} />
+                      <Text style={[s.chipText, { color: active ? chip.color : c.text2 }]}>{chip.game} ({chip.count})</Text>
+                    </PressableScale>
+                  );
+                })}
+                <View style={{ width: 8 }} />
+              </ScrollView>
             ) : null}
 
-            {filteredCoupons.map((coupon, index) => {
-              const gc = GAME_COLORS[coupon.game as keyof typeof GAME_COLORS];
-              const mainColor = gc?.main || coupon.color;
-              const bonusColor = gc?.bonus || '#FF6B6B';
-              const isExpanded = expandedCoupon === coupon.id;
-              const couponNumber = totalCoupons - index;
-              const bonusLabel = coupon.game === 'Çılgın Sayısal Loto' ? 'Joker' : 'Şans Topu';
-              const isChecked = coupon.matchedCount !== undefined && coupon.matchedCount !== null;
+            <View style={s.topRow}>
+              <Text style={s.sectionTitle}>{totalCoupons} kupon</Text>
+              <Pressable onPress={handleDeleteAll} hitSlop={8}>
+                <Text style={[s.deleteAll, { color: c.danger }]}>Tümünü sil</Text>
+              </Pressable>
+            </View>
 
-              return (
-                <View key={coupon.id}>
-                  <View style={[styles.couponCard, { borderLeftColor: mainColor }]}>
-                    <View style={styles.couponHeaderRow}>
-                      <View style={[styles.couponNumberBadge, { backgroundColor: mainColor + '15', borderColor: mainColor + '33' }]}>
-                        <Text style={[styles.couponNumberText, { color: mainColor }]}>#{couponNumber}</Text>
-                      </View>
-                      <Text style={styles.couponEmoji}>{coupon.icon}</Text>
-                      <View style={styles.couponInfo}>
-                        <Text style={styles.couponGame}>{coupon.game}</Text>
-                        <Text style={styles.couponDate}>📅 {coupon.date}</Text>
-                      </View>
-                    </View>
-
-                    {/* Ana sayı topları */}
-                    <View style={styles.numberBalls}>
-                      {coupon.numbers.map((num, i) => {
-                        const isHit = coupon.matchedNumbers && coupon.matchedNumbers.includes(num);
-                        let bgColor = PENDING_COLOR;
-                        if (isChecked) {
-                          bgColor = isHit ? mainColor : MISS_COLOR;
-                        }
-                        return (
-                          <View key={i} style={[styles.ball, { backgroundColor: bgColor }]}>
-                            <Text style={[styles.ballText, !isChecked && { color: '#8E8E93' }]}>{num}</Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-
-                    {/* Bonus / Joker */}
-                    {coupon.bonus && coupon.bonus.length > 0 && (
-                      <>
-                        <Text style={styles.bonusLabel}>🎯 {bonusLabel}</Text>
-                        <View style={styles.numberBalls}>
-                          {coupon.bonus.map((num, i) => {
-                            const isBonusHit = coupon.matchedBonus && coupon.matchedBonus.includes(num);
-                            let bgColor = PENDING_COLOR;
-                            if (isChecked) {
-                              bgColor = isBonusHit ? bonusColor : MISS_COLOR;
-                            }
-                            return (
-                              <View key={i} style={[styles.ball, { backgroundColor: bgColor }]}>
-                                <Text style={[styles.ballText, !isChecked && { color: '#8E8E93' }]}>{num}</Text>
-                              </View>
-                            );
-                          })}
-                        </View>
-                      </>
-                    )}
-
-                    {/* SüperStar */}
-                    {coupon.superStar != null && coupon.game === 'Çılgın Sayısal Loto' && (
-                      <>
-                        <Text style={styles.bonusLabel}>⭐ SüperStar</Text>
-                        <View style={styles.numberBalls}>
-                          <View style={[styles.ball, {
-                            backgroundColor: isChecked
-                              ? (coupon.matchedSuperStar ? '#FFD700' : MISS_COLOR)
-                              : PENDING_COLOR
-                          }]}>
-                            <Text style={[styles.ballText, { color: (!isChecked || coupon.matchedSuperStar) ? '#000' : '#8E8E93' }]}>
-                              {coupon.superStar}
-                            </Text>
-                          </View>
-                        </View>
-                      </>
-                    )}
-
-                    <View style={styles.actionRow}>
-                      <TouchableOpacity style={styles.actionBtn} onPress={() => handleShare(coupon)}>
-                        <Ionicons name="share-outline" size={18} color={mainColor} />
-                        <Text style={[styles.actionBtnText, { color: mainColor }]}>Paylaş</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.actionBtn, { borderColor: '#FF6B6B33' }]} onPress={() => handleDelete(coupon.id)}>
-                        <Ionicons name="trash-outline" size={18} color="#FF6B6B" />
-                        <Text style={[styles.actionBtnText, { color: '#FF6B6B' }]}>Sil</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <TouchableOpacity
-                      style={[styles.historyToggle, { borderColor: mainColor + '22' }]}
-                      onPress={() => setExpandedCoupon(isExpanded ? null : coupon.id)}>
-                      <Text style={[styles.historyToggleText, { color: mainColor }]}>
-                        📊 Geçmiş Performans {isExpanded ? '▲' : '▼'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {isExpanded && (
-                    <CouponHistory
-                      game={coupon.game}
-                      numbers={coupon.numbers}
-                      bonus={coupon.bonus}
-                      superStar={coupon.superStar ?? undefined}
-                    />
-                  )}
-                </View>
-              );
-            })}
-
-            <View style={{ height: 30 }} />
+            {filteredCoupons.length === 0 ? (
+              <EmptyState
+                icon={<TicketIcon color={c.brand} size={30} />}
+                title={filterStatus === 'pending' ? 'Bekleyen kupon yok' : filterStatus === 'checked' ? 'Kontrol edilmiş kupon yok' : 'Kupon bulunamadı'}
+                desc={filterStatus === 'pending' ? 'Tüm kuponların kontrol edildi.' : 'Bu filtreye uygun kupon yok.'}
+              />
+            ) : (
+              filteredCoupons.map((coupon, index) => (
+                <CouponTicket
+                  key={coupon.id}
+                  coupon={coupon}
+                  number={totalCoupons - index}
+                  expanded={expandedCoupon === coupon.id}
+                  onToggle={() => toggleExpand(coupon.id)}
+                  onShare={() => handleShare(coupon)}
+                  onDelete={() => handleDelete(coupon.id)}
+                  onOpenResult={() => openCheckResult(coupon)}
+                  getScoreLabel={getScoreLabel}
+                  theme={theme}
+                />
+              ))
+            )}
           </>
         )}
       </ScrollView>
 
+      {/* Result modal */}
       <Modal visible={checkModal} transparent animationType="slide" onRequestClose={() => setCheckModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {checking && (
-              <View style={styles.modalLoading}>
-                <Text style={styles.modalLoadingText}>Kontrol ediliyor...</Text>
-              </View>
-            )}
-
-            {!checking && checkResult && checkingCoupon && (() => {
-              const gc = GAME_COLORS[checkingCoupon.game as keyof typeof GAME_COLORS];
-              const mainColor = gc?.main || '#6C63FF';
-              const bonusColor = gc?.bonus || '#FF6B6B';
-              const scoreLabel = getScoreLabel(checkResult.score, checkingCoupon.game);
-              const hasPrize = checkResult.prize !== null;
-              const gameCurrency = getGameByName(checkingCoupon.game)?.currency || 'TRY';
-
-              return (
-                <>
-                  <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>✅ Kupon Sonucu</Text>
-                    <Text style={styles.modalSubtitle}>{checkingCoupon.game} · {checkResult.draw.draw_date}</Text>
-                  </View>
-
-                  <View style={[styles.scoreBox, { backgroundColor: scoreLabel.color + '15', borderColor: scoreLabel.color + '33' }]}>
-                    <Text style={[styles.scoreLabel, { color: scoreLabel.color }]}>{scoreLabel.label}</Text>
-                  </View>
-
-                  {hasPrize && (
-                    <View style={[styles.prizeCard, { borderColor: '#FFD700' }]}>
-                      <View style={styles.prizeCardInner}>
-                        <Text style={styles.prizeEmoji}>💰</Text>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.prizeTitle}>Tahmini İkramiye</Text>
-                          <Text style={styles.prizeAmount}>
-                            {formatPrize(checkResult.prize!.amount, gameCurrency)}
-                          </Text>
-                          {checkResult.prize!.note ? (
-                            <Text style={styles.prizeNote}>{checkResult.prize!.note}</Text>
-                          ) : null}
-                        </View>
+        <View style={[s.overlay, { backgroundColor: c.overlay }]}>
+          <View style={[s.sheet, { backgroundColor: c.surface, paddingBottom: insets.bottom + 16 }]}>
+            <View style={s.grabber} />
+            {checking ? (
+              <LoadingState label="Kontrol ediliyor…" />
+            ) : checkResult && checkingCoupon ? (
+              (() => {
+                const id = getGameByName(checkingCoupon.game)?.id ?? 'cilgin';
+                const mainColor = GameAccent[id] ?? c.brand;
+                const score = getScoreLabel(checkResult.score);
+                const currency = getGameByName(checkingCoupon.game)?.currency || 'TRY';
+                return (
+                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 540 }}>
+                    <View style={s.modalHead}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.modalTitle}>Kupon sonucu</Text>
+                        <Text style={s.modalSubtitle}>{checkingCoupon.game} · {checkResult.draw.draw_date}</Text>
                       </View>
-                      <Text style={styles.prizeWarning}>
-                        ⚠️ Bu tutar tahminidir. Gerçek ikramiye tutarı çekiliş sonuçlarına göre değişir. Resmi sonuçlar için bayinize danışın.
-                      </Text>
+                      <Pressable onPress={() => setCheckModal(false)} style={[s.close, { backgroundColor: c.surfaceAlt }]} hitSlop={8}>
+                        <CloseIcon color={c.text2} size={20} />
+                      </Pressable>
                     </View>
-                  )}
 
-                  {!hasPrize && checkResult.mainMatchCount > 0 && (
-                    <View style={styles.noPrizeBox}>
-                      <Text style={styles.noPrizeText}>
-                        ℹ️ {checkResult.mainMatchCount} ana sayı tutturdun. Bu kategoride ikramiye dağıtılmamaktadır.
-                      </Text>
+                    <View style={[s.scoreBox, { backgroundColor: score.color + '14', borderColor: score.color + '33' }]}>
+                      <TrophyIcon color={score.color} size={22} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.scoreLabel, { color: score.color }]}>{score.label}</Text>
+                        <Text style={s.scoreSub}>{score.sub}</Text>
+                      </View>
                     </View>
-                  )}
 
-                  <Text style={styles.modalLabel}>Senin Sayıların</Text>
-                  <View style={styles.modalBalls}>
-                    {checkingCoupon.numbers.map((num, i) => (
-                      <View key={i} style={[styles.modalBall, { backgroundColor: checkResult.matchedNumbers.includes(num) ? mainColor : '#E5E5EA' }]}>
-                        <Text style={[styles.modalBallText, { color: checkResult.matchedNumbers.includes(num) ? '#fff' : '#8E8E93' }]}>{num}</Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  {checkingCoupon.superStar != null && checkResult.draw.superstar != null && (
-                    <>
-                      <Text style={styles.modalLabel}>⭐ SüperStar</Text>
-                      <View style={styles.modalBalls}>
-                        <View style={[styles.modalBall, {
-                          backgroundColor: checkResult.matchedSuperStar ? '#FFD700' : '#E5E5EA',
-                        }]}>
-                          <Text style={[styles.modalBallText, { color: checkResult.matchedSuperStar ? '#000' : '#8E8E93' }]}>
-                            {checkingCoupon.superStar}
-                          </Text>
+                    {checkResult.prize ? (
+                      <View style={[s.prizeCard, { backgroundColor: c.goldSoft, borderColor: c.gold + '44' }]}>
+                        <View style={s.prizeRow}>
+                          <Text style={s.prizeLabel}>Tahmini ikramiye</Text>
+                          <Text style={s.prizeAmount}>{formatPrize(checkResult.prize.amount, currency)}</Text>
                         </View>
+                        <Text style={s.prizeNote}>Tahminidir; resmî tutar çekiliş sonuçlarına göre değişir. Bayinize danışın.</Text>
                       </View>
-                    </>
-                  )}
+                    ) : null}
 
-                  <Text style={styles.modalLabel}>Çekilen Sayılar</Text>
-                  <ScrollView style={{ maxHeight: 150 }}>
-                    <View style={styles.modalBalls}>
-                      {parseNumbers(checkResult.draw.numbers).map((num, i) => (
-                        <View key={i} style={[styles.modalBall, {
-                          backgroundColor: checkResult.matchedNumbers.includes(num) ? mainColor : '#FFFFFF',
-                          borderWidth: 1, borderColor: mainColor,
-                        }]}>
-                          <Text style={[styles.modalBallText, { color: checkResult.matchedNumbers.includes(num) ? '#fff' : mainColor }]}>{num}</Text>
-                        </View>
-                      ))}
+                    <Text style={s.modalLabel}>SENİN SAYILARIN</Text>
+                    <View style={s.modalBalls}>
+                      {checkingCoupon.numbers.map((num, i) => {
+                        const hit = checkResult.matchedNumbers.includes(num);
+                        return <NumberBall key={i} value={num} color={hit ? mainColor : undefined} variant={hit ? 'game' : 'muted'} size={38} />;
+                      })}
                     </View>
-                    {checkResult.draw.bonus && checkResult.draw.bonus !== '-' && (
-                      <View style={[styles.modalBalls, { marginTop: 8 }]}>
-                        {checkResult.draw.bonus.split(',').map((n, i) => (
-                          <View key={i} style={[styles.modalBall, {
-                            backgroundColor: checkResult.matchedBonus.includes(parseInt(n.trim())) ? bonusColor : '#FFFFFF',
-                            borderWidth: 1, borderColor: bonusColor,
-                          }]}>
-                            <Text style={[styles.modalBallText, { color: checkResult.matchedBonus.includes(parseInt(n.trim())) ? '#fff' : bonusColor }]}>{n.trim()}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                    {checkResult.draw.superstar != null && (
-                      <View style={[styles.modalBalls, { marginTop: 8 }]}>
-                        <View style={[styles.modalBall, {
-                          backgroundColor: checkResult.matchedSuperStar ? '#FFD700' : '#FFFFFF',
-                          borderWidth: 1, borderColor: '#FFD700',
-                        }]}>
-                          <Text style={[styles.modalBallText, { color: checkResult.matchedSuperStar ? '#000' : '#8E8E93' }]}>
-                            {checkResult.draw.superstar}
-                          </Text>
+
+                    {checkingCoupon.superStar != null ? (
+                      <>
+                        <Text style={s.modalLabel}>SÜPERSTAR</Text>
+                        <View style={s.modalBalls}>
+                          <NumberBall value={checkingCoupon.superStar} variant={checkResult.matchedSuperStar ? 'star' : 'muted'} size={38} />
                         </View>
-                      </View>
-                    )}
+                      </>
+                    ) : null}
+
+                    <AppButton label="Kapat" variant="secondary" onPress={() => setCheckModal(false)} style={{ marginTop: 12 }} />
                   </ScrollView>
-
-                  <TouchableOpacity
-                    style={styles.historyLink}
-                    onPress={() => {
-                      const couponId = checkingCoupon.id;
-                      setCheckModal(false);
-                      setTimeout(() => {
-                        setExpandedCoupon(couponId);
-                        scrollRef.current?.scrollToEnd({ animated: true });
-                      }, 400);
-                    }}>
-                    <Text style={styles.historyLinkText}>
-                      📊 Bu kuponun geçmiş performansını gör
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              );
-            })()}
-
-            <TouchableOpacity style={styles.modalClose} onPress={() => setCheckModal(false)}>
-              <Text style={styles.modalCloseText}>Kapat</Text>
-            </TouchableOpacity>
+                );
+              })()
+            ) : null}
           </View>
         </View>
       </Modal>
@@ -710,101 +478,181 @@ export default function SavedScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F7' },
-  header: { padding: 20, paddingTop: 20 },
-  headerTitle: { color: '#1a1a2e', fontSize: 26, fontWeight: 'bold' },
-  headerSub: { color: '#8E8E93', fontSize: 14, marginTop: 4 },
-  loadingContainer: { alignItems: 'center', padding: 80, gap: 12 },
-  loadingText: { color: '#8E8E93', fontSize: 14, marginTop: 8 },
-  statsCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E5EA', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  statsTitle: { color: '#1a1a2e', fontSize: 15, fontWeight: 'bold', marginBottom: 14 },
-  statsGrid: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  statItem: { flex: 1, alignItems: 'center' },
-  statValue: { color: '#6C63FF', fontSize: 24, fontWeight: 'bold' },
-  statLabel: { color: '#8E8E93', fontSize: 11, marginTop: 2 },
-  statDivider: { width: 1, height: 40, backgroundColor: '#E5E5EA' },
-  mostPlayed: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F5F5F7', padding: 10, borderRadius: 10 },
-  mostPlayedLabel: { color: '#8E8E93', fontSize: 12 },
-  mostPlayedValue: { color: '#1a1a2e', fontSize: 12, fontWeight: 'bold', flex: 1 },
-  filterRow: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 12, gap: 8 },
-  filterBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5EA', alignItems: 'center' },
-  filterBtnActive: { backgroundColor: '#6C63FF', borderColor: '#6C63FF' },
-  filterBtnText: { color: '#8E8E93', fontSize: 11, fontWeight: '600' },
-  filterBtnTextActive: { color: '#fff' },
-  gameChipRow: { marginBottom: 14 },
-  gameChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: '#E5E5EA', backgroundColor: '#FFFFFF', gap: 4 },
-  gameChipActive: { backgroundColor: '#6C63FF', borderColor: '#6C63FF' },
-  gameChipEmoji: { fontSize: 13 },
-  gameChipText: { color: '#8E8E93', fontSize: 11, fontWeight: '600' },
-  gameChipTextActive: { color: '#fff' },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 },
-  sectionTitle: { color: '#1a1a2e', fontSize: 16, fontWeight: 'bold' },
-  deleteAllText: { color: '#FF6B6B', fontSize: 14 },
-  emptyContainer: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40 },
-  emptyEmoji: { fontSize: 60, marginBottom: 16 },
-  emptyTitle: { color: '#1a1a2e', fontSize: 20, fontWeight: 'bold', marginBottom: 8 },
-  emptyDesc: { color: '#8E8E93', fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  guideCard: { marginHorizontal: 20, backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: '#E5E5EA', padding: 28, alignItems: 'center', gap: 14, marginTop: 40 },
-  guideEmoji: { fontSize: 48 },
-  guideTitle: { color: '#1a1a2e', fontSize: 20, fontWeight: 'bold' },
-  guideDesc: { color: '#8E8E93', fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  guideBtn: { backgroundColor: '#6C63FF', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12 },
-  guideBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
-  couponCard: { backgroundColor: '#FFFFFF', marginHorizontal: 20, padding: 16, borderRadius: 16, marginBottom: 8, borderLeftWidth: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  couponHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 10 },
-  couponNumberBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
-  couponNumberText: { fontSize: 12, fontWeight: 'bold' },
-  couponEmoji: { fontSize: 24 },
-  couponInfo: { flex: 1 },
-  couponGame: { color: '#1a1a2e', fontSize: 14, fontWeight: 'bold' },
-  couponDate: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
-  numberBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  ball: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
-  ballText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  bonusBall: { elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
-  bonusLabel: { color: '#8E8E93', fontSize: 12, marginBottom: 6 },
-  actionRow: { flexDirection: 'row', gap: 8, marginTop: 12, justifyContent: 'center' },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#E5E5EA', backgroundColor: '#F5F5F7' },
-  actionBtnText: { fontSize: 12, fontWeight: '600' },
-  historyToggle: { marginTop: 12, padding: 10, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
-  historyToggleText: { fontSize: 13, fontWeight: 'bold' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '80%' },
-  modalLoading: { alignItems: 'center', padding: 40 },
-  modalLoadingText: { color: '#8E8E93', fontSize: 16 },
-  modalHeader: { marginBottom: 16 },
-  modalTitle: { color: '#1a1a2e', fontSize: 20, fontWeight: 'bold' },
-  modalSubtitle: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
-  scoreBox: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 16, alignItems: 'center' },
-  scoreLabel: { fontSize: 18, fontWeight: 'bold' },
-  prizeCard: { backgroundColor: '#FFD70015', borderWidth: 1.5, borderRadius: 14, padding: 14, marginBottom: 14, gap: 10 },
-  prizeCardInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  prizeEmoji: { fontSize: 32 },
-  prizeTitle: { color: '#1a1a2e', fontSize: 13, fontWeight: 'bold' },
-  prizeAmount: { color: '#1a1a2e', fontSize: 26, fontWeight: 'bold', marginTop: 2 },
-  prizeNote: { color: '#8E8E93', fontSize: 12, marginTop: 2 },
-  prizeWarning: { color: '#8E8E93', fontSize: 10, lineHeight: 15, textAlign: 'center' },
-  noPrizeBox: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5EA', borderRadius: 10, padding: 12, marginBottom: 14 },
-  noPrizeText: { color: '#8E8E93', fontSize: 12, textAlign: 'center' },
-  modalLabel: { color: '#8E8E93', fontSize: 12, marginBottom: 8 },
-  modalBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-  modalBall: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  modalBallText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  modalClose: { backgroundColor: '#F5F5F7', padding: 14, borderRadius: 10, alignItems: 'center', marginTop: 8 },
-  modalCloseText: { color: '#1a1a2e', fontSize: 14, fontWeight: 'bold' },
-  historyLink: {
-    backgroundColor: '#6C63FF12',
-    borderWidth: 1,
-    borderColor: '#6C63FF33',
-    borderRadius: 10,
-    padding: 12,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  historyLinkText: {
-    color: '#6C63FF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-});
+/* ───────────────── ticket card ───────────────── */
+function CouponTicket({
+  coupon,
+  number,
+  expanded,
+  onToggle,
+  onShare,
+  onDelete,
+  onOpenResult,
+  getScoreLabel,
+  theme,
+}: {
+  coupon: Coupon;
+  number: number;
+  expanded: boolean;
+  onToggle: () => void;
+  onShare: () => void;
+  onDelete: () => void;
+  onOpenResult: () => void;
+  getScoreLabel: (n: number) => { label: string; color: string; sub: string };
+  theme: AppTheme;
+}) {
+  const c = theme.colors;
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const id = getGameByName(coupon.game)?.id ?? 'cilgin';
+  const mainColor = GameAccent[id] ?? c.brand;
+  const isChecked = coupon.matchedCount !== undefined && coupon.matchedCount !== null;
+  const score = isChecked ? getScoreLabel(coupon.matchedCount as number) : null;
+
+  // entrance animation
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, { toValue: 1, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [anim]);
+
+  return (
+    <Animated.View style={{ opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
+      <View style={s.ticket}>
+        <View style={[s.ticketStripe, { backgroundColor: mainColor }]} />
+        <View style={s.ticketBody}>
+          <View style={s.ticketHead}>
+            <GameEmblem game={id} size={38} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.ticketGame}>{coupon.game}</Text>
+              <Text style={s.ticketDate}>{coupon.date} · #{number}</Text>
+            </View>
+            {isChecked ? (
+              <Pressable onPress={onOpenResult} style={[s.scorePill, { backgroundColor: (score!.color) + '1A' }]}>
+                <Text style={[s.scorePillText, { color: score!.color }]} numberOfLines={1}>
+                  {coupon.matchedCount === 0 ? 'Tutmadı' : `${coupon.matchedCount} tutturdu`}
+                </Text>
+              </Pressable>
+            ) : (
+              <View style={[s.pendingPill, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+                <Text style={s.pendingPillText}>Bekliyor</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={[s.perforation, { borderTopColor: c.border }]} />
+
+          <View style={s.ticketBalls}>
+            {coupon.numbers.map((num, i) => {
+              if (!isChecked) return <NumberBall key={i} value={num} variant="muted" size={36} />;
+              const hit = coupon.matchedNumbers?.includes(num);
+              return <NumberBall key={i} value={num} color={hit ? mainColor : undefined} variant={hit ? 'game' : 'muted'} size={36} />;
+            })}
+          </View>
+
+          {coupon.bonus && coupon.bonus.length > 0 ? (
+            <View style={s.ticketBalls}>
+              {coupon.bonus.map((num, i) => {
+                if (!isChecked) return <NumberBall key={i} value={num} variant="muted" size={32} />;
+                const hit = coupon.matchedBonus?.includes(num);
+                return <NumberBall key={i} value={num} variant={hit ? 'bonus' : 'muted'} size={32} />;
+              })}
+            </View>
+          ) : null}
+
+          <View style={s.ticketActions}>
+            <PressableScale onPress={onShare} style={[s.actionBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+              <ShareIcon color={c.text2} size={18} />
+              <Text style={[s.actionText, { color: c.text2 }]}>Paylaş</Text>
+            </PressableScale>
+            <PressableScale onPress={onDelete} haptic={false} style={[s.actionIconBtn, { backgroundColor: c.dangerSoft, borderColor: c.dangerSoft }]}>
+              <TrashIcon color={c.danger} size={18} />
+            </PressableScale>
+          </View>
+
+          <PressableScale onPress={onToggle} style={[s.historyToggle, { borderColor: mainColor + '22' }]}>
+            <Text style={[s.historyToggleText, { color: mainColor }]}>Geçmiş performans</Text>
+            <View style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }}>
+              <ChevronDownIcon color={mainColor} size={16} />
+            </View>
+          </PressableScale>
+        </View>
+      </View>
+
+      {expanded ? (
+        <View style={{ marginTop: -4, marginBottom: 8 }}>
+          <CouponHistory game={coupon.game} numbers={coupon.numbers} bonus={coupon.bonus} superStar={coupon.superStar ?? undefined} />
+        </View>
+      ) : null}
+    </Animated.View>
+  );
+}
+
+function Stat({ value, label, color, theme }: { value: string; label: string; color: string; theme: AppTheme }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center' }}>
+      <Text style={{ fontFamily: theme.font.extrabold, fontSize: 26, color, fontVariant: ['tabular-nums'] }}>{value}</Text>
+      <Text style={{ ...theme.typography.caption, color: theme.colors.text2, marginTop: 3 }}>{label}</Text>
+    </View>
+  );
+}
+
+function makeStyles(theme: AppTheme) {
+  const c = theme.colors;
+  const { spacing, radius, typography: ty } = theme;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    header: { paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
+    title: { ...ty.h1, color: c.text },
+    subtitle: { ...ty.bodyMedium, color: c.text2, marginTop: 3 },
+
+    stats: { flexDirection: 'row', marginHorizontal: spacing.xl, padding: 18, marginBottom: spacing.lg },
+    statDivider: { width: 1, height: 40, alignSelf: 'center' },
+
+    statusRow: { flexDirection: 'row', gap: 6, paddingHorizontal: spacing.xl, marginBottom: spacing.lg },
+    statusBtn: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.md, borderWidth: 1 },
+    statusBtnText: { ...ty.caption, fontFamily: theme.font.bold },
+
+    chipRow: { paddingHorizontal: spacing.xl, gap: 8, marginBottom: spacing.lg },
+    chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, borderWidth: 1 },
+    chipText: { ...ty.caption, fontFamily: theme.font.semibold },
+
+    topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, marginBottom: spacing.md },
+    sectionTitle: { ...ty.h3, color: c.text },
+    deleteAll: { ...ty.label },
+
+    ticket: { marginHorizontal: spacing.xl, marginBottom: 12, borderRadius: radius.xl, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, flexDirection: 'row', overflow: 'hidden', ...theme.shadowSm },
+    ticketStripe: { width: 8 },
+    ticketBody: { flex: 1, padding: 16 },
+    ticketHead: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 14 },
+    ticketGame: { ...ty.h3, color: c.text },
+    ticketDate: { ...ty.caption, color: c.text3, marginTop: 2 },
+    scorePill: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: radius.pill, flexShrink: 0 },
+    scorePillText: { ...ty.caption, fontFamily: theme.font.extrabold },
+    pendingPill: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, flexShrink: 0 },
+    pendingPillText: { ...ty.caption, fontFamily: theme.font.bold, color: c.text3 },
+    perforation: { borderTopWidth: 1, borderStyle: 'dashed', marginHorizontal: -16, marginBottom: 14 },
+    ticketBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 8 },
+    ticketActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
+    actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 11, borderRadius: radius.md, borderWidth: 1 },
+    actionText: { ...ty.caption, fontFamily: theme.font.bold },
+    actionIconBtn: { width: 46, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, borderWidth: 1 },
+    historyToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, paddingVertical: 10, borderRadius: radius.md, borderWidth: 1 },
+    historyToggleText: { ...ty.label, fontFamily: theme.font.bold },
+
+    overlay: { flex: 1, justifyContent: 'flex-end' },
+    sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing.xl },
+    grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: c.border, marginBottom: spacing.lg },
+    modalHead: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
+    modalTitle: { ...ty.h2, color: c.text },
+    modalSubtitle: { ...ty.caption, color: c.text2, marginTop: 3 },
+    close: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+    scoreBox: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: radius.lg, borderWidth: 1, marginBottom: 14 },
+    scoreLabel: { ...ty.h3, fontFamily: theme.font.extrabold },
+    scoreSub: { ...ty.caption, color: c.text2, marginTop: 2 },
+    prizeCard: { padding: 14, borderRadius: radius.md, borderWidth: 1, marginBottom: 16 },
+    prizeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    prizeLabel: { ...ty.bodyMedium, color: c.text2 },
+    prizeAmount: { fontFamily: theme.font.extrabold, fontSize: 20, color: c.text },
+    prizeNote: { ...ty.micro, color: c.text3, marginTop: 6, letterSpacing: 0, lineHeight: 15 },
+    modalLabel: { ...ty.caption, color: c.text2, fontFamily: theme.font.semibold, marginBottom: 9 },
+    modalBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 16 },
+  });
+}
