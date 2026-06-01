@@ -562,13 +562,14 @@ function CouponTicket({
               <ShareIcon color={c.text2} size={18} />
               <Text style={[s.actionText, { color: c.text2 }]}>Paylaş</Text>
             </PressableScale>
-            <PressableScale onPress={onDelete} haptic={false} style={[s.actionIconBtn, { backgroundColor: c.dangerSoft, borderColor: c.dangerSoft }]}>
+            <PressableScale onPress={onDelete} haptic={false} style={[s.actionBtn, { backgroundColor: c.dangerSoft, borderColor: c.dangerSoft }]}>
               <TrashIcon color={c.danger} size={18} />
+              <Text style={[s.actionText, { color: c.danger }]}>Sil</Text>
             </PressableScale>
           </View>
 
           <PressableScale onPress={onToggle} style={[s.historyToggle, { borderColor: mainColor + '22' }]}>
-            <Text style={[s.historyToggleText, { color: mainColor }]}>Geçmiş performans</Text>
+            <Text style={[s.historyToggleText, { color: mainColor }]}>Geçmiş Çekilişler</Text>
             <View style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }}>
               <ChevronDownIcon color={mainColor} size={16} />
             </View>
