@@ -27,7 +27,7 @@ import { chatWithAI } from '../../lib/deepseek';
 import { GameEmblem } from '../../lib/emblems';
 import { GAMES, getGameByName } from '../../lib/games';
 import { AIAssistantIcon, BackIcon, BookmarkIcon, SendIcon } from '../../lib/icons';
-import { safeQuery, supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
 
 /* ───────────────────────── stats helpers ───────────────────────── */
@@ -61,71 +61,72 @@ function formatOdds(n: number): string {
 }
 
 async function getGameStats(game: (typeof GAMES)[0]): Promise<string> {
-  const { data, error } = await safeQuery(
-    () =>
-      supabase
-        .from('draws')
-        .select('numbers, draw_date')
-        .eq('game', game.name)
-        .order('draw_date_parsed', { ascending: false })
-        .limit(100)
-  );
+  try {
+    const { data, error } = await supabase
+      .from('draws')
+      .select('numbers, draw_date')
+      .eq('game', game.name)
+      .order('draw_date_parsed', { ascending: false })
+      .limit(100);
 
-  if (error || !data || data.length === 0) return `${game.name}: Henüz yeterli çekiliş verisi yok.\n`;
+    if (error || !data || data.length === 0) return `${game.name}: Henüz yeterli çekiliş verisi yok.\n`;
 
-  const countMap: Record<number, number> = {};
-  const missingMap: Record<number, number> = {};
-  let totalNumbers = 0;
-  let evenCount = 0;
+    const countMap: Record<number, number> = {};
+    const missingMap: Record<number, number> = {};
+    let totalNumbers = 0;
+    let evenCount = 0;
 
-  data.forEach((row, idx) => {
-    const nums = parseNumbers(row.numbers).filter((n) => n >= 1 && n <= game.max);
-    nums.forEach((num) => {
-      countMap[num] = (countMap[num] || 0) + 1;
-      totalNumbers++;
-      if (num % 2 === 0) evenCount++;
-      if (missingMap[num] === undefined) missingMap[num] = idx;
+    data.forEach((row: any, idx: number) => {
+      const nums = parseNumbers(row.numbers).filter((n: number) => n >= 1 && n <= game.max);
+      nums.forEach((num: number) => {
+        countMap[num] = (countMap[num] || 0) + 1;
+        totalNumbers++;
+        if (num % 2 === 0) evenCount++;
+        if (missingMap[num] === undefined) missingMap[num] = idx;
+      });
     });
-  });
 
-  const sortedByCount = Object.entries(countMap)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([num, count]) => `${num} (${count} kez)`);
+    const sortedByCount = Object.entries(countMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([num, count]) => `${num} (${count} kez)`);
 
-  const sortedByLeast = Object.entries(countMap)
-    .sort((a, b) => a[1] - b[1])
-    .slice(0, 5)
-    .map(([num, count]) => `${num} (${count} kez)`);
+    const sortedByLeast = Object.entries(countMap)
+      .sort((a, b) => a[1] - b[1])
+      .slice(0, 5)
+      .map(([num, count]) => `${num} (${count} kez)`);
 
-  const coldList = Object.entries(missingMap)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([num, since]) => `${num} (${since} çekiliş)`);
+    const coldList = Object.entries(missingMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([num, since]) => `${num} (${since} çekiliş)`);
 
-  const evenPct = Math.round((evenCount / totalNumbers) * 100);
-  const oddPct = 100 - evenPct;
-  const odds = calcOdds(game);
-  const drawCount = data.length;
+    const evenPct = Math.round((evenCount / totalNumbers) * 100);
+    const oddPct = 100 - evenPct;
+    const odds = calcOdds(game);
+    const drawCount = data.length;
 
-  const sums = data.map((row) => {
-    const nums = parseNumbers(row.numbers).filter((n) => n >= 1 && n <= game.max);
-    return nums.reduce((a, b) => a + b, 0);
-  });
-  const avgSum = Math.round(sums.reduce((a, b) => a + b, 0) / sums.length);
-  const minSum = Math.min(...sums);
-  const maxSum = Math.max(...sums);
+    const sums = data.map((row: any) => {
+      const nums = parseNumbers(row.numbers).filter((n: number) => n >= 1 && n <= game.max);
+      return nums.reduce((a: number, b: number) => a + b, 0);
+    });
+    const avgSum = Math.round(sums.reduce((a: number, b: number) => a + b, 0) / sums.length);
+    const minSum = Math.min(...sums);
+    const maxSum = Math.max(...sums);
 
-  return [
-    `${game.name} (son ${drawCount} çekiliş):`,
-    `  En çok çıkan: ${sortedByCount.join(', ')}`,
-    `  En az çıkan: ${sortedByLeast.join(', ')}`,
-    `  En çok geciken: ${coldList.join(', ')}`,
-    `  Çift/Tek: %${evenPct} / %${oddPct}`,
-    `  Toplam aralığı: ${minSum} – ${maxSum} (ort. ${avgSum})`,
-    `  Büyük ikramiye ihtimali: ${formatOdds(odds)}`,
-    ``,
-  ].join('\n');
+    return [
+      `${game.name} (son ${drawCount} çekiliş):`,
+      `  En çok çıkan: ${sortedByCount.join(', ')}`,
+      `  En az çıkan: ${sortedByLeast.join(', ')}`,
+      `  En çok geciken: ${coldList.join(', ')}`,
+      `  Çift/Tek: %${evenPct} / %${oddPct}`,
+      `  Toplam aralığı: ${minSum} – ${maxSum} (ort. ${avgSum})`,
+      `  Büyük ikramiye ihtimali: ${formatOdds(odds)}`,
+      ``,
+    ].join('\n');
+  } catch {
+    return `${game.name}: İstatistikler yüklenemedi.\n`;
+  }
 }
 
 async function buildStatsPrompt(): Promise<string> {
@@ -335,7 +336,7 @@ export default function AIAssistantScreen() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {messages.length === 0 ? (
           <View style={s.empty}>
