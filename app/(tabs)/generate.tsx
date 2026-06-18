@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
   Easing,
   Modal,
@@ -21,7 +20,9 @@ import { AppButton } from '../../components/ui/app-button';
 import { NumberBall } from '../../components/ui/number-ball';
 import { PressableScale, Surface } from '../../components/ui/surface';
 import { Toggle } from '../../components/ui/toggle';
+import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme, GameAccent } from '../../constants/theme';
+import { useAlert } from '../../contexts/AlertContext';
 import { GameEmblem } from '../../lib/emblems';
 import { GAMES } from '../../lib/games';
 import GameSelector from '../../lib/GameSelector';
@@ -65,6 +66,7 @@ function calcMinSum(count: number): number {
   for (let i = 1; i <= count; i++) sum += i;
   return sum;
 }
+
 function calcMaxSum(count: number, max: number): number {
   let sum = 0;
   for (let i = max; i > max - count; i--) sum += i;
@@ -111,7 +113,11 @@ function generateWithConstraints(
         if (usedRanges.has(i)) continue;
         const from = Math.floor(i * sliceSize) + 1;
         const to = Math.floor((i + 1) * sliceSize);
-        availableRanges.push(Array.from({ length: to - from + 1 }, (_, j) => from + j).filter((n) => !constraints.excludeNumbers.includes(n)));
+        availableRanges.push(
+          Array.from({ length: to - from + 1 }, (_, j) => from + j).filter(
+            (n) => !constraints.excludeNumbers.includes(n)
+          )
+        );
       }
       if (availableRanges.length < remaining) continue;
       const shuffledRanges = availableRanges.sort(() => Math.random() - 0.5);
@@ -160,7 +166,6 @@ type HistoryEntry = {
   aiExplanation?: string;
 };
 
-const HISTORY_KEY = 'generationHistory';
 const MAX_HISTORY = 5;
 
 /* ───────────────────────── animated ball ───────────────────────── */
@@ -190,6 +195,7 @@ export default function GenerateScreen() {
   const theme = useTheme();
   const c = theme.colors;
   const s = useMemo(() => makeStyles(theme), [theme]);
+  const { showAlert } = useAlert();
 
   const [selectedGame, setSelectedGame] = useState(GAMES[0]);
   const [generatedNumbers, setGeneratedNumbers] = useState<number[]>([]);
@@ -244,7 +250,7 @@ export default function GenerateScreen() {
   }, [params.game]);
 
   useEffect(() => {
-    AsyncStorage.getItem(HISTORY_KEY).then((data) => {
+    AsyncStorage.getItem(STORAGE_KEYS.GENERATION_HISTORY).then((data) => {
       if (data) setHistory(JSON.parse(data));
     });
   }, []);
@@ -253,7 +259,7 @@ export default function GenerateScreen() {
     async (entry: HistoryEntry) => {
       const updated = [entry, ...history].slice(0, MAX_HISTORY);
       setHistory(updated);
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+      await AsyncStorage.setItem(STORAGE_KEYS.GENERATION_HISTORY, JSON.stringify(updated));
     },
     [history]
   );
@@ -264,11 +270,11 @@ export default function GenerateScreen() {
 
     const sumError = validateSumRange(selectedGame.count, selectedGame.max, sumMinNum, sumMaxNum);
     if (sumError) {
-      Alert.alert('Geçersiz toplam aralığı', `${sumError}\n\nGeçerli aralık: ${theoreticalMin} – ${theoreticalMax}`);
+      showAlert('Geçersiz toplam aralığı', `${sumError}\n\nGeçerli aralık: ${theoreticalMin} – ${theoreticalMax}`);
       return;
     }
     if (includeNumbers.length > selectedGame.count) {
-      Alert.alert('Filtre hatası', `En fazla ${selectedGame.count} zorunlu sayı belirleyebilirsiniz.`);
+      showAlert('Filtre hatası', `En fazla ${selectedGame.count} zorunlu sayı belirleyebilirsiniz.`);
       return;
     }
 
@@ -283,11 +289,11 @@ export default function GenerateScreen() {
     });
 
     if (nums === null) {
-      Alert.alert('Üretim başarısız', 'Seçili filtrelerle uygun bir kombinasyon bulunamadı. Filtreleri gevşetmeyi deneyin.');
+      showAlert('Üretim başarısız', 'Seçili filtrelerle uygun bir kombinasyon bulunamadı. Filtreleri gevşetmeyi deneyin.');
       return;
     }
     if (nums.length === 0) {
-      Alert.alert('Filtre hatası', 'Zorunlu sayılar çok fazla. Lütfen sayı adedini azaltın.');
+      showAlert('Filtre hatası', 'Zorunlu sayılar çok fazla. Lütfen sayı adedini azaltın.');
       return;
     }
 
@@ -302,7 +308,14 @@ export default function GenerateScreen() {
     setSuperStarNumber(ss ?? null);
     setGenId((g) => g + 1);
 
-    saveToHistory({ game: selectedGame.name, gameId: selectedGame.id, numbers: nums, bonus, superStar: ss, timestamp: Date.now() });
+    saveToHistory({
+      game: selectedGame.name,
+      gameId: selectedGame.id,
+      numbers: nums,
+      bonus,
+      superStar: ss,
+      timestamp: Date.now(),
+    });
   };
 
   const handleGameSelect = (game: (typeof GAMES)[0]) => {
@@ -332,10 +345,13 @@ export default function GenerateScreen() {
 
   const handleClearHistory = async () => {
     setHistory([]);
-    await AsyncStorage.removeItem(HISTORY_KEY);
+    await AsyncStorage.removeItem(STORAGE_KEYS.GENERATION_HISTORY);
   };
 
-  const buildCoupon = (entry: { game: string; numbers: number[]; bonus: number[]; superStar?: number | null }, idOffset = 0) => ({
+  const buildCoupon = (
+    entry: { game: string; numbers: number[]; bonus: number[]; superStar?: number | null },
+    idOffset = 0
+  ) => ({
     id: Date.now() + idOffset,
     game: entry.game,
     icon: GAMES.find((g) => g.name === entry.game)?.icon || '',
@@ -348,13 +364,21 @@ export default function GenerateScreen() {
     matchedCount: undefined,
   });
 
-  const isDup = (coupons: any[], entry: { game: string; numbers: number[]; bonus: number[]; superStar?: number | null }) =>
+  const isDup = (
+    coupons: any[],
+    entry: { game: string; numbers: number[]; bonus: number[]; superStar?: number | null }
+  ) =>
     coupons.some((cp: any) => {
       if (cp.game !== entry.game) return false;
-      const sameNumbers = cp.numbers.length === entry.numbers.length && cp.numbers.every((n: number) => entry.numbers.includes(n));
+      const sameNumbers =
+        cp.numbers.length === entry.numbers.length &&
+        cp.numbers.every((n: number) => entry.numbers.includes(n));
       if (!sameNumbers) return false;
       if (entry.bonus.length > 0 && cp.bonus && cp.bonus.length > 0) {
-        return cp.bonus.length === entry.bonus.length && cp.bonus.every((n: number) => entry.bonus.includes(n));
+        return (
+          cp.bonus.length === entry.bonus.length &&
+          cp.bonus.every((n: number) => entry.bonus.includes(n))
+        );
       }
       return (entry.superStar ?? null) === (cp.superStar ?? null);
     });
@@ -362,7 +386,7 @@ export default function GenerateScreen() {
   const handleSaveAllHistory = async () => {
     setSavingAll(true);
     try {
-      const existing = await AsyncStorage.getItem('savedCoupons');
+      const existing = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_COUPONS);
       const coupons = existing ? JSON.parse(existing) : [];
       let savedCount = 0;
       for (const entry of currentGameHistory) {
@@ -371,16 +395,22 @@ export default function GenerateScreen() {
         savedCount++;
       }
       if (savedCount > 0) {
-        await AsyncStorage.setItem('savedCoupons', JSON.stringify(coupons));
-        Alert.alert('Kaydedildi', `${savedCount} kupon Kuponlarım'a eklendi.`, [
+        await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(coupons));
+        showAlert('Kaydedildi', `${savedCount} kupon Kuponlarım'a eklendi.`, [
           { text: 'Tamam' },
-          { text: "Kuponlarıma git", onPress: () => { setHistoryModal(false); router.push('/(tabs)/saved'); } },
+          {
+            text: 'Kuponlarıma git',
+            onPress: () => {
+              setHistoryModal(false);
+              router.push('/(tabs)/saved');
+            },
+          },
         ]);
       } else {
-        Alert.alert('Bilgi', 'Geçmişteki tüm kuponlar zaten kayıtlı.');
+        showAlert('Bilgi', 'Geçmişteki tüm kuponlar zaten kayıtlı.');
       }
     } catch {
-      Alert.alert('Hata', 'Kuponlar kaydedilemedi.');
+      showAlert('Hata', 'Kuponlar kaydedilemedi.');
     } finally {
       setSavingAll(false);
     }
@@ -388,31 +418,40 @@ export default function GenerateScreen() {
 
   const handleSave = async () => {
     if (generatedNumbers.length === 0) {
-      Alert.alert('Uyarı', 'Önce bir kupon üretin.');
+      showAlert('Uyarı', 'Önce bir kupon üretin.');
       return;
     }
-    const entry = { game: selectedGame.name, numbers: generatedNumbers, bonus: bonusNumbers, superStar: superStarNumber };
+    const entry = {
+      game: selectedGame.name,
+      numbers: generatedNumbers,
+      bonus: bonusNumbers,
+      superStar: superStarNumber,
+    };
     try {
-      const existing = await AsyncStorage.getItem('savedCoupons');
+      const existing = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_COUPONS);
       const coupons = existing ? JSON.parse(existing) : [];
       const persist = async () => {
         coupons.unshift(buildCoupon(entry));
-        await AsyncStorage.setItem('savedCoupons', JSON.stringify(coupons));
-        Alert.alert('Kaydedildi', "Kuponunuz Kuponlarım'a eklendi.", [
+        await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(coupons));
+        showAlert('Kaydedildi', "Kuponunuz Kuponlarım'a eklendi.", [
           { text: 'Tamam' },
           { text: 'Kuponlarıma git', onPress: () => router.push('/(tabs)/saved') },
         ]);
       };
       if (isDup(coupons, entry)) {
-        Alert.alert('Aynı kupon zaten kayıtlı', 'Bu kombinasyon daha önce kaydedilmiş. Yine de kaydetmek ister misiniz?', [
-          { text: 'Vazgeç', style: 'cancel' },
-          { text: 'Yine de kaydet', onPress: persist },
-        ]);
+        showAlert(
+          'Aynı kupon zaten kayıtlı',
+          'Bu kombinasyon daha önce kaydedilmiş. Yine de kaydetmek ister misiniz?',
+          [
+            { text: 'Vazgeç', style: 'cancel' },
+            { text: 'Yine de kaydet', onPress: persist },
+          ]
+        );
         return;
       }
       await persist();
     } catch {
-      Alert.alert('Hata', 'Kupon kaydedilemedi.');
+      showAlert('Hata', 'Kupon kaydedilemedi.');
     }
   };
 
@@ -447,7 +486,6 @@ export default function GenerateScreen() {
         <Text style={s.sectionLabel}>OYUN SEÇ</Text>
         <GameSelector selectedGame={selectedGame} onSelect={handleGameSelect} />
 
-        {/* Result card */}
         <Surface style={s.resultCard} elevated>
           {generatedNumbers.length === 0 ? (
             <View style={s.empty}>
@@ -461,7 +499,12 @@ export default function GenerateScreen() {
               <View style={s.balls} key={`n-${genId}`}>
                 {generatedNumbers.map((num, i) => (
                   <DrawBall key={`${genId}-${i}`} index={i}>
-                    <NumberBall value={num} color={includeNumbers.includes(num) ? c.gold : mainColor} size={46} variant={includeNumbers.includes(num) ? 'bonus' : 'game'} />
+                    <NumberBall
+                      value={num}
+                      color={includeNumbers.includes(num) ? c.gold : mainColor}
+                      size={46}
+                      variant={includeNumbers.includes(num) ? 'bonus' : 'game'}
+                    />
                   </DrawBall>
                 ))}
               </View>
@@ -510,7 +553,6 @@ export default function GenerateScreen() {
           )}
         </Surface>
 
-        {/* Generate + filter toggle */}
         <View style={s.btnRow}>
           <AppButton
             label={generatedNumbers.length > 0 ? 'Yeniden üret' : 'Kupon üret'}
@@ -524,7 +566,10 @@ export default function GenerateScreen() {
             onPress={() => setShowFilter((v) => !v)}
             style={[
               s.filterBtn,
-              { backgroundColor: filterActive ? mainColor + '1A' : c.surface, borderColor: filterActive ? mainColor : c.border },
+              {
+                backgroundColor: filterActive ? mainColor + '1A' : c.surface,
+                borderColor: filterActive ? mainColor : c.border,
+              },
             ]}
           >
             <SlidersIcon color={filterActive ? mainColor : c.text2} size={22} />
@@ -532,7 +577,6 @@ export default function GenerateScreen() {
           </PressableScale>
         </View>
 
-        {/* Save */}
         {generatedNumbers.length > 0 ? (
           <AppButton
             label="Kuponu kaydet"
@@ -543,20 +587,24 @@ export default function GenerateScreen() {
           />
         ) : null}
 
-        {/* History entry */}
         {currentGameHistory.length > 0 ? (
-          <PressableScale onPress={() => setHistoryModal(true)} style={[s.historyBtn, { backgroundColor: c.surface, borderColor: c.border }]}>
+          <PressableScale
+            onPress={() => setHistoryModal(true)}
+            style={[s.historyBtn, { backgroundColor: c.surface, borderColor: c.border }]}
+          >
             <ClockIcon color={c.brand} size={17} />
             <Text style={[s.historyBtnText, { color: c.brand }]}>Geçmiş ({currentGameHistory.length})</Text>
           </PressableScale>
         ) : null}
 
-        {/* Filter panel */}
         {showFilter ? (
           <Surface style={s.filterPanel}>
             <Text style={s.filterPanelTitle}>AKILLI FİLTRELER</Text>
 
-            <Pressable onPress={() => { setBalanced((b) => !b); if (!balanced) setEvenCount(null); }} style={[s.toggleRow, { borderColor: balanced ? c.brand : c.border, backgroundColor: balanced ? c.brandSoft : 'transparent' }]}>
+            <Pressable
+              onPress={() => { setBalanced((b) => !b); if (!balanced) setEvenCount(null); }}
+              style={[s.toggleRow, { borderColor: balanced ? c.brand : c.border, backgroundColor: balanced ? c.brandSoft : 'transparent' }]}
+            >
               <View style={{ flex: 1 }}>
                 <Text style={[s.toggleTitle, balanced && { color: c.brand }]}>Dengeli dağılım</Text>
                 <Text style={s.toggleDesc}>Düşük, orta ve yüksek sayılardan eşit oranda seçer</Text>
@@ -593,7 +641,10 @@ export default function GenerateScreen() {
 
             <View style={s.divider} />
 
-            <Pressable onPress={() => setNoConsecutive((v) => !v)} style={[s.toggleRow, { borderColor: noConsecutive ? c.brand : c.border, backgroundColor: noConsecutive ? c.brandSoft : 'transparent' }]}>
+            <Pressable
+              onPress={() => setNoConsecutive((v) => !v)}
+              style={[s.toggleRow, { borderColor: noConsecutive ? c.brand : c.border, backgroundColor: noConsecutive ? c.brandSoft : 'transparent' }]}
+            >
               <View style={{ flex: 1 }}>
                 <Text style={[s.toggleTitle, noConsecutive && { color: c.brand }]}>Ardışık sayıları engelle</Text>
                 <Text style={s.toggleDesc}>Yan yana 2{"'"}den fazla ardışık sayı olmasın</Text>
@@ -646,14 +697,12 @@ export default function GenerateScreen() {
           </Surface>
         ) : null}
 
-        {/* Responsible note */}
         <View style={[s.note, { backgroundColor: c.surfaceAlt, borderColor: c.hairline }]}>
           <InfoIcon color={c.text3} size={15} />
           <Text style={s.noteText}>Sayılar tamamen rastgele üretilir. Eğlence amaçlıdır, kazanç garantisi yoktur.</Text>
         </View>
       </ScrollView>
 
-      {/* History modal */}
       <Modal visible={historyModal} transparent animationType="slide" onRequestClose={() => setHistoryModal(false)}>
         <View style={[s.modalOverlay, { backgroundColor: c.overlay }]}>
           <View style={[s.modalSheet, { backgroundColor: c.surface, paddingBottom: insets.bottom + 16 }]}>
@@ -663,7 +712,11 @@ export default function GenerateScreen() {
                 <Text style={s.modalTitle}>Kupon geçmişi</Text>
                 <Text style={s.modalSubtitle}>{selectedGame.name} · son {MAX_HISTORY} üretim</Text>
               </View>
-              <Pressable onPress={() => setHistoryModal(false)} style={[s.modalClose, { backgroundColor: c.surfaceAlt }]} hitSlop={8}>
+              <Pressable
+                onPress={() => setHistoryModal(false)}
+                style={[s.modalClose, { backgroundColor: c.surfaceAlt }]}
+                hitSlop={8}
+              >
                 <CloseIcon color={c.text2} size={20} />
               </Pressable>
             </View>
@@ -674,7 +727,11 @@ export default function GenerateScreen() {
                 const timeAgo = Math.floor((Date.now() - entry.timestamp) / 60000);
                 const timeStr = timeAgo < 1 ? 'az önce' : timeAgo < 60 ? `${timeAgo} dk önce` : '1+ saat önce';
                 return (
-                  <PressableScale key={index} onPress={() => handleRestore(entry)} style={[s.historyEntry, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+                  <PressableScale
+                    key={index}
+                    onPress={() => handleRestore(entry)}
+                    style={[s.historyEntry, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+                  >
                     <View style={s.historyEntryHead}>
                       <View style={s.historyEntryGameRow}>
                         <GameEmblem game={entry.gameId} size={22} />
@@ -697,8 +754,19 @@ export default function GenerateScreen() {
             </ScrollView>
 
             <View style={s.modalActions}>
-              <AppButton label={savingAll ? 'Kaydediliyor…' : 'Tümünü kaydet'} onPress={handleSaveAllHistory} disabled={savingAll} iconLeft={(color, size) => <CheckIcon color={color} size={size} />} />
-              <AppButton label="Geçmişi temizle" variant="ghost" accent={c.danger} onPress={handleClearHistory} iconLeft={(color, size) => <TrashIcon color={color} size={size} />} />
+              <AppButton
+                label={savingAll ? 'Kaydediliyor…' : 'Tümünü kaydet'}
+                onPress={handleSaveAllHistory}
+                disabled={savingAll}
+                iconLeft={(color, size) => <CheckIcon color={color} size={size} />}
+              />
+              <AppButton
+                label="Geçmişi temizle"
+                variant="ghost"
+                accent={c.danger}
+                onPress={handleClearHistory}
+                iconLeft={(color, size) => <TrashIcon color={color} size={size} />}
+              />
             </View>
           </View>
         </View>

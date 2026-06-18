@@ -100,7 +100,7 @@ export default function OnboardingScreen() {
           <View style={[s.slide, { width }]}>
             <View style={[s.iconWrap, { backgroundColor: item.isWarning ? c.goldSoft : c.brandSoft }]}>
               {item.Icon === 'brand' ? (
-                <BrandMark size={76} bg={c.brand} fg={c.brandText} />
+                <BrandMark size={76}  />
               ) : (
                 <SlideIcon
                   icon={item.Icon}

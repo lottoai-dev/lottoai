@@ -5,7 +5,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
   Easing,
   LayoutAnimation,
@@ -25,12 +24,14 @@ import { AppButton } from '../../components/ui/app-button';
 import { NumberBall } from '../../components/ui/number-ball';
 import { EmptyState, LoadingState } from '../../components/ui/states';
 import { PressableScale, Surface } from '../../components/ui/surface';
+import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme, GameAccent } from '../../constants/theme';
+import { useAlert } from '../../contexts/AlertContext';
 import CouponHistory from '../../lib/CouponHistory';
 import { GameEmblem } from '../../lib/emblems';
 import { getGameByName } from '../../lib/games';
 import { CloseIcon, ShareIcon, StatsIcon, TicketIcon, TrashIcon, TrophyIcon } from '../../lib/icons';
-import { getPrizeTable, type PrizeEstimate } from '../../lib/prizeEstimates';
+import { formatPrize, getPrizeTable, type PrizeEstimate } from '../../lib/prizeEstimates';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
 
@@ -77,6 +78,7 @@ export default function SavedScreen() {
   const c = theme.colors;
   const s = useMemo(() => makeStyles(theme), [theme]);
   const scrollRef = useRef<ScrollView>(null);
+  const { showAlert } = useAlert();
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [checkModal, setCheckModal] = useState(false);
@@ -89,15 +91,16 @@ export default function SavedScreen() {
 
   const loadCoupons = async () => {
     try {
-      const data = await AsyncStorage.getItem('savedCoupons');
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_COUPONS);
       setCoupons(data ? JSON.parse(data) : []);
     } catch {
       setCoupons([]);
     }
   };
 
+  const autoCheckRef = useRef<(showNotification?: boolean) => Promise<void>>(async () => {});
   const autoCheckAllPending = useCallback(async (showNotification = false) => {
-    const saved = await AsyncStorage.getItem('savedCoupons');
+    const saved = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_COUPONS);
     if (!saved) return;
     const allCoupons: Coupon[] = JSON.parse(saved);
     const pending = allCoupons.filter((cp) => cp.matchedCount === undefined || cp.matchedCount === null);
@@ -171,7 +174,7 @@ export default function SavedScreen() {
 
     if (hasChanges) {
       setCoupons(updated);
-      await AsyncStorage.setItem('savedCoupons', JSON.stringify(updated));
+      await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(updated));
 
       if (showNotification && newlyCheckedCount > 0) {
         const gameList = [...new Set(pending.map((cp) => cp.game))].join(', ');
@@ -190,16 +193,19 @@ export default function SavedScreen() {
   }, []);
 
   useEffect(() => {
-    const channel = supabase
-      .channel('draws-changes')
+    autoCheckRef.current = autoCheckAllPending;
+  }, [autoCheckAllPending]);
+
+  useEffect(() => {
+    const channel = supabase.channel('draws-changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'draws' }, () => {
-        autoCheckAllPending(true);
+        autoCheckRef.current(true);
       })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [autoCheckAllPending]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -225,7 +231,7 @@ export default function SavedScreen() {
   const checkedCount = coupons.length - pendingCount;
 
   const handleDelete = (id: number) => {
-    Alert.alert('Kuponu sil', 'Bu kupon kalıcı olarak silinecek.', [
+    showAlert('Kuponu sil', 'Bu kupon kalıcı olarak silinecek.', [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Sil',
@@ -234,21 +240,21 @@ export default function SavedScreen() {
           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           const updated = coupons.filter((cp) => cp.id !== id);
           setCoupons(updated);
-          await AsyncStorage.setItem('savedCoupons', JSON.stringify(updated));
+          await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(updated));
         },
       },
     ]);
   };
 
   const handleDeleteAll = () => {
-    Alert.alert('Tümünü sil', 'Tüm kayıtlı kuponlar silinecek.', [
+    showAlert('Tümünü sil', 'Tüm kayıtlı kuponlar silinecek.', [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Sil',
         style: 'destructive',
         onPress: async () => {
           setCoupons([]);
-          await AsyncStorage.removeItem('savedCoupons');
+          await AsyncStorage.removeItem(STORAGE_KEYS.SAVED_COUPONS);
         },
       },
     ]);
@@ -269,7 +275,7 @@ export default function SavedScreen() {
         `LottoAI ile üretildi`;
       await Share.share({ message });
     } catch {
-      Alert.alert('Hata', 'Paylaşım yapılamadı.');
+      showAlert('Hata', 'Paylaşım yapılamadı.');
     }
   };
 
@@ -279,18 +285,6 @@ export default function SavedScreen() {
     if (score >= 4) return { label: `${score} sayı tutturdun`, color: c.brand, sub: 'Harika sonuç!' };
     if (score >= 2) return { label: `${score} sayı tutturdun`, color: c.brand, sub: 'İyi gidiyorsun!' };
     return { label: `${score} sayı tutturdun`, color: c.text2, sub: 'Bir sonrakine!' };
-  };
-
-  const formatPrize = (amount: number, currency = 'TRY') => {
-    if (currency === 'USD') {
-      if (amount >= 1e9) return `$${(amount / 1e9).toFixed(1)}B`;
-      if (amount >= 1e6) return `$${(amount / 1e6).toFixed(1)}M`;
-      if (amount >= 1e3) return `$${(amount / 1e3).toFixed(1)}K`;
-      return `$${amount}`;
-    }
-    if (amount >= 1e6) return `${(amount / 1e6).toFixed(1)} Milyon TL`;
-    if (amount >= 1e3) return `${(amount / 1e3).toFixed(1)} Bin TL`;
-    return `${amount} TL`;
   };
 
   const openCheckResult = (coupon: Coupon) => {
@@ -310,6 +304,7 @@ export default function SavedScreen() {
     setChecking(false);
     setCheckModal(true);
   };
+
   return (
     <View style={s.container}>
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
@@ -337,7 +332,6 @@ export default function SavedScreen() {
           </View>
         ) : (
           <>
-            {/* Stats */}
             <Surface style={s.stats}>
               <Stat value={String(coupons.length)} label="Toplam" color={c.brand} theme={theme} />
               <View style={[s.statDivider, { backgroundColor: c.hairline }]} />
@@ -346,7 +340,6 @@ export default function SavedScreen() {
               <Stat value={String(totalMatched)} label="Tutuşan" color={c.brand} theme={theme} />
             </Surface>
 
-            {/* Status filter */}
             <View style={s.statusRow}>
               {([['all', `Tümü (${coupons.length})`], ['pending', `Bekleyen (${pendingCount})`], ['checked', `Kontrol (${checkedCount})`]] as [FilterStatus, string][]).map(([key, label]) => {
                 const active = filterStatus === key;
@@ -394,7 +387,6 @@ export default function SavedScreen() {
         )}
       </ScrollView>
 
-      {/* Result modal */}
       <Modal visible={checkModal} transparent animationType="slide" onRequestClose={() => setCheckModal(false)}>
         <View style={[s.overlay, { backgroundColor: c.overlay }]}>
           <View style={[s.sheet, { backgroundColor: c.surface, paddingBottom: insets.bottom + 16 }]}>
@@ -463,7 +455,6 @@ export default function SavedScreen() {
         </View>
       </Modal>
 
-      {/* History modal */}
       {historyModalCoupon && (
         <CouponHistory
           game={historyModalCoupon.game}
@@ -478,7 +469,6 @@ export default function SavedScreen() {
   );
 }
 
-/* ───────────────── ticket card ───────────────── */
 const CouponTicket = React.memo(function CouponTicket({
   coupon,
   number,

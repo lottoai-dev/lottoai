@@ -1,14 +1,17 @@
+// app/index.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+
+import { STORAGE_KEYS } from '../constants/storage-keys';
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasOnboarded, setHasOnboarded] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem('onboardingCompleted')
+    AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED)
       .then((value) => {
         setHasOnboarded(value === 'true');
       })

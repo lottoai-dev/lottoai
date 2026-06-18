@@ -1,12 +1,9 @@
 // app/(tabs)/results.tsx
-// Sonuçlar hub — merges the old Results, Statistics and Analyze screens
-// behind a segmented control. Each segment is a self-contained component.
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnalyzeTab } from '../../components/results/AnalyzeTab';
@@ -39,14 +36,9 @@ export default function ResultsHub() {
   const [segment, setSegment] = useState<Segment>('results');
   const [newResults, setNewResults] = useState<string[]>([]);
 
-  // fade between segments
-  const fade = useMemo(() => new Animated.Value(1), []);
-  const switchSegment = useCallback(
-    (next: string) => {
-      setSegment(next as Segment);
-    },
-    []
-  );
+  const switchSegment = useCallback((next: string) => {
+    setSegment(next as Segment);
+  }, []);
 
   useEffect(() => {
     if (params.game) {
@@ -111,7 +103,7 @@ export default function ResultsHub() {
           {segment === 'results' ? <ResultsTab game={selectedGame} onSeen={markSeen} /> : null}
           {segment === 'stats' ? <StatisticsTab game={selectedGame} /> : null}
           {segment === 'analyze' ? <AnalyzeTab game={selectedGame} /> : null}
-          </View>
+        </View>
       </ScrollView>
     </View>
   );

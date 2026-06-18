@@ -46,7 +46,8 @@ export const GameEmblem = React.memo(function GameEmblem({ game, size = 40 }: Em
   );
 });
 
-export function BrandMark({ size = 40 }: { size?: number; bg?: string; fg?: string }) {
+// bg ve fg prop'ları kaldırıldı — icon.png kullandığı için bu renkler etkisiz
+export function BrandMark({ size = 40 }: { size?: number }) {
   return (
     <Image
       source={require('../assets/images/icon.png')}

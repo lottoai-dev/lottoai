@@ -2,12 +2,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
+import { STORAGE_KEYS } from '../constants/storage-keys';
+
 export type Bildirim = {
   id: string;
   title: string;
   body: string;
   screen?: string;
-  createdAt: string; // ISO string
+  createdAt: string;
   isRead: boolean;
 };
 
@@ -21,27 +23,23 @@ type BildirimContextType = {
 };
 
 const BildirimContext = createContext<BildirimContextType | null>(null);
-
-const STORAGE_KEY = 'bildirimler';
 const MAX_BILDIRIM = 20;
 
 export function BildirimProvider({ children }: { children: React.ReactNode }) {
   const [bildirimler, setBildirimler] = useState<Bildirim[]>([]);
 
-  // AsyncStorage'dan yükle
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
+    AsyncStorage.getItem(STORAGE_KEYS.BILDIRIMLER)
       .then((data) => {
         if (data) setBildirimler(JSON.parse(data));
       })
       .catch(() => {});
   }, []);
 
-  // AsyncStorage'a kaydet
   const persist = (list: Bildirim[]) => {
     const trimmed = list.slice(0, MAX_BILDIRIM);
     setBildirimler(trimmed);
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed)).catch(() => {});
+    AsyncStorage.setItem(STORAGE_KEYS.BILDIRIMLER, JSON.stringify(trimmed)).catch(() => {});
   };
 
   const addBildirim = useCallback(

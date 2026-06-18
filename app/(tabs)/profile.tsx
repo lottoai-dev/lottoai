@@ -4,12 +4,14 @@ import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Svg, { Circle, Path } from 'react-native-svg';
 import { PressableScale, Surface } from '../../components/ui/surface';
+import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme } from '../../constants/theme';
+import { useAlert } from '../../contexts/AlertContext';
 import { BrandMark } from '../../lib/emblems';
 import {
   BellIcon,
@@ -27,7 +29,6 @@ import {
 } from '../../lib/icons';
 import { useTheme, useThemeControls } from '../../lib/theme';
 
-/* small theme-mode glyphs */
 function SunGlyph({ color }: { color: string }) {
   return (
     <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
@@ -36,6 +37,7 @@ function SunGlyph({ color }: { color: string }) {
     </Svg>
   );
 }
+
 function MoonGlyph({ color }: { color: string }) {
   return (
     <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
@@ -43,6 +45,7 @@ function MoonGlyph({ color }: { color: string }) {
     </Svg>
   );
 }
+
 function AutoGlyph({ color }: { color: string }) {
   return (
     <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
@@ -59,6 +62,7 @@ export default function ProfileScreen() {
   const c = theme.colors;
   const s = useMemo(() => makeStyles(theme), [theme]);
   const { pref, setPref } = useThemeControls();
+  const { showAlert } = useAlert();
 
   const [name, setName] = useState('');
   const [editing, setEditing] = useState(false);
@@ -70,19 +74,23 @@ export default function ProfileScreen() {
 
   const loadData = async () => {
     try {
-      const savedName = await AsyncStorage.getItem('userName');
+      const savedName = await AsyncStorage.getItem(STORAGE_KEYS.USER_NAME);
       if (savedName) setName(savedName);
-      const couponsData = await AsyncStorage.getItem('savedCoupons');
+
+      const couponsData = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_COUPONS);
       if (couponsData) {
         const coupons = JSON.parse(couponsData);
         setTotalCoupons(coupons.length);
         setBestResult(coupons.reduce((max: number, cp: any) => Math.max(max, cp.matchedCount || 0), 0));
         setTotalMatched(coupons.reduce((acc: number, cp: any) => acc + (cp.matchedCount || 0), 0));
       }
-      const notifData = await AsyncStorage.getItem('notificationSettings_v2');
+
+      const notifData = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATION_SETTINGS);
       if (notifData) {
         const settings = JSON.parse(notifData);
-        setNotificationsEnabled(Object.values(settings).some((v: any) => v?.before === true || v?.after === true));
+        setNotificationsEnabled(
+          Object.values(settings).some((v: any) => v?.before === true || v?.after === true)
+        );
       }
     } catch {}
   };
@@ -91,17 +99,17 @@ export default function ProfileScreen() {
 
   const saveName = async () => {
     if (tempName.trim() === '') {
-      Alert.alert('Uyarı', 'İsim boş olamaz.');
+      showAlert('Uyarı', 'İsim boş olamaz.');
       return;
     }
-    await AsyncStorage.setItem('userName', tempName.trim());
+    await AsyncStorage.setItem(STORAGE_KEYS.USER_NAME, tempName.trim());
     setName(tempName.trim());
     setEditing(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const clearData = () => {
-    Alert.alert('Tüm verileri sil', 'Tüm kuponların, ayarların ve verilerin silinecek. Bu işlem geri alınamaz.', [
+    showAlert('Tüm verileri sil', 'Tüm kuponların, ayarların ve verilerin silinecek. Bu işlem geri alınamaz.', [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Sil',
@@ -112,7 +120,7 @@ export default function ProfileScreen() {
           setBestResult(0);
           setTotalMatched(0);
           setName('');
-          Alert.alert('Silindi', 'Tüm veriler temizlendi. Uygulamayı kapatıp açın.');
+          showAlert('Silindi', 'Tüm veriler temizlendi. Uygulamayı kapatıp açın.');
         },
       },
     ]);
@@ -124,7 +132,14 @@ export default function ProfileScreen() {
     { key: 'dark', label: 'Koyu', Glyph: MoonGlyph },
   ];
 
-  const MenuRow = ({ Icon, color, title, sub, onPress, last }: { Icon: (p: any) => React.ReactNode; color: string; title: string; sub: string; onPress?: () => void; last?: boolean }) => (
+  const MenuRow = ({ Icon, color, title, sub, onPress, last }: {
+    Icon: (p: any) => React.ReactNode;
+    color: string;
+    title: string;
+    sub: string;
+    onPress?: () => void;
+    last?: boolean;
+  }) => (
     <PressableScale onPress={onPress} style={[s.menuRow, ...(!last ? [{ borderBottomWidth: 1, borderBottomColor: c.hairline }] : [])]}>
       <View style={[s.menuIcon, { backgroundColor: color + '1A' }]}>
         <Icon color={color} size={20} />
@@ -140,12 +155,15 @@ export default function ProfileScreen() {
   return (
     <View style={s.container}>
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}
+      >
         <View style={s.header}>
           <Text style={s.title}>Profil</Text>
         </View>
 
-        {/* Avatar */}
         <Surface style={s.avatarCard}>
           <View style={[s.avatar, { backgroundColor: c.brand }]}>
             <Text style={s.avatarText}>{name ? name.charAt(0).toUpperCase() : 'L'}</Text>
@@ -178,14 +196,12 @@ export default function ProfileScreen() {
           </View>
         </Surface>
 
-        {/* Stats */}
         <Surface style={s.statsCard}>
           <Stat value={String(totalCoupons)} label="Kupon" color={c.brand} theme={theme} divider />
           <Stat value={String(bestResult)} label="En iyi" color={c.gold} theme={theme} divider />
           <Stat value={String(totalMatched)} label="Tutuşan" color={c.brand} theme={theme} />
         </Surface>
 
-        {/* Theme selector */}
         <Surface style={s.card}>
           <Text style={s.cardLabel}>GÖRÜNÜM</Text>
           <View style={[s.themeSeg, { backgroundColor: theme.mode === 'dark' ? c.surfaceAlt : '#ECEEF1' }]}>
@@ -194,26 +210,48 @@ export default function ProfileScreen() {
               return (
                 <Pressable
                   key={opt.key}
-                  onPress={() => { setPref(opt.key);  }}
+                  onPress={() => { setPref(opt.key); }}
                   style={[s.themeOpt, active && [{ backgroundColor: c.surface }, theme.shadowSm]]}
                 >
                   {opt.Glyph({ color: active ? c.text : c.text2 })}
-                  <Text style={[s.themeOptText, { color: active ? c.text : c.text2, fontFamily: active ? theme.font.bold : theme.font.semibold }]}>{opt.label}</Text>
+                  <Text style={[
+                    s.themeOptText,
+                    { color: active ? c.text : c.text2, fontFamily: active ? theme.font.bold : theme.font.semibold }
+                  ]}>
+                    {opt.label}
+                  </Text>
                 </Pressable>
               );
             })}
           </View>
         </Surface>
 
-        {/* Tools */}
         <Surface style={s.card}>
           <Text style={s.cardLabel}>ARAÇLAR</Text>
-          <MenuRow Icon={BellIcon} color={c.brand} title="Hatırlatıcılar" sub={notificationsEnabled ? 'Açık' : 'Çekiliş öncesi/sonrası bildirim'} onPress={() => router.push('/notifications')} />
-          <MenuRow Icon={StatsIcon} color={c.gold} title="İstatistikler" sub="Sıcak/soğuk sayılar, dağılım" onPress={() => router.push('/(tabs)/results?tab=stats')} />
-          <MenuRow Icon={SearchIcon} color={c.brand} title="Sayı analizi" sub="Sayılarını sorgula" onPress={() => router.push('/(tabs)/results?tab=analyze')} last />
+          <MenuRow
+            Icon={BellIcon}
+            color={c.brand}
+            title="Hatırlatıcılar"
+            sub={notificationsEnabled ? 'Açık' : 'Çekiliş öncesi/sonrası bildirim'}
+            onPress={() => router.push('/notifications')}
+          />
+          <MenuRow
+            Icon={StatsIcon}
+            color={c.gold}
+            title="İstatistikler"
+            sub="Sıcak/soğuk sayılar, dağılım"
+            onPress={() => router.push('/(tabs)/results?tab=stats')}
+          />
+          <MenuRow
+            Icon={SearchIcon}
+            color={c.brand}
+            title="Sayı analizi"
+            sub="Sayılarını sorgula"
+            onPress={() => router.push('/(tabs)/results?tab=analyze')}
+            last
+          />
         </Surface>
 
-        {/* Responsible gaming */}
         <View style={[s.responsible, { backgroundColor: c.brandSoft, borderColor: c.brandBorder }]}>
           <View style={s.responsibleHead}>
             <ShieldIcon color={c.brand} size={20} />
@@ -221,29 +259,35 @@ export default function ProfileScreen() {
           </View>
           <Text style={s.responsibleText}>
             Şans oyunları eğlence amaçlıdır, gelir kaynağı değildir. 18 yaş ve üzeri içindir. Oyun kontrolden çıktıysa{' '}
-            <Text style={{ fontFamily: theme.font.bold, color: c.brand }} onPress={() => Linking.openURL('tel:115')}>Yeşilay 115</Text>{' '}
+            <Text
+              style={{ fontFamily: theme.font.bold, color: c.brand }}
+              onPress={() => Linking.openURL('tel:115')}
+            >
+              Yeşilay 115
+            </Text>{' '}
             danışma hattını arayabilirsin.
           </Text>
         </View>
 
-        {/* About */}
         <Surface style={s.card}>
           <Text style={s.cardLabel}>HAKKINDA</Text>
-          <MenuRow Icon={ShieldIcon} color={c.text2} title="Gizlilik politikası" sub="Kişisel verilerin" onPress={() => router.push('/legal')} />
-          <MenuRow Icon={DocIcon} color={c.text2} title="Kullanım koşulları" sub="Uygulama kuralları" onPress={() => router.push('/legal')} />
+          <MenuRow Icon={ShieldIcon} color={c.text2} title="Gizlilik politikası" sub="Kişisel verilerin" onPress={() => Linking.openURL('https://lottoai-dev.github.io/lottoai-legal')} />
+          <MenuRow Icon={DocIcon} color={c.text2} title="Kullanım koşulları" sub="Uygulama kuralları" onPress={() => Linking.openURL('https://lottoai-dev.github.io/lottoai-legal')} />
+          <MenuRow Icon={InfoIcon} color={c.text2} title="Sık sorulan sorular" sub="Uygulama hakkında" onPress={() => router.push('/legal')} />
           <MenuRow Icon={MailIcon} color={c.text2} title="Bize ulaş" sub="lottoai.destek@gmail.com" onPress={() => Linking.openURL('mailto:lottoai.destek@gmail.com')} />
           <MenuRow Icon={InfoIcon} color={c.text3} title="Versiyon" sub="1.0.0" last />
         </Surface>
 
-        {/* Danger */}
-        <PressableScale onPress={clearData} haptic={false} style={[s.danger, { backgroundColor: c.dangerSoft, borderColor: c.danger + '33' }]}>
+        <PressableScale
+          onPress={clearData}
+          style={[s.danger, { backgroundColor: c.dangerSoft, borderColor: c.danger + '33' }]}
+        >
           <TrashIcon color={c.danger} size={20} />
           <Text style={[s.dangerText, { color: c.danger }]}>Tüm verileri sil</Text>
         </PressableScale>
 
-        {/* Footer */}
         <View style={s.footer}>
-          <BrandMark size={34} bg={c.brand} fg={c.brandText} />
+          <BrandMark size={34} />
           <Text style={s.footerText}>LottoAI · v1.0.0</Text>
           <Text style={s.footerSub}>18+ · Şans oyunları asistanı</Text>
         </View>
@@ -252,15 +296,25 @@ export default function ProfileScreen() {
   );
 }
 
-function Stat({ value, label, color, theme, divider }: { value: string; label: string; color: string; theme: AppTheme; divider?: boolean }) {
+function Stat({ value, label, color, theme, divider }: {
+  value: string;
+  label: string;
+  color: string;
+  theme: AppTheme;
+  divider?: boolean;
+}) {
   const c = theme.colors;
   return (
     <>
       <View style={{ flex: 1, alignItems: 'center' }}>
-        <Text style={{ fontFamily: theme.font.extrabold, fontSize: 26, color, fontVariant: ['tabular-nums'] }}>{value}</Text>
+        <Text style={{ fontFamily: theme.font.extrabold, fontSize: 26, color, fontVariant: ['tabular-nums'] }}>
+          {value}
+        </Text>
         <Text style={{ ...theme.typography.caption, color: c.text2, marginTop: 3 }}>{label}</Text>
       </View>
-      {divider ? <View style={{ width: 1, height: 40, backgroundColor: c.hairline, alignSelf: 'center' }} /> : null}
+      {divider ? (
+        <View style={{ width: 1, height: 40, backgroundColor: c.hairline, alignSelf: 'center' }} />
+      ) : null}
     </>
   );
 }
@@ -273,14 +327,21 @@ function makeStyles(theme: AppTheme) {
     header: { paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
     title: { ...ty.h1, color: c.text },
 
-    avatarCard: { marginHorizontal: spacing.xl, marginBottom: spacing.md, padding: 22, flexDirection: 'row', alignItems: 'center', gap: 16, borderRadius: radius.xxl },
+    avatarCard: {
+      marginHorizontal: spacing.xl, marginBottom: spacing.md,
+      padding: 22, flexDirection: 'row', alignItems: 'center',
+      gap: 16, borderRadius: radius.xxl,
+    },
     avatar: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
     avatarText: { fontFamily: theme.font.extrabold, fontSize: 28, color: '#fff' },
     nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     nameText: { ...ty.h2, color: c.text },
     memberText: { ...ty.caption, color: c.text2, marginTop: 3 },
     editRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    nameInput: { flex: 1, height: 42, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 12, fontFamily: theme.font.bold, fontSize: 16 },
+    nameInput: {
+      flex: 1, height: 42, borderRadius: radius.md, borderWidth: 1,
+      paddingHorizontal: 12, fontFamily: theme.font.bold, fontSize: 16,
+    },
     editBtn: { width: 42, height: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
 
     statsCard: { flexDirection: 'row', marginHorizontal: spacing.xl, padding: 18, marginBottom: spacing.md },
@@ -289,7 +350,10 @@ function makeStyles(theme: AppTheme) {
     cardLabel: { ...ty.micro, color: c.text2, marginBottom: 10 },
 
     themeSeg: { flexDirection: 'row', gap: 3, padding: 4, borderRadius: 13 },
-    themeOpt: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10 },
+    themeOpt: {
+      flex: 1, flexDirection: 'row', alignItems: 'center',
+      justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10,
+    },
     themeOptText: { fontSize: 13 },
 
     menuRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13 },
@@ -302,7 +366,11 @@ function makeStyles(theme: AppTheme) {
     responsibleTitle: { ...ty.title, color: c.text },
     responsibleText: { ...ty.caption, color: c.text2, lineHeight: 19 },
 
-    danger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginHorizontal: spacing.xl, marginBottom: spacing.md, padding: 14, borderRadius: radius.md, borderWidth: 1 },
+    danger: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      gap: 10, marginHorizontal: spacing.xl, marginBottom: spacing.md,
+      padding: 14, borderRadius: radius.md, borderWidth: 1,
+    },
     dangerText: { ...ty.title },
 
     footer: { alignItems: 'center', gap: 5, paddingTop: 18, paddingBottom: 28 },

@@ -10,9 +10,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale, Surface } from '../../components/ui/surface';
 import { Toggle } from '../../components/ui/toggle';
+import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme, GameAccent } from '../../constants/theme';
 import { GameEmblem } from '../../lib/emblems';
-import { GAMES, type GameId } from '../../lib/games';
+import { GAMES, type Game, type GameId } from '../../lib/games';
 import { t } from '../../lib/i18n';
 import { BackIcon, BellIcon, CalendarIcon, CheckIcon, ClockIcon } from '../../lib/icons';
 import { useTheme } from '../../lib/theme';
@@ -29,21 +30,21 @@ Notifications.setNotificationHandler({
 
 type GameSettings = {
   before: boolean;
-  beforeMinutes: number;  // 15, 30, 60, 120
+  beforeMinutes: number;
   after: boolean;
 };
 
 type NotifSettings = Partial<Record<GameId, GameSettings>>;
-const SETTINGS_KEY = 'notificationSettings_v3';
+const SETTINGS_KEY = STORAGE_KEYS.NOTIFICATION_SETTINGS;
 
 const BEFORE_OPTIONS = [15, 30, 60, 120] as const;
+
 function formatMinutes(min: number): string {
   if (min < 60) return `${min} dk`;
   return `${min / 60} saat`;
 }
 
-/* ───────────────────────── next draw helper ───────────────────────── */
-function getNextDrawTime(game: (typeof GAMES)[0]): Date | null {
+function getNextDrawTime(game: Game): Date | null {
   const now = new Date();
   let earliest: Date | null = null;
 
@@ -55,27 +56,24 @@ function getNextDrawTime(game: (typeof GAMES)[0]): Date | null {
     if (daysUntil < 0) daysUntil += 7;
     if (daysUntil === 0 && candidate <= now) daysUntil = 7;
     candidate.setDate(candidate.getDate() + daysUntil);
-
     if (!earliest || candidate < earliest) earliest = candidate;
   }
   return earliest;
 }
 
 function useCountdown(targetDate: Date | null) {
-  const [parts, setParts] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
+  const [parts, setParts] = useState<{
+    days: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+  } | null>(null);
 
   useEffect(() => {
-    if (!targetDate) {
-      setParts(null);
-      return;
-    }
-
+    if (!targetDate) { setParts(null); return; }
     const tick = () => {
       const diff = targetDate.getTime() - Date.now();
-      if (diff <= 0) {
-        setParts({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        return;
-      }
+      if (diff <= 0) { setParts({ days: 0, hours: 0, minutes: 0, seconds: 0 }); return; }
       const totalSeconds = Math.floor(diff / 1000);
       setParts({
         days: Math.floor(totalSeconds / 86400),
@@ -84,7 +82,6 @@ function useCountdown(targetDate: Date | null) {
         seconds: totalSeconds % 60,
       });
     };
-
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
@@ -95,13 +92,16 @@ function useCountdown(targetDate: Date | null) {
 
 function CountdownLabel({ targetDate, theme }: { targetDate: Date | null; theme: AppTheme }) {
   const parts = useCountdown(targetDate);
+  const c = theme.colors;
 
-  if (!parts) {
-    return <Text style={{ ...theme.typography.caption, color: theme.colors.text3 }}>—</Text>;
-  }
+  if (!parts) return <Text style={{ ...theme.typography.caption, color: c.text3 }}>—</Text>;
 
   if (parts.days === 0 && parts.hours === 0 && parts.minutes === 0 && parts.seconds === 0) {
-    return <Text style={{ ...theme.typography.caption, color: theme.colors.brand, fontFamily: theme.font.bold }}>Şimdi!</Text>;
+    return (
+      <Text style={{ ...theme.typography.caption, color: c.brand, fontFamily: theme.font.bold }}>
+        Şimdi!
+      </Text>
+    );
   }
 
   const pad = (n: number) => n.toString().padStart(2, '0');
@@ -111,13 +111,107 @@ function CountdownLabel({ targetDate, theme }: { targetDate: Date | null; theme:
     : [`${pad(parts.hours)}s`, `${pad(parts.minutes)}dk`, `${pad(parts.seconds)}sn`];
 
   return (
-    <Text style={{ ...theme.typography.caption, color: theme.colors.text2, fontVariant: ['tabular-nums'] }}>
+    <Text style={{ ...theme.typography.caption, color: c.text2, fontVariant: ['tabular-nums'] }}>
       {segments.join(' : ')}
     </Text>
   );
 }
 
-/* ───────────────────────── main screen ───────────────────────── */
+function GameCard({
+  game,
+  settings,
+  expandedGame,
+  onToggleBefore,
+  onToggleAfter,
+  onBeforeMinutesChange,
+  theme,
+}: {
+  game: Game;
+  settings: GameSettings;
+  expandedGame: GameId | null;
+  onToggleBefore: (gameId: GameId, value: boolean) => void;
+  onToggleAfter: (gameId: GameId, value: boolean) => void;
+  onBeforeMinutesChange: (gameId: GameId, minutes: number) => void;
+  theme: AppTheme;
+}) {
+  const c = theme.colors;
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const color = GameAccent[game.id] ?? c.brand;
+  const expanded = expandedGame === game.id;
+  const nextDraw = useMemo(() => getNextDrawTime(game), [game]);
+
+  return (
+    <Surface style={s.gameCard}>
+      <View style={[s.gameAccent, { backgroundColor: settings.before || settings.after ? color : 'transparent' }]} />
+      <View style={s.gameInner}>
+        <View style={s.gameHeader}>
+          <GameEmblem game={game.id} size={38} />
+          <View style={{ flex: 1 }}>
+            <Text style={s.gameName}>{game.name}</Text>
+            <View style={s.gameMeta}>
+              <CalendarIcon color={c.text3} size={13} />
+              <Text style={s.gameMetaText}>
+                {game.drawDaysLong} · {game.drawHour}:{String(game.drawMinute).padStart(2, '0')}
+              </Text>
+            </View>
+          </View>
+          <View style={[s.countdownBadge, { backgroundColor: color + '12', borderColor: color + '22' }]}>
+            <ClockIcon color={color} size={12} />
+            <CountdownLabel targetDate={nextDraw} theme={theme} />
+          </View>
+        </View>
+
+        <View style={[s.toggleRow, { borderTopColor: c.hairline }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.toggleLabel}>Çekiliş hatırlatıcısı</Text>
+            <Text style={s.toggleDesc}>
+              {settings.before
+                ? `Çekilişten ${formatMinutes(settings.beforeMinutes)} önce bildirim`
+                : 'Kapalı'}
+            </Text>
+          </View>
+          <Toggle value={settings.before} onChange={(v) => onToggleBefore(game.id, v)} accent={color} />
+        </View>
+
+        {settings.before && expanded ? (
+          <View style={[s.timeOptionsRow, { borderTopColor: c.hairline }]}>
+            {BEFORE_OPTIONS.map((opt) => {
+              const active = settings.beforeMinutes === opt;
+              return (
+                <Pressable
+                  key={opt}
+                  onPress={() => onBeforeMinutesChange(game.id, opt)}
+                  style={[
+                    s.timeOption,
+                    {
+                      borderColor: active ? color : c.border,
+                      backgroundColor: active ? color : 'transparent',
+                    },
+                  ]}
+                >
+                  <Text style={[s.timeOptionText, { color: active ? '#fff' : c.text2 }]}>
+                    {formatMinutes(opt)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+
+        <View style={[s.toggleRow, { borderTopColor: c.hairline }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.toggleLabel}>Sonuç bildirimi</Text>
+            <Text style={s.toggleDesc}>
+              {settings.after ? 'Sonuç açıklandığında anında bildirim' : 'Kapalı'}
+            </Text>
+          </View>
+          <Toggle value={settings.after} onChange={(v) => onToggleAfter(game.id, v)} accent={color} />
+        </View>
+      </View>
+    </Surface>
+  );
+}
+
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -182,9 +276,16 @@ export default function NotificationsScreen() {
   return (
     <View style={s.container}>
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 40 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 40 }}
+      >
         <View style={s.nav}>
-          <Pressable onPress={() => router.back()} style={[s.navBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]} hitSlop={6}>
+          <Pressable
+            onPress={() => router.back()}
+            style={[s.navBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+            hitSlop={6}
+          >
             <BackIcon color={c.text2} size={22} />
           </Pressable>
           <Text style={s.navTitle}>Hatırlatıcılar</Text>
@@ -194,7 +295,10 @@ export default function NotificationsScreen() {
         <Text style={s.subtitle}>Çekiliş öncesi ve sonrası bildirim al</Text>
 
         {!hasPermission ? (
-          <PressableScale onPress={handleRequestPermission} style={[s.permCard, { backgroundColor: c.brandSoft, borderColor: c.brandBorder }]}>
+          <PressableScale
+            onPress={handleRequestPermission}
+            style={[s.permCard, { backgroundColor: c.brandSoft, borderColor: c.brandBorder }]}
+          >
             <View style={[s.permIcon, { backgroundColor: c.brand }]}>
               <BellIcon color={c.brandText} size={20} />
             </View>
@@ -205,119 +309,48 @@ export default function NotificationsScreen() {
             <Text style={[s.permBtn, { color: c.brand }]}>İzin ver</Text>
           </PressableScale>
         ) : (
-          <>
-            <View style={[s.granted, { backgroundColor: c.brandSoft, borderColor: c.brandBorder }]}>
-              <CheckIcon color={c.brand} size={18} />
-              <Text style={[s.grantedText, { color: c.brand }]}>Bildirim izni verildi</Text>
-            </View>
-
-            <PressableScale onPress={sendTestNotification} style={[s.testBtn, { backgroundColor: c.surface, borderColor: c.border }]}>
-              <BellIcon color={c.brand} size={18} />
-              <Text style={[s.testBtnText, { color: c.brand }]}>Test bildirimi gönder</Text>
-            </PressableScale>
-          </>
+          <View style={[s.granted, { backgroundColor: c.brandSoft, borderColor: c.brandBorder }]}>
+            <CheckIcon color={c.brand} size={18} />
+            <Text style={[s.grantedText, { color: c.brand }]}>Bildirim izni verildi</Text>
+          </View>
         )}
 
         <Text style={s.sectionTitle}>Oyun hatırlatıcıları</Text>
-        {GAMES.map((game) => {
-          const gs = getGameSettings(game.id);
-          const color = GameAccent[game.id] ?? c.brand;
-          const nextDraw = useMemo(() => getNextDrawTime(game), [game]);
-          const expanded = expandedGame === game.id;
 
-          return (
-            <Surface key={game.id} style={s.gameCard}>
-              <View style={[s.gameAccent, { backgroundColor: gs.before || gs.after ? color : 'transparent' }]} />
-              <View style={s.gameInner}>
-                {/* Header + geri sayım */}
-                <View style={s.gameHeader}>
-                  <GameEmblem game={game.id} size={38} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.gameName}>{game.name}</Text>
-                    <View style={s.gameMeta}>
-                      <CalendarIcon color={c.text3} size={13} />
-                      <Text style={s.gameMetaText}>{game.drawDaysLong} · {game.drawHour}:{String(game.drawMinute).padStart(2, '0')}</Text>
-                    </View>
-                  </View>
-                  <View style={[s.countdownBadge, { backgroundColor: color + '12', borderColor: color + '22' }]}>
-                    <ClockIcon color={color} size={12} />
-                    <CountdownLabel targetDate={nextDraw} theme={theme} />
-                  </View>
-                </View>
-
-                {/* Çekiliş hatırlatıcısı toggle + zaman seçimi */}
-                <View style={[s.toggleRow, { borderTopColor: c.hairline }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.toggleLabel}>Çekiliş hatırlatıcısı</Text>
-                    <Text style={s.toggleDesc}>
-                      {gs.before
-                        ? `Çekilişten ${formatMinutes(gs.beforeMinutes)} önce bildirim`
-                        : 'Kapalı'}
-                    </Text>
-                  </View>
-                  <Toggle value={gs.before} onChange={(v) => handleToggleBefore(game.id, v)} accent={color} />
-                </View>
-
-                {/* Zaman seçenekleri (sadece açıkken ve genişletilmişken) */}
-                {gs.before && expanded ? (
-                  <View style={[s.timeOptionsRow, { borderTopColor: c.hairline }]}>
-                    {BEFORE_OPTIONS.map((opt) => {
-                      const active = gs.beforeMinutes === opt;
-                      return (
-                        <Pressable
-                          key={opt}
-                          onPress={() => handleBeforeMinutesChange(game.id, opt)}
-                          style={[
-                            s.timeOption,
-                            {
-                              borderColor: active ? color : c.border,
-                              backgroundColor: active ? color : 'transparent',
-                            },
-                          ]}
-                        >
-                          <Text style={[s.timeOptionText, { color: active ? '#fff' : c.text2 }]}>
-                            {formatMinutes(opt)}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                ) : null}
-
-                {/* Sonuç bildirimi toggle */}
-                <View style={[s.toggleRow, { borderTopColor: c.hairline }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.toggleLabel}>Sonuç bildirimi</Text>
-                    <Text style={s.toggleDesc}>
-                      {gs.after
-                        ? 'Sonuç açıklandığında anında bildirim'
-                        : 'Kapalı'}
-                    </Text>
-                  </View>
-                  <Toggle value={gs.after} onChange={(v) => handleToggleAfter(game.id, v)} accent={color} />
-                </View>
-              </View>
-            </Surface>
-          );
-        })}
+        {GAMES.map((game) => (
+          <GameCard
+            key={game.id}
+            game={game}
+            settings={getGameSettings(game.id)}
+            expandedGame={expandedGame}
+            onToggleBefore={handleToggleBefore}
+            onToggleAfter={handleToggleAfter}
+            onBeforeMinutesChange={handleBeforeMinutesChange}
+            theme={theme}
+          />
+        ))}
 
         <View style={[s.note, { backgroundColor: c.surfaceAlt, borderColor: c.hairline }]}>
           <ClockIcon color={c.text3} size={15} />
-          <Text style={s.noteText}>Bildirimler çekiliş kapanış saatinden seçtiğiniz süre kadar önce gönderilir. Sonuç bildirimleri ise sonuçlar açıklandığı anda iletilir.</Text>
+          <Text style={s.noteText}>
+            Bildirimler çekiliş kapanış saatinden seçtiğiniz süre kadar önce gönderilir.
+            Sonuç bildirimleri ise sonuçlar açıklandığı anda iletilir.
+          </Text>
         </View>
       </ScrollView>
     </View>
   );
 }
 
-/* ───────────────────────── helpers ───────────────────────── */
 async function requestPermission(): Promise<boolean> {
   if (!Device.isDevice) {
     Alert.alert(t('notifTitle'), t('notifDeviceWarning'));
     return false;
   }
   const { status: existing } = await Notifications.getPermissionsAsync();
-  const { status } = existing === 'granted' ? { status: existing } : await Notifications.requestPermissionsAsync();
+  const { status } = existing === 'granted'
+    ? { status: existing }
+    : await Notifications.requestPermissionsAsync();
   if (status !== 'granted') {
     Alert.alert(t('notifPermRequired'), t('notifPermSettings'));
     return false;
@@ -349,7 +382,6 @@ async function scheduleNotifications(gameId: GameId, settings: GameSettings) {
     const weekday = day === 0 ? 1 : day + 1;
 
     if (settings.before) {
-      // Çekiliş saatinden settings.beforeMinutes dakika öncesini hesapla
       const beforeDate = new Date();
       beforeDate.setHours(game.drawHour, game.drawMinute, 0, 0);
       beforeDate.setMinutes(beforeDate.getMinutes() - settings.beforeMinutes);
@@ -391,54 +423,76 @@ async function scheduleNotifications(gameId: GameId, settings: GameSettings) {
   }
 }
 
-async function sendTestNotification() {
-  await Notifications.scheduleNotificationAsync({
-    content: { title: t('notifTestTitle'), body: t('notifTestBody'), sound: true, data: { screen: 'notifications' } },
-    trigger: { type: 'timeInterval', seconds: 3, repeats: false } as any,
-  });
-  Alert.alert('Test bildirimi', t('notifTestAlert'));
-}
-
 function makeStyles(theme: AppTheme) {
   const c = theme.colors;
   const { spacing, radius, typography: ty } = theme;
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
-    nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 6 },
+    nav: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 16, paddingBottom: 6,
+    },
     navBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
     navTitle: { ...ty.h3, color: c.text },
     subtitle: { ...ty.bodyMedium, color: c.text2, paddingHorizontal: spacing.xl, marginBottom: spacing.lg },
 
-    permCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: spacing.xl, padding: 16, borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.md },
+    permCard: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      marginHorizontal: spacing.xl, padding: 16, borderRadius: radius.lg,
+      borderWidth: 1, marginBottom: spacing.md,
+    },
     permIcon: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
     permTitle: { ...ty.title, color: c.text },
     permDesc: { ...ty.caption, color: c.text2, marginTop: 2 },
     permBtn: { ...ty.label, fontFamily: theme.font.bold },
-    granted: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: spacing.xl, padding: 13, borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.md },
+
+    granted: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      gap: 8, marginHorizontal: spacing.xl, padding: 13,
+      borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.lg,
+    },
     grantedText: { ...ty.bodySemibold },
-    testBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: spacing.xl, padding: 13, borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.lg },
-    testBtnText: { ...ty.label, fontFamily: theme.font.bold },
 
     sectionTitle: { ...ty.h3, color: c.text, paddingHorizontal: spacing.xl, marginBottom: 12 },
 
-    gameCard: { marginHorizontal: spacing.xl, marginBottom: 12, flexDirection: 'row', overflow: 'hidden', borderRadius: radius.xl },
+    gameCard: {
+      marginHorizontal: spacing.xl, marginBottom: 12,
+      flexDirection: 'row', overflow: 'hidden', borderRadius: radius.xl,
+    },
     gameAccent: { width: 4 },
     gameInner: { flex: 1, padding: 16 },
     gameHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
     gameName: { ...ty.h3, color: c.text, flex: 1 },
     gameMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
     gameMetaText: { ...ty.caption, color: c.text3 },
-    countdownBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1 },
+    countdownBadge: {
+      flexDirection: 'row', alignItems: 'center', gap: 4,
+      paddingHorizontal: 10, paddingVertical: 6,
+      borderRadius: radius.pill, borderWidth: 1,
+    },
 
-    toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: 1, marginTop: 8 },
+    toggleRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      paddingVertical: 12, borderTopWidth: 1, marginTop: 8,
+    },
     toggleLabel: { ...ty.bodySemibold, color: c.text },
     toggleDesc: { ...ty.caption, color: c.text3, marginTop: 2 },
 
-    timeOptionsRow: { flexDirection: 'row', gap: 8, paddingVertical: 10, borderTopWidth: 1, marginTop: 4 },
-    timeOption: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.sm, borderWidth: 1 },
+    timeOptionsRow: {
+      flexDirection: 'row', gap: 8,
+      paddingVertical: 10, borderTopWidth: 1, marginTop: 4,
+    },
+    timeOption: {
+      flex: 1, alignItems: 'center', paddingVertical: 8,
+      borderRadius: radius.sm, borderWidth: 1,
+    },
     timeOptionText: { ...ty.caption, fontFamily: theme.font.bold },
 
-    note: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginHorizontal: spacing.xl, marginTop: spacing.sm, padding: 13, borderRadius: radius.md, borderWidth: 1 },
+    note: {
+      flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+      marginHorizontal: spacing.xl, marginTop: spacing.sm,
+      padding: 13, borderRadius: radius.md, borderWidth: 1,
+    },
     noteText: { ...ty.caption, color: c.text2, flex: 1, lineHeight: 18 },
   });
 }

@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { formatPrize } from '../../lib/prizeEstimates';
 
 import { AppButton } from '../../components/ui/app-button';
 import { NumberBall } from '../../components/ui/number-ball';
@@ -103,18 +104,7 @@ function parseNumbers(str: string): number[] {
   return str.split(' - ').map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
 }
 
-function formatPrize(amount: number, currency = 'TRY'): string {
-  if (currency === 'USD') {
-    if (amount >= 1e9) return `$${(amount / 1e9).toFixed(1)}B`;
-    if (amount >= 1e6) return `$${(amount / 1e6).toFixed(1)}M`;
-    if (amount >= 1e3) return `$${(amount / 1e3).toFixed(1)}K`;
-    return `$${amount}`;
-  }
-  if (amount >= 1e9) return `${(amount / 1e9).toFixed(1)} Milyar TL`;
-  if (amount >= 1e6) return `${(amount / 1e6).toFixed(1)} Milyon TL`;
-  if (amount >= 1e3) return `${(amount / 1e3).toFixed(0)} Bin TL`;
-  return `${amount} TL`;
-}
+
 
 function gameMeta(name: string) {
   const game = getGameByName(name);
@@ -345,7 +335,7 @@ export default function HomeScreen() {
         {/* Header */}
         <Animated.View style={[s.header, { opacity: fade, transform: [{ translateY: rise }] }]}>
           <View style={s.headerLeft}>
-            <BrandMark size={42} bg={c.brand} fg={c.brandText} />
+            <BrandMark size={42}  />
             <View>
               <Text style={s.greeting}>{userName ? `Merhaba, ${userName}` : 'Merhaba'}</Text>
               <Text style={s.brand}>LottoAI</Text>
@@ -652,8 +642,8 @@ function makeStyles(theme: AppTheme) {
     brand: { ...ty.h2, color: c.text },
     headerActions: { flexDirection: 'row', gap: spacing.sm },
     iconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', ...theme.shadowSm },
-    dot: { position: 'absolute', top: 6, right: 6, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: c.danger, borderWidth: 2, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-    dotText: { fontSize: 10, fontFamily: theme.font.bold, color: '#fff' },
+    dot: { position: 'absolute', top: 4, right: 4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: c.danger, borderWidth: 2, borderColor: c.surface, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+dotText: { fontSize: 10, fontFamily: theme.font.bold, color: '#fff', lineHeight: 14, textAlign: 'center', includeFontPadding: false },
 
     errorCard: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.xxl, alignItems: 'center', gap: spacing.md },
     errorText: { ...ty.bodyMedium, color: c.text2, textAlign: 'center' },

@@ -1,8 +1,5 @@
 // lib/supabase.ts
-// Supabase istemcisi + zaman aşımı ve ağ hatası yardımcıları
-
 import { createClient } from '@supabase/supabase-js';
-import { logError } from './logger';
 
 const SUPABASE_URL = 'https://tsxzukctomvnyzalgxap.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_R4PXW8J2-BxE77dlN7cS-w_6NfFrcl0';
@@ -34,7 +31,7 @@ export async function safeQuery<T>(
     const { data, error } = await queryFn();
 
     if (error) {
-      logError('safeQuery', error, { code: error.code });
+      console.error('[safeQuery]', error, { code: error.code });
       if (error.code === 'PGRST116') {
         return { data: null, error: 'Sonuç bulunamadı.' };
       }
@@ -43,7 +40,7 @@ export async function safeQuery<T>(
 
     return { data, error: null };
   } catch (err: any) {
-    logError('safeQuery', err, { name: err.name });
+    console.error('[safeQuery]', err, { name: err.name });
     if (err.name === 'AbortError') {
       return { data: null, error: 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.' };
     }

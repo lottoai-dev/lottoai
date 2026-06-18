@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import { Platform, View } from 'react-native';
 
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { AlertProvider } from '../contexts/AlertContext';
 import { BildirimProvider, useBildirim } from '../contexts/BildirimContext';
 import { OfflineBanner } from '../lib/OfflineBanner';
 import { useAppFonts } from '../lib/fonts';
@@ -72,14 +73,26 @@ function RootContent() {
     });
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      const { screen } = response.notification.request.content.data ?? {};
+      const { title, body, data } = response.notification.request.content;
+      addBildirim({
+        title: title || 'Bildirim',
+        body: body || '',
+        screen: data?.screen as string | undefined,
+      });
+      const { screen } = data ?? {};
       if (screen === 'saved') router.push('/(tabs)/saved');
       else if (screen === 'generate') router.push('/(tabs)/generate');
     });
 
     Notifications.getLastNotificationResponseAsync().then((response) => {
       if (!response) return;
-      const { screen } = response.notification.request.content.data ?? {};
+      const { title, body, data } = response.notification.request.content;
+      addBildirim({
+        title: title || 'Bildirim',
+        body: body || '',
+        screen: data?.screen as string | undefined,
+      });
+      const { screen } = data ?? {};
       if (screen === 'saved') router.push('/(tabs)/saved');
       else if (screen === 'generate') router.push('/(tabs)/generate');
     });
@@ -109,11 +122,13 @@ function RootContent() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <BildirimProvider>
-        <ErrorBoundary>
-          <RootContent />
-        </ErrorBoundary>
-      </BildirimProvider>
+      <AlertProvider>
+        <BildirimProvider>
+          <ErrorBoundary>
+            <RootContent />
+          </ErrorBoundary>
+        </BildirimProvider>
+      </AlertProvider>
     </ThemeProvider>
   );
 }

@@ -5,7 +5,6 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   KeyboardAvoidingView,
@@ -22,13 +21,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '../../components/ui/app-button';
 import { NumberBall } from '../../components/ui/number-ball';
 import { PressableScale } from '../../components/ui/surface';
+import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme, GameAccent } from '../../constants/theme';
+import { useAlert } from '../../contexts/AlertContext';
 import { chatWithAI } from '../../lib/deepseek';
 import { GameEmblem } from '../../lib/emblems';
 import { GAMES, getGameByName } from '../../lib/games';
 import { AIAssistantIcon, BackIcon, BookmarkIcon, SendIcon } from '../../lib/icons';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
+
+/* ───────────────────────── cache ───────────────────────── */
+let cachedStatsText: string | null = null;
 
 /* ───────────────────────── stats helpers ───────────────────────── */
 function combination(n: number, r: number): number {
@@ -137,33 +141,64 @@ async function buildStatsPrompt(): Promise<string> {
   return lines.join('\n');
 }
 
-/* ───────────────────────── getBasePrompt ───────────────────────── */
-const getBasePrompt = (statsText: string): string => {
+const getBasePrompt = (statsText: string, userName: string | null): string => {
   const today = new Date();
   const gunAdi = today.toLocaleDateString('tr-TR', { weekday: 'long' });
   const tarih = today.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-  return `Sen, Türkiye'deki şans oyunları konusunda uzman bir loto asistanısın. Kullanıcılara güncel oyun kuralları hakkında bilgi verir, istatistiksel yorumlar yapar ve isterlerse rastgele kupon üretirsin.
-Kesinlikle kazanma garantisi vermezsin. Yanıtlarında sohbet havasında, sade bir dil kullan ve gereksiz yere markdown formatı (yıldız, tire gibi) kullanma.
+  const userStr = userName ? `Kullanıcının adı: ${userName}. Konuşmada uygun yerlerde ismiyle hitap et, ama her cümlede kullanma.` : 'Kullanıcı henüz ismini girmemiş.';
+
+  return `Sen LottoAI uygulamasının yapay zeka asistanısın. Adın Lota.
+
+Kişiliğin:
+- Sıcak, samimi ve doğal konuşursun. Ne çok resmi ne de çok şakacısın.
+- Kullanıcıyla arkadaş gibi konuşursun ama saygı sınırını korursun.
+- Zaman zaman hafif espri yapabilirsin ama asla zorlamazsın.
+- Kazanma garantisi vermezsin, şans oyunlarının eğlence amaçlı olduğunu hatırlatırsın.
+- Cevapların kısa ve öz olur, gereksiz uzatmazsın.
+- Kesinlikle markdown formatı kullanmazsın (yıldız, tire, başlık gibi).
+
+${userStr}
+
+Konu yönetimi:
+- Loto dışı sorularda nazikçe konuyu loto veya şans oyunlarına çekersin.
+- Örneğin biri "hava nasıl?" derse "Bilmiyorum ama şansın açık görünüyor, bir kupon deneyelim mi?" gibi yanıt verebilirsin.
+- Siyaset, din, kişisel sorunlar gibi hassas konulara hiç girmezsin.
 
 Bugün ${gunAdi}, ${tarih}.
 
 Güncel Oyun Bilgileri:
-- Çılgın Sayısal Loto: 1-90 arasından 6 numara seçilir. Joker (1-90 arası 1 numara) ve SüperStar (1-90 arası 1 numara) çekilişleri vardır. SADECE Pazartesi, Çarşamba ve Cumartesi günleri çekilir.
-- Süper Loto: 1-60 arasından 6 numara seçilir. SADECE Salı, Perşembe ve Pazar günleri çekilir.
-- Şans Topu: 1-34 arasından 5 numara + 1-14 arasından 1 "Şans Topu" seçilir. SADECE Çarşamba ve Pazar günleri çekilir.
-- On Numara: 1-80 arasından 10 numara seçilir. Çekilişte 22 numara belirlenir. SADECE Pazartesi ve Cuma günleri çekilir.
+- Çılgın Sayısal Loto: 1-90 arasından 6 ana numara seçilir. Ayrıca 1-90 arasından 1 adet SüperStar numarası seçilir (ana numaralardan bağımsız, tekrar edebilir). SADECE Pazartesi, Çarşamba ve Cumartesi günleri çekilir.
+- Süper Loto: 1-60 arasından 6 numara seçilir. Ek numara yoktur. SADECE Salı, Perşembe ve Pazar günleri çekilir.
+- Şans Topu: 1-34 arasından 5 ana numara + 1-14 arasından 1 adet "Şans Topu" numarası seçilir. Şans Topu ana numaralardan tamamen bağımsızdır. SADECE Çarşamba ve Pazar günleri çekilir.
+- On Numara: 1-80 arasından 10 numara seçilir. Çekilişte 22 numara belirlenir. Ek numara yoktur. SADECE Pazartesi ve Cuma günleri çekilir.
 
-Eğer kullanıcı bir kupon üretmeni isterse, yanıtının SONUNDA mutlaka şu alanları içeren bir JSON objesi bulundur. JSON'u her zaman bir kod bloğu içine al:
+Eğer kullanıcı bir kupon üretmeni isterse, yanıtının SONUNDA mutlaka aşağıdaki kurallara uygun bir JSON objesi bulundur. JSON'u her zaman bir kod bloğu içine al:
+
+Çılgın Sayısal Loto için (6 ana numara 1-90, 1 SüperStar 1-90):
 \`\`\`json
-{ "game": "On Numara", "numbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "explanation": "Sayıların seçilme sebebi..." }
+{ "game": "Çılgın Sayısal Loto", "numbers": [5, 14, 27, 38, 52, 71], "superStar": 43, "bonus": null, "explanation": "Seçim sebebi..." }
 \`\`\`
 
-JSON'daki "game" alanı, kullanıcının istediği oyunun tam adı olmalıdır: "Çılgın Sayısal Loto", "Süper Loto", "Şans Topu" veya "On Numara".
-JSON'daki "numbers" dizisi:
-- Çılgın Sayısal Loto ve Süper Loto için 6 adet, benzersiz sayı içermeli.
-- Şans Topu için 5 adet, benzersiz sayı içermeli.
-- On Numara için 10 adet, benzersiz sayı içermeli.
-Sayılar, oyunun kendi numara aralığında olmalıdır.
+Süper Loto için (6 numara 1-60, ek numara yok):
+\`\`\`json
+{ "game": "Süper Loto", "numbers": [3, 11, 22, 34, 45, 58], "superStar": null, "bonus": null, "explanation": "Seçim sebebi..." }
+\`\`\`
+
+Şans Tobu için (5 ana numara 1-34, 1 Şans Topu 1-14):
+\`\`\`json
+{ "game": "Şans Topu", "numbers": [4, 12, 19, 25, 31], "superStar": null, "bonus": 7, "explanation": "Seçim sebebi..." }
+\`\`\`
+
+On Numara için (10 numara 1-80, ek numara yok):
+\`\`\`json
+{ "game": "On Numara", "numbers": [3, 11, 18, 24, 33, 47, 55, 62, 71, 78], "superStar": null, "bonus": null, "explanation": "Seçim sebebi..." }
+\`\`\`
+
+Kurallar:
+- "numbers" dizisindeki sayılar benzersiz ve oyunun kendi aralığında olmalıdır.
+- Çılgın Sayısal Loto'da "superStar" 1-90 arasında olmalı, ana numaralardan farklı olmasına gerek yok.
+- Şans Topu'nda "bonus" 1-14 arasında olmalıdır.
+- Diğer oyunlarda "superStar" ve "bonus" alanları null olmalıdır.
 
 Aşağıda güncel çekiliş istatistikleri verilmiştir. Kullanıcı sorduğunda bu verilere dayanarak yanıt ver:
 
@@ -173,7 +208,13 @@ ${statsText}`;
 type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
-  coupon?: { game: string; numbers: number[]; explanation: string };
+  coupon?: {
+    game: string;
+    numbers: number[];
+    superStar: number | null;
+    bonus: number | null;
+    explanation: string;
+  };
 };
 
 const SUGGESTIONS = [
@@ -183,9 +224,12 @@ const SUGGESTIONS = [
   'Sıcak sayılar ne demek?',
 ];
 
-/* typing dots */
 function TypingDots({ color }: { color: string }) {
-  const dots = [useRef(new Animated.Value(0.4)).current, useRef(new Animated.Value(0.4)).current, useRef(new Animated.Value(0.4)).current];
+  const dots = [
+    useRef(new Animated.Value(0.4)).current,
+    useRef(new Animated.Value(0.4)).current,
+    useRef(new Animated.Value(0.4)).current,
+  ];
   React.useEffect(() => {
     const anims = dots.map((d, i) =>
       Animated.loop(
@@ -215,18 +259,26 @@ export default function AIAssistantScreen() {
   const c = theme.colors;
   const s = useMemo(() => makeStyles(theme), [theme]);
   const scrollRef = useRef<ScrollView>(null);
+  const { showAlert } = useAlert();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEYS.USER_NAME).then((name) => {
+      if (name) setUserName(name);
+    });
+  }, []);
 
   const extractJSON = (text: string): any | null => {
     const codeBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
     if (codeBlockMatch) {
       try { return JSON.parse(codeBlockMatch[1]); } catch {}
     }
-    const plainMatch = text.match(/\{[\s\S]*"game"[\s\S]*"numbers"[\s\S]*"explanation"[\s\S]*\}/);
+    const plainMatch = text.match(/\{[\s\S]*"game"[\s\S]*"numbers"[\s\S]*\}/);
     if (plainMatch) {
       try { return JSON.parse(plainMatch[0]); } catch {}
     }
@@ -241,18 +293,24 @@ export default function AIAssistantScreen() {
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setLoading(true);
-    setStatsLoading(true);
 
     let statsText = '';
     try {
-      statsText = await buildStatsPrompt();
+      if (cachedStatsText) {
+        statsText = cachedStatsText;
+      } else {
+        setStatsLoading(true);
+        statsText = await buildStatsPrompt();
+        cachedStatsText = statsText;
+        setStatsLoading(false);
+      }
     } catch {
       statsText = 'İstatistikler şu anda yüklenemedi.';
+      setStatsLoading(false);
     }
-    setStatsLoading(false);
 
     const apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
-      { role: 'system', content: getBasePrompt(statsText) },
+      { role: 'system', content: getBasePrompt(statsText, userName) },
       ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
       { role: 'user', content },
     ];
@@ -264,13 +322,15 @@ export default function AIAssistantScreen() {
       let cleanReply = reply;
       const codeBlockMatch = reply.match(/```json[\s\S]*?```/);
       if (codeBlockMatch) cleanReply = reply.replace(/```json[\s\S]*?```/, '').trim();
-      else if (parsed) cleanReply = reply.replace(/\{[\s\S]*"game"[\s\S]*"numbers"[\s\S]*"explanation"[\s\S]*\}/, '').trim();
+      else if (parsed) cleanReply = reply.replace(/\{[\s\S]*"game"[\s\S]*"numbers"[\s\S]*\}/, '').trim();
 
       const assistantMsg: ChatMessage = { role: 'assistant', content: cleanReply };
       if (parsed && parsed.numbers && Array.isArray(parsed.numbers) && parsed.game) {
         assistantMsg.coupon = {
           game: parsed.game,
           numbers: parsed.numbers.sort((a: number, b: number) => a - b),
+          superStar: parsed.superStar ?? null,
+          bonus: parsed.bonus ?? null,
           explanation: parsed.explanation || 'AI tarafından önerilen kupon',
         };
       }
@@ -278,6 +338,7 @@ export default function AIAssistantScreen() {
     } else {
       setMessages((prev) => [...prev, { role: 'assistant', content: 'Üzgünüm, şu anda yanıt veremiyorum.' }]);
     }
+
     setLoading(false);
     scrollRef.current?.scrollToEnd({ animated: true });
   };
@@ -285,7 +346,7 @@ export default function AIAssistantScreen() {
   const saveCoupon = async (coupon: ChatMessage['coupon']) => {
     if (!coupon) return;
     try {
-      const existing = await AsyncStorage.getItem('savedCoupons');
+      const existing = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_COUPONS);
       const coupons = existing ? JSON.parse(existing) : [];
       const gameConfig = GAMES.find((g) => g.name === coupon.game);
       const gameColor = GameAccent[gameConfig?.id ?? 'cilgin'] ?? c.brand;
@@ -295,20 +356,20 @@ export default function AIAssistantScreen() {
         icon: gameConfig?.icon || '',
         color: gameColor,
         numbers: coupon.numbers,
-        bonus: [],
-        superStar: null,
+        bonus: coupon.bonus !== null ? [coupon.bonus] : [],
+        superStar: coupon.superStar,
         date: new Date().toLocaleDateString('tr-TR'),
         timestamp: new Date().toISOString(),
         matchedCount: undefined,
         aiExplanation: coupon.explanation,
       });
-      await AsyncStorage.setItem('savedCoupons', JSON.stringify(coupons));
-      Alert.alert('Kaydedildi', "AI kuponu Kuponlarım'a eklendi.", [
+      await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(coupons));
+      showAlert('Kaydedildi', "AI kuponu Kuponlarım'a eklendi.", [
         { text: 'Tamam' },
         { text: 'Kuponlarıma git', onPress: () => router.push('/(tabs)/saved') },
       ]);
     } catch {
-      Alert.alert('Hata', 'Kupon kaydedilemedi.');
+      showAlert('Hata', 'Kupon kaydedilemedi.');
     }
   };
 
@@ -317,14 +378,18 @@ export default function AIAssistantScreen() {
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
       <View style={{ paddingTop: insets.top + 6 }}>
         <View style={s.nav}>
-          <Pressable onPress={() => router.back()} style={[s.navBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]} hitSlop={6}>
+          <Pressable
+            onPress={() => router.back()}
+            style={[s.navBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+            hitSlop={6}
+          >
             <BackIcon color={c.text2} size={22} />
           </Pressable>
           <View style={[s.navAvatar, { backgroundColor: c.brandSoft }]}>
             <AIAssistantIcon color={c.brand} size={22} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={s.navTitle}>AI Asistan</Text>
+            <Text style={s.navTitle}>Lota</Text>
             <View style={s.navStatus}>
               <View style={[s.statusDot, { backgroundColor: c.brand }]} />
               <Text style={[s.navStatusText, { color: c.brand }]}>Çevrimiçi</Text>
@@ -343,11 +408,17 @@ export default function AIAssistantScreen() {
             <View style={[s.emptyIcon, { backgroundColor: c.brandSoft }]}>
               <AIAssistantIcon color={c.brand} size={34} />
             </View>
-            <Text style={s.emptyTitle}>Merhaba, ben LottoAI</Text>
-            <Text style={s.emptyDesc}>Loto hakkında soru sor ya da senin için kupon üreteyim. Şununla başlayabilirsin:</Text>
+            <Text style={s.emptyTitle}>Merhaba, ben Lota</Text>
+            <Text style={s.emptyDesc}>
+              Loto hakkında soru sor ya da senin için kupon üreteyim. Şununla başlayabilirsin:
+            </Text>
             <View style={s.suggestions}>
               {SUGGESTIONS.map((sug, i) => (
-                <PressableScale key={i} onPress={() => send(sug)} style={[s.suggestion, { backgroundColor: c.surface, borderColor: c.border }]}>
+                <PressableScale
+                  key={i}
+                  onPress={() => send(sug)}
+                  style={[s.suggestion, { backgroundColor: c.surface, borderColor: c.border }]}
+                >
                   <Text style={s.suggestionText}>{sug}</Text>
                 </PressableScale>
               ))}
@@ -364,10 +435,21 @@ export default function AIAssistantScreen() {
           >
             {messages.map((msg, index) => (
               <View key={index} style={{ gap: 12 }}>
-                <View style={[s.bubble, msg.role === 'user' ? [s.userBubble, { backgroundColor: c.brand }] : [s.aiBubble, { backgroundColor: c.surface, borderColor: c.border }]]}>
-                  <Text style={[s.bubbleText, { color: msg.role === 'user' ? c.brandText : c.text }]}>{msg.content}</Text>
+                <View
+                  style={[
+                    s.bubble,
+                    msg.role === 'user'
+                      ? [s.userBubble, { backgroundColor: c.brand }]
+                      : [s.aiBubble, { backgroundColor: c.surface, borderColor: c.border }],
+                  ]}
+                >
+                  <Text style={[s.bubbleText, { color: msg.role === 'user' ? c.brandText : c.text }]}>
+                    {msg.content}
+                  </Text>
                 </View>
-                {msg.coupon ? <AICouponCard coupon={msg.coupon} theme={theme} onSave={() => saveCoupon(msg.coupon)} /> : null}
+                {msg.coupon ? (
+                  <AICouponCard coupon={msg.coupon} theme={theme} onSave={() => saveCoupon(msg.coupon)} />
+                ) : null}
               </View>
             ))}
             {statsLoading ? (
@@ -385,13 +467,12 @@ export default function AIAssistantScreen() {
           </ScrollView>
         )}
 
-        {/* Input */}
         <View style={[s.inputRow, { borderTopColor: c.hairline, paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }]}>
           <TextInput
             style={[s.input, { backgroundColor: c.surface, borderColor: c.border, color: c.text }]}
             value={input}
             onChangeText={setInput}
-            placeholder="Bir şey yaz…"
+            placeholder="Lota'ya bir şey yaz…"
             placeholderTextColor={c.text3}
             multiline
             editable={!loading}
@@ -409,27 +490,53 @@ export default function AIAssistantScreen() {
   );
 }
 
-function AICouponCard({ coupon, theme, onSave }: { coupon: NonNullable<ChatMessage['coupon']>; theme: AppTheme; onSave: () => void }) {
+function AICouponCard({ coupon, theme, onSave }: {
+  coupon: NonNullable<ChatMessage['coupon']>;
+  theme: AppTheme;
+  onSave: () => void;
+}) {
   const c = theme.colors;
   const s = useMemo(() => makeStyles(theme), [theme]);
   const id = getGameByName(coupon.game)?.id ?? 'cilgin';
   const color = GameAccent[id] ?? c.brand;
+
   return (
     <View style={[s.couponCard, { backgroundColor: c.surface, borderColor: c.border }]}>
       <View style={s.couponHead}>
         <GameEmblem game={id} size={34} />
         <View>
           <Text style={s.couponGame}>{coupon.game}</Text>
-          <Text style={s.couponTag}>AI önerisi</Text>
+          <Text style={s.couponTag}>Lota'nın önerisi</Text>
         </View>
       </View>
+
       <View style={s.couponBalls}>
         {coupon.numbers.map((n, i) => (
           <NumberBall key={i} value={n} color={color} size={38} />
         ))}
       </View>
+
+      {coupon.bonus !== null && (
+        <View style={s.couponExtra}>
+          <Text style={[s.couponExtraLabel, { color: c.text3 }]}>Şans Topu</Text>
+          <NumberBall value={coupon.bonus} variant="bonus" size={38} />
+        </View>
+      )}
+
+      {coupon.superStar !== null && (
+        <View style={s.couponExtra}>
+          <Text style={[s.couponExtraLabel, { color: c.text3 }]}>SüperStar</Text>
+          <NumberBall value={coupon.superStar} variant="star" size={38} />
+        </View>
+      )}
+
       <Text style={s.couponExp}>{coupon.explanation}</Text>
-      <AppButton label="Kuponu kaydet" onPress={onSave} iconLeft={(cl, sz) => <BookmarkIcon color={cl} size={sz} />} style={{ marginTop: 13 }} />
+      <AppButton
+        label="Kuponu kaydet"
+        onPress={onSave}
+        iconLeft={(cl, sz) => <BookmarkIcon color={cl} size={sz} />}
+        style={{ marginTop: 13 }}
+      />
     </View>
   );
 }
@@ -465,6 +572,8 @@ function makeStyles(theme: AppTheme) {
     couponGame: { ...ty.title, color: c.text },
     couponTag: { ...ty.caption, color: c.text3 },
     couponBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+    couponExtra: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
+    couponExtraLabel: { ...ty.caption, fontFamily: theme.font.semibold },
     couponExp: { ...ty.caption, color: c.text2, lineHeight: 18, marginTop: 13, paddingTop: 13, borderTopWidth: 1, borderTopColor: c.hairline },
 
     inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1 },

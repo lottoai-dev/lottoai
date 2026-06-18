@@ -11,7 +11,6 @@ import { LoadingState } from '../components/ui/states';
 import { AppTheme, GameAccent } from '../constants/theme';
 import { getGameByName } from './games';
 import { CloseIcon } from './icons';
-import { logError } from './logger';
 import { safeQuery, supabase } from './supabase';
 import { useTheme } from './theme';
 
@@ -60,8 +59,16 @@ export default function CouponHistory({ game, numbers, bonus, superStar, visible
     setError(null);
     setResult(null);
 
-    const { data, error: err } = await safeQuery(
-      () =>
+    type DrawRow = {
+      numbers: string;
+      bonus: string;
+      superstar: number | null;
+      draw_date: string;
+      draw_no: string;
+    };
+    
+    const { data, error: err } = await safeQuery<DrawRow[]>(
+      async () =>
         supabase
           .from('draws')
           .select('numbers, bonus, superstar, draw_date, draw_no')
