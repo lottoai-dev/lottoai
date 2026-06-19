@@ -1,12 +1,14 @@
 // app/onboarding.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, FlatList, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '../components/ui/app-button';
+import { STORAGE_KEYS } from '../constants/storage-keys';
 import { AppTheme } from '../constants/theme';
 import { BrandMark } from '../lib/emblems';
 import { t } from '../lib/i18n';
@@ -14,6 +16,14 @@ import { DiceIcon, ResultsIcon, ShieldIcon, StatsIcon, type IconProps } from '..
 import { useTheme } from '../lib/theme';
 
 const { width } = Dimensions.get('window');
+
+function softHaptic() {
+  if (Platform.OS === 'android') {
+    Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Keyboard_Tap);
+  } else {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+  }
+}
 
 type Slide = {
   Icon: 'brand' | React.ComponentType<IconProps>;
@@ -57,14 +67,17 @@ export default function OnboardingScreen() {
   const isLast = currentIndex === SLIDES.length - 1;
 
   const goToSlide = (index: number) => {
+    softHaptic();
     listRef.current?.scrollToIndex({ index, animated: true });
     setCurrentIndex(index);
   };
 
   const handleNext = async () => {
-    if (!isLast) goToSlide(currentIndex + 1);
-    else {
-      await AsyncStorage.setItem('onboardingCompleted', 'true');
+    if (!isLast) {
+      goToSlide(currentIndex + 1);
+    } else {
+      softHaptic();
+      await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, 'true');
       router.replace('/(tabs)/home');
     }
   };
@@ -100,7 +113,7 @@ export default function OnboardingScreen() {
           <View style={[s.slide, { width }]}>
             <View style={[s.iconWrap, { backgroundColor: item.isWarning ? c.goldSoft : c.brandSoft }]}>
               {item.Icon === 'brand' ? (
-                <BrandMark size={76}  />
+                <BrandMark size={76} />
               ) : (
                 <SlideIcon
                   icon={item.Icon}

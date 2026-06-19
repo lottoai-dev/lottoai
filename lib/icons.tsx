@@ -1,8 +1,4 @@
 // lib/icons.tsx
-// Unified, emoji-free icon set for LottoAI. All icons are stroke-based line
-// icons sized to a 24px grid. Pass { color, size, active } — `active` fills
-// tab icons with a soft tint.
-
 import React from 'react';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
@@ -342,10 +338,13 @@ export function BackIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
 export function ShareIcon({ color, size = 24, strokeWidth = 1.8 }: IconProps) {
   return (
     <Svg {...base(size)}>
-      <Circle cx={18} cy={5.5} r={2.5} stroke={color} strokeWidth={strokeWidth} />
-      <Circle cx={6} cy={12} r={2.5} stroke={color} strokeWidth={strokeWidth} />
-      <Circle cx={18} cy={18.5} r={2.5} stroke={color} strokeWidth={strokeWidth} />
-      <Path d="M8.5 13.5l7-3M8.5 10.5l7 3" stroke={color} strokeWidth={strokeWidth} />
+      <Path
+        d="M12 3v13M7 8l5-5 5 5M8 17H6a2 2 0 00-2 2v1a1 1 0 001 1h14a1 1 0 001-1v-1a2 2 0 00-2-2h-2"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </Svg>
   );
 }

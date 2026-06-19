@@ -1,5 +1,6 @@
 // app/(tabs)/saved.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -37,6 +38,14 @@ import { useTheme } from '../../lib/theme';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+function softHaptic() {
+  if (Platform.OS === 'android') {
+    Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Keyboard_Tap);
+  } else {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+  }
 }
 
 type Coupon = {
@@ -237,6 +246,7 @@ export default function SavedScreen() {
         text: 'Sil',
         style: 'destructive',
         onPress: async () => {
+          softHaptic();
           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           const updated = coupons.filter((cp) => cp.id !== id);
           setCoupons(updated);
@@ -253,6 +263,7 @@ export default function SavedScreen() {
         text: 'Sil',
         style: 'destructive',
         onPress: async () => {
+          softHaptic();
           setCoupons([]);
           await AsyncStorage.removeItem(STORAGE_KEYS.SAVED_COUPONS);
         },
@@ -556,25 +567,25 @@ const CouponTicket = React.memo(function CouponTicket({
 
           <View style={s.ticketActions}>
             <PressableScale
-              onPress={onShare}
-              style={[s.actionBtn, { flex: 1, backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+              onPress={onOpenHistory}
+              style={[s.historyBtn, { flex: 1, borderColor: mainColor + '22' }]}
             >
-              <ShareIcon color={c.text2} size={16} />
-              <Text style={[s.actionText, { color: c.text2 }]}>Paylaş</Text>
+              <StatsIcon color={mainColor} size={16} />
+              <Text style={[s.historyBtnText, { color: mainColor }]}>Geçmiş</Text>
+            </PressableScale>
+            <PressableScale
+              onPress={onShare}
+              style={[s.actionBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+            >
+              <ShareIcon color={c.text2} size={20} />
             </PressableScale>
             <PressableScale
               onPress={onDelete}
-              style={[s.actionBtn, { flex: 1, backgroundColor: c.danger + '18', borderColor: c.danger + '44' }]}
+              style={[s.actionBtn, { backgroundColor: c.danger + '18', borderColor: c.danger + '44' }]}
             >
-              <TrashIcon color={c.danger} size={16} />
-              <Text style={[s.actionText, { color: c.danger }]}>Sil</Text>
+              <TrashIcon color={c.danger} size={20} />
             </PressableScale>
           </View>
-
-          <PressableScale onPress={onOpenHistory} style={[s.historyBtn, { borderColor: mainColor + '22' }]}>
-            <StatsIcon color={mainColor} size={18} />
-            <Text style={[s.historyBtnText, { color: mainColor }]}>Geçmiş performans</Text>
-          </PressableScale>
         </View>
       </View>
     </Animated.View>
@@ -623,20 +634,17 @@ function makeStyles(theme: AppTheme) {
     perforation: { borderTopWidth: 1, borderStyle: 'dashed', marginHorizontal: -16, marginBottom: 14 },
     ticketBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 8 },
 
-    ticketActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+    ticketActions: { flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'center' },
     actionBtn: {
-      flexDirection: 'row',
+      width: 42,
+      height: 42,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 5,
-      paddingVertical: 10,
-      paddingHorizontal: 12,
       borderRadius: radius.md,
       borderWidth: 1,
     },
     actionText: { ...ty.label, fontFamily: theme.font.semibold },
-
-    historyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8, paddingVertical: 11, borderRadius: radius.md, borderWidth: 1 },
+    historyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, paddingHorizontal: 12, borderRadius: radius.md, borderWidth: 1 },
     historyBtnText: { ...ty.label, fontFamily: theme.font.bold },
 
     overlay: { flex: 1, justifyContent: 'flex-end' },

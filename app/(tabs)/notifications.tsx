@@ -1,6 +1,7 @@
 // app/(tabs)/notifications.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
+import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -42,6 +43,14 @@ const BEFORE_OPTIONS = [15, 30, 60, 120] as const;
 function formatMinutes(min: number): string {
   if (min < 60) return `${min} dk`;
   return `${min / 60} saat`;
+}
+
+function toggleHaptic() {
+  if (Platform.OS === 'android') {
+    Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Keyboard_Tap);
+  } else {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+  }
 }
 
 function getNextDrawTime(game: Game): Date | null {
@@ -170,7 +179,11 @@ function GameCard({
                 : 'Kapalı'}
             </Text>
           </View>
-          <Toggle value={settings.before} onChange={(v) => onToggleBefore(game.id, v)} accent={color} />
+          <Toggle
+            value={settings.before}
+            onChange={(v) => { toggleHaptic(); onToggleBefore(game.id, v); }}
+            accent={color}
+          />
         </View>
 
         {settings.before && expanded ? (
@@ -205,7 +218,11 @@ function GameCard({
               {settings.after ? 'Sonuç açıklandığında anında bildirim' : 'Kapalı'}
             </Text>
           </View>
-          <Toggle value={settings.after} onChange={(v) => onToggleAfter(game.id, v)} accent={color} />
+          <Toggle
+            value={settings.after}
+            onChange={(v) => { toggleHaptic(); onToggleAfter(game.id, v); }}
+            accent={color}
+          />
         </View>
       </View>
     </Surface>

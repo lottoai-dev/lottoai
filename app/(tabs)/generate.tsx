@@ -1,5 +1,6 @@
 // app/(tabs)/generate.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -7,12 +8,13 @@ import {
   Animated,
   Easing,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  View,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -37,6 +39,14 @@ import {
   TrashIcon,
 } from '../../lib/icons';
 import { useTheme } from '../../lib/theme';
+
+function softHaptic() {
+  if (Platform.OS === 'android') {
+    Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Keyboard_Tap);
+  } else {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+  }
+}
 
 /* ───────────────────────── number logic ───────────────────────── */
 function generateNumbers(count: number, max: number): number[] {
@@ -303,6 +313,8 @@ export default function GenerateScreen() {
       ss = generateNumbers(1, selectedGame.superStar.max)[0];
     }
 
+    softHaptic();
+
     setGeneratedNumbers(nums);
     setBonusNumbers(bonus);
     setSuperStarNumber(ss ?? null);
@@ -374,12 +386,12 @@ export default function GenerateScreen() {
         cp.numbers.length === entry.numbers.length &&
         cp.numbers.every((n: number) => entry.numbers.includes(n));
       if (!sameNumbers) return false;
-      if (entry.bonus.length > 0 && cp.bonus && cp.bonus.length > 0) {
-        return (
-          cp.bonus.length === entry.bonus.length &&
-          cp.bonus.every((n: number) => entry.bonus.includes(n))
-        );
-      }
+      const sameBonus =
+        entry.bonus.length === 0 && (!cp.bonus || cp.bonus.length === 0)
+          ? true
+          : cp.bonus?.length === entry.bonus.length &&
+            cp.bonus.every((n: number) => entry.bonus.includes(n));
+      if (!sameBonus) return false;
       return (entry.superStar ?? null) === (cp.superStar ?? null);
     });
 
@@ -396,6 +408,7 @@ export default function GenerateScreen() {
       }
       if (savedCount > 0) {
         await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(coupons));
+        softHaptic();
         showAlert('Kaydedildi', `${savedCount} kupon Kuponlarım'a eklendi.`, [
           { text: 'Tamam' },
           {
@@ -433,6 +446,7 @@ export default function GenerateScreen() {
       const persist = async () => {
         coupons.unshift(buildCoupon(entry));
         await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(coupons));
+        softHaptic();
         showAlert('Kaydedildi', "Kuponunuz Kuponlarım'a eklendi.", [
           { text: 'Tamam' },
           { text: 'Kuponlarıma git', onPress: () => router.push('/(tabs)/saved') },

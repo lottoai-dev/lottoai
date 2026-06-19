@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useMemo, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -28,6 +28,14 @@ import {
   TrashIcon,
 } from '../../lib/icons';
 import { useTheme, useThemeControls } from '../../lib/theme';
+
+function softHaptic() {
+  if (Platform.OS === 'android') {
+    Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Keyboard_Tap);
+  } else {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+  }
+}
 
 function SunGlyph({ color }: { color: string }) {
   return (
@@ -105,7 +113,7 @@ export default function ProfileScreen() {
     await AsyncStorage.setItem(STORAGE_KEYS.USER_NAME, tempName.trim());
     setName(tempName.trim());
     setEditing(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    softHaptic();
   };
 
   const clearData = () => {
