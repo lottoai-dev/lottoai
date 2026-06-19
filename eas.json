@@ -33,7 +33,6 @@
         "buildType": "app-bundle"
       },
       "ios": {
-        "enterpriseProvisioning": "universal"
       },
       "env": {
         "APP_ENV": "production"
