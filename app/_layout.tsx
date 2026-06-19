@@ -86,12 +86,7 @@ function RootContent() {
 
     Notifications.getLastNotificationResponseAsync().then((response) => {
       if (!response) return;
-      const { title, body, data } = response.notification.request.content;
-      addBildirim({
-        title: title || 'Bildirim',
-        body: body || '',
-        screen: data?.screen as string | undefined,
-      });
+      const { data } = response.notification.request.content;
       const { screen } = data ?? {};
       if (screen === 'saved') router.push('/(tabs)/saved');
       else if (screen === 'generate') router.push('/(tabs)/generate');
