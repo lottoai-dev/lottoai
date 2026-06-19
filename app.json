@@ -1,0 +1,99 @@
+{
+  "expo": {
+    "name": "LottoAI",
+    "slug": "lottoai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "description": "LottoAI, Türkiye'nin en akıllı loto asistanı! Çılgın Sayısal Loto, Süper Loto, Şans Topu ve On Numara için akıllı kuponlar üret, çekiliş sonuçlarını anında takip et, detaylı istatistikler ve AI analizi ile şansını artır. 18 yaş ve üzeri içindir. Şans oyunları bağımlılık yapabilir, sorumlu oynayın.",
+    "primaryColor": "#1C9E73",
+    "privacy": "https://lottoai-dev.github.io/lottoai-legal/",
+    "keywords": ["loto", "kupon", "çekiliş", "sayısal", "şans", "istatistik", "analiz", "AI"],
+    "categories": ["utilities", "entertainment"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.lottoai.app",
+      "buildNumber": "1",
+      "icon": "./assets/images/ios-icon.png",
+      "infoPlist": {
+        "NSUserNotificationsUsageDescription": "Çekiliş saatlerinde hatırlatıcı bildirimi almak için izin gereklidir.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "splash": {
+        "image": "./assets/images/splash-icon-light.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff",
+        "dark": {
+          "image": "./assets/images/splash-icon-dark.png",
+          "backgroundColor": "#1a1a2e"
+        }
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "package": "com.lottoai.app",
+      "versionCode": 1,
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM"
+      ],
+      "jsEngine": "hermes"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon-192.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon-light.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "image": "./assets/images/splash-icon-dark.png",
+            "backgroundColor": "#1a1a2e"
+          }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#6C63FF",
+          "sounds": []
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      "expo-localization"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "1686d4a1-7dbf-4293-a0b3-a71afc9e4a61"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "scheme": "lottoai",
+    "owner": "lottoai"
+  }
+}
