@@ -273,16 +273,20 @@ export default function SavedScreen() {
 
   const handleShare = async (coupon: Coupon) => {
     try {
-      const numbersText = coupon.numbers.join(' - ');
-      const bonusText = coupon.bonus && coupon.bonus.length > 0 ? `\nŞans Topu/Joker: ${coupon.bonus.join(' - ')}` : '';
-      const superStarText = coupon.superStar ? `\nSüperStar: ${coupon.superStar}` : '';
+      const numbersText = coupon.numbers.join(' · ');
+      const bonusText = coupon.bonus && coupon.bonus.length > 0 ? `\n🔵 Şans Topu: ${coupon.bonus.join(' · ')}` : '';
+      const superStarText = coupon.superStar ? `\n⭐ SüperStar: ${coupon.superStar}` : '';
+      const matchText = coupon.matchedCount !== undefined && coupon.matchedCount !== null
+        ? `\n🎯 Sonuç: ${coupon.matchedCount} sayı tutturdu`
+        : '';
       const message =
-        `LottoAI Kuponu\n` +
-        `———————————\n` +
-        `Oyun: ${coupon.game}\n` +
-        `Tarih: ${coupon.date}\n` +
-        `Sayılar: ${numbersText}${bonusText}${superStarText}\n` +
-        `———————————\n` +
+        `🍀 LottoAI Kuponu\n` +
+        `━━━━━━━━━━━━━━━\n` +
+        `🎮 ${coupon.game}\n` +
+        `📅 ${coupon.date}\n` +
+        `━━━━━━━━━━━━━━━\n` +
+        `🔢 ${numbersText}${bonusText}${superStarText}${matchText}\n` +
+        `━━━━━━━━━━━━━━━\n` +
         `LottoAI ile üretildi`;
       await Share.share({ message });
     } catch {

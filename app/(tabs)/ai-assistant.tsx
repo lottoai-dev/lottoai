@@ -27,7 +27,7 @@ import { useAlert } from '../../contexts/AlertContext';
 import { chatWithAI } from '../../lib/deepseek';
 import { GameEmblem } from '../../lib/emblems';
 import { GAMES, getGameByName } from '../../lib/games';
-import { AIAssistantIcon, BackIcon, BookmarkIcon, SendIcon } from '../../lib/icons';
+import { AIAssistantIcon, BackIcon, BookmarkIcon, CloseIcon, SendIcon } from '../../lib/icons';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
 
@@ -273,6 +273,18 @@ export default function AIAssistantScreen() {
     });
   }, []);
 
+  const handleClearMessages = () => {
+    if (messages.length === 0) return;
+    showAlert('Sohbeti temizle', 'Tüm mesajlar silinecek.', [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'Temizle',
+        style: 'destructive',
+        onPress: () => setMessages([]),
+      },
+    ]);
+  };
+
   const extractJSON = (text: string): any | null => {
     const codeBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
     if (codeBlockMatch) {
@@ -395,6 +407,15 @@ export default function AIAssistantScreen() {
               <Text style={[s.navStatusText, { color: c.brand }]}>Çevrimiçi</Text>
             </View>
           </View>
+          {messages.length > 0 ? (
+            <Pressable
+              onPress={handleClearMessages}
+              style={[s.navBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+              hitSlop={6}
+            >
+              <CloseIcon color={c.text2} size={20} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
