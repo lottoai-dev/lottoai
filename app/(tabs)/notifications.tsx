@@ -17,6 +17,7 @@ import { GameEmblem } from '../../lib/emblems';
 import { GAMES, type Game, type GameId } from '../../lib/games';
 import { t } from '../../lib/i18n';
 import { BackIcon, BellIcon, CalendarIcon, CheckIcon, ClockIcon } from '../../lib/icons';
+import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
 
 Notifications.setNotificationHandler({
@@ -276,7 +277,13 @@ export default function NotificationsScreen() {
     const newSettings = { ...settings, [gameId]: updated };
     setSettings(newSettings);
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
-    await scheduleNotifications(gameId, updated);
+    const anyAfter = Object.values(newSettings).some((s) => s.after);
+    await supabase
+      .from('push_tokens')
+      .update({ notify_results: anyAfter })
+      .eq('token', (await Notifications.getExpoPushTokenAsync({
+        projectId: '1686d4a1-7dbf-4293-a0b3-a71afc9e4a61',
+      })).data);
   };
 
   const handleBeforeMinutesChange = async (gameId: GameId, minutes: number) => {
@@ -420,23 +427,7 @@ async function scheduleNotifications(gameId: GameId, settings: GameSettings) {
       });
     }
 
-    if (settings.after) {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: t('notifAfterTitle', { name: game.name }),
-          body: t('notifAfterBody'),
-          sound: true,
-          data: { gameId, type: 'after', screen: 'saved' },
-        },
-        trigger: {
-          type: 'weekly',
-          weekday,
-          hour: game.notifyAfterHour,
-          minute: game.notifyAfterMinute,
-          repeats: true,
-        } as any,
-      });
-    }
+    
   }
 }
 
