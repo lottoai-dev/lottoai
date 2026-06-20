@@ -425,7 +425,11 @@ export default function AIAssistantScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {messages.length === 0 ? (
-          <View style={s.empty}>
+          <ScrollView
+            contentContainerStyle={s.empty}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <View style={[s.emptyIcon, { backgroundColor: c.brandSoft }]}>
               <AIAssistantIcon color={c.brand} size={34} />
             </View>
@@ -444,7 +448,7 @@ export default function AIAssistantScreen() {
                 </PressableScale>
               ))}
             </View>
-          </View>
+          </ScrollView>
         ) : (
           <ScrollView
             ref={scrollRef}
@@ -575,7 +579,7 @@ function makeStyles(theme: AppTheme) {
     statusDot: { width: 6, height: 6, borderRadius: 3 },
     navStatusText: { ...ty.caption, fontFamily: theme.font.semibold },
 
-    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xxl },
+    empty: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xxl },
     emptyIcon: { width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
     emptyTitle: { ...ty.h2, color: c.text },
     emptyDesc: { ...ty.body, color: c.text2, textAlign: 'center', maxWidth: 290, marginTop: 8 },
