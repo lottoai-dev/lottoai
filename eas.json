@@ -28,15 +28,16 @@
       }
     },
     "production": {
-      "autoIncrement": true,
-      "android": {
-        "buildType": "app-bundle"
-      },
-      "ios": {
-      },
-      "env": {
-        "APP_ENV": "production"
-      }
-    }
+  "autoIncrement": true,
+  "android": {
+    "buildType": "app-bundle",
+    "googleServicesFile": "$GOOGLE_SERVICES_JSON"
+  },
+  "ios": {
+  },
+  "env": {
+    "APP_ENV": "production"
+  }
+}
   }
 }
