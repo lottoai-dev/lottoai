@@ -294,11 +294,13 @@ export default function SavedScreen() {
     }
   };
 
-  const getScoreLabel = (score: number) => {
+  const getScoreLabel = (score: number, gameName: string) => {
+    const prizeTable = getPrizeTable(gameName);
+    const hasPrize = prizeTable ? prizeTable[score] != null : false;
+
     if (score === 0) return { label: 'Tutmadı', color: c.text3, sub: 'Bir sonrakine!' };
-    if (score >= 6) return { label: 'Büyük ikramiye!', color: c.gold, sub: 'Tebrikler!' };
-    if (score >= 4) return { label: `${score} sayı tutturdun`, color: c.brand, sub: 'Harika sonuç!' };
-    if (score >= 2) return { label: `${score} sayı tutturdun`, color: c.brand, sub: 'İyi gidiyorsun!' };
+    if (hasPrize && score >= 6) return { label: 'Büyük ikramiye!', color: c.gold, sub: 'Tebrikler!' };
+    if (hasPrize) return { label: `${score} sayı tutturdun`, color: c.brand, sub: 'Harika sonuç!' };
     return { label: `${score} sayı tutturdun`, color: c.text2, sub: 'Bir sonrakine!' };
   };
 
@@ -412,7 +414,7 @@ export default function SavedScreen() {
               (() => {
                 const id = getGameByName(checkingCoupon.game)?.id ?? 'cilgin';
                 const mainColor = GameAccent[id] ?? c.brand;
-                const score = getScoreLabel(checkResult.score);
+                const score = getScoreLabel(checkResult.score, checkingCoupon.game);
                 const currency = getGameByName(checkingCoupon.game)?.currency || 'TRY';
                 return (
                   <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 540 }}>
@@ -500,7 +502,7 @@ const CouponTicket = React.memo(function CouponTicket({
   onDelete: () => void;
   onOpenResult: () => void;
   onOpenHistory: () => void;
-  getScoreLabel: (n: number) => { label: string; color: string; sub: string };
+  getScoreLabel: (n: number, gameName: string) => { label: string; color: string; sub: string };
   theme: AppTheme;
 }) {
   const c = theme.colors;
@@ -508,7 +510,7 @@ const CouponTicket = React.memo(function CouponTicket({
   const id = getGameByName(coupon.game)?.id ?? 'cilgin';
   const mainColor = GameAccent[id] ?? c.brand;
   const isChecked = coupon.matchedCount !== undefined && coupon.matchedCount !== null;
-  const score = isChecked ? getScoreLabel(coupon.matchedCount as number) : null;
+  const score = isChecked ? getScoreLabel(coupon.matchedCount as number, coupon.game) : null;
 
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
