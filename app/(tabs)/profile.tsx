@@ -77,7 +77,7 @@ export default function ProfileScreen() {
   const [tempName, setTempName] = useState('');
   const [totalCoupons, setTotalCoupons] = useState(0);
   const [bestResult, setBestResult] = useState(0);
-  const [totalMatched, setTotalMatched] = useState(0);
+  
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   const loadData = async () => {
@@ -90,7 +90,7 @@ export default function ProfileScreen() {
         const coupons = JSON.parse(couponsData);
         setTotalCoupons(coupons.length);
         setBestResult(coupons.reduce((max: number, cp: any) => Math.max(max, cp.matchedCount || 0), 0));
-        setTotalMatched(coupons.reduce((acc: number, cp: any) => acc + (cp.matchedCount || 0), 0));
+        
       }
 
       const notifData = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATION_SETTINGS);
@@ -126,7 +126,7 @@ export default function ProfileScreen() {
           await AsyncStorage.clear();
           setTotalCoupons(0);
           setBestResult(0);
-          setTotalMatched(0);
+          
           setName('');
           showAlert('Silindi', 'Tüm veriler temizlendi. Uygulamayı kapatıp açın.');
         },
@@ -207,7 +207,7 @@ export default function ProfileScreen() {
         <Surface style={s.statsCard}>
           <Stat value={String(totalCoupons)} label="Kupon" color={c.brand} theme={theme} divider />
           <Stat value={String(bestResult)} label="En iyi" color={c.gold} theme={theme} divider />
-          <Stat value={String(totalMatched)} label="Tutuşan" color={c.brand} theme={theme} />
+          
         </Surface>
 
         <Surface style={s.card}>

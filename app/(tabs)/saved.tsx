@@ -353,8 +353,7 @@ export default function SavedScreen() {
               <Stat value={String(coupons.length)} label="Toplam" color={c.brand} theme={theme} />
               <View style={[s.statDivider, { backgroundColor: c.hairline }]} />
               <Stat value={String(bestResult)} label="En iyi" color={c.gold} theme={theme} />
-              <View style={[s.statDivider, { backgroundColor: c.hairline }]} />
-              <Stat value={String(totalMatched)} label="Tutuşan" color={c.brand} theme={theme} />
+              
             </Surface>
 
             <View style={s.statusRow}>
