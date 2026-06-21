@@ -234,7 +234,6 @@ export default function SavedScreen() {
   }, [coupons, filterStatus]);
 
   const totalCoupons = filteredCoupons.length;
-  const totalMatched = coupons.reduce((acc, cp) => acc + (cp.matchedCount || 0), 0);
   const bestResult = coupons.reduce((max, cp) => Math.max(max, cp.matchedCount || 0), 0);
   const pendingCount = coupons.filter((cp) => cp.matchedCount === undefined || cp.matchedCount === null).length;
   const checkedCount = coupons.length - pendingCount;
@@ -272,6 +271,7 @@ export default function SavedScreen() {
   };
 
   const handleShare = async (coupon: Coupon) => {
+    softHaptic();
     try {
       const numbersText = coupon.numbers.join(' · ');
       const bonusText = coupon.bonus && coupon.bonus.length > 0 ? `\n🔵 Şans Topu: ${coupon.bonus.join(' · ')}` : '';
@@ -306,6 +306,7 @@ export default function SavedScreen() {
 
   const openCheckResult = (coupon: Coupon) => {
     if (coupon.matchedCount === undefined || coupon.matchedCount === null) return;
+    softHaptic();
     const prizeTable = getPrizeTable(coupon.game);
     const prize = prizeTable && coupon.matchedNumbers ? prizeTable[coupon.matchedNumbers.length] ?? null : null;
     setCheckingCoupon(coupon);
@@ -344,7 +345,7 @@ export default function SavedScreen() {
               title="Henüz kuponun yok"
               desc="Kupon üret ekranında sayılarını seç ve kaydet. Sonuçlar açıklanınca otomatik kontrol edip burada gösterelim."
               action="İlk kuponunu üret"
-              onAction={() => router.push('/(tabs)/generate')}
+              onAction={() => { softHaptic(); router.push('/(tabs)/generate'); }}
             />
           </View>
         ) : (
@@ -353,7 +354,6 @@ export default function SavedScreen() {
               <Stat value={String(coupons.length)} label="Toplam" color={c.brand} theme={theme} />
               <View style={[s.statDivider, { backgroundColor: c.hairline }]} />
               <Stat value={String(bestResult)} label="En iyi" color={c.gold} theme={theme} />
-              
             </Surface>
 
             <View style={s.statusRow}>
@@ -362,7 +362,7 @@ export default function SavedScreen() {
                 return (
                   <Pressable
                     key={key}
-                    onPress={() => { setFilterStatus(key); }}
+                    onPress={() => { softHaptic(); setFilterStatus(key); }}
                     style={[s.statusBtn, { backgroundColor: active ? c.brand : c.surface, borderColor: active ? c.brand : c.border }]}
                   >
                     <Text style={[s.statusBtnText, { color: active ? c.brandText : c.text2 }]} numberOfLines={1}>{label}</Text>
@@ -373,7 +373,7 @@ export default function SavedScreen() {
 
             <View style={s.topRow}>
               <Text style={s.sectionTitle}>{totalCoupons} kupon</Text>
-              <Pressable onPress={handleDeleteAll} hitSlop={8}>
+              <Pressable onPress={() => { softHaptic(); handleDeleteAll(); }} hitSlop={8}>
                 <Text style={[s.deleteAll, { color: c.danger }]}>Tümünü sil</Text>
               </Pressable>
             </View>
@@ -393,7 +393,7 @@ export default function SavedScreen() {
                   onShare={() => handleShare(coupon)}
                   onDelete={() => handleDelete(coupon.id)}
                   onOpenResult={() => openCheckResult(coupon)}
-                  onOpenHistory={() => setHistoryModalCoupon(coupon)}
+                  onOpenHistory={() => { softHaptic(); setHistoryModalCoupon(coupon); }}
                   getScoreLabel={getScoreLabel}
                   theme={theme}
                 />
@@ -422,7 +422,7 @@ export default function SavedScreen() {
                         <Text style={s.modalTitle}>Kupon sonucu</Text>
                         <Text style={s.modalSubtitle}>{checkingCoupon.game} · {checkResult.draw.draw_date}</Text>
                       </View>
-                      <Pressable onPress={() => setCheckModal(false)} style={[s.close, { backgroundColor: c.surfaceAlt }]} hitSlop={8}>
+                      <Pressable onPress={() => { softHaptic(); setCheckModal(false); }} style={[s.close, { backgroundColor: c.surfaceAlt }]} hitSlop={8}>
                         <CloseIcon color={c.text2} size={20} />
                       </Pressable>
                     </View>
@@ -462,7 +462,7 @@ export default function SavedScreen() {
                       </>
                     ) : null}
 
-                    <AppButton label="Kapat" variant="secondary" onPress={() => setCheckModal(false)} style={{ marginTop: 12 }} />
+                    <AppButton label="Kapat" variant="secondary" onPress={() => { softHaptic(); setCheckModal(false); }} style={{ marginTop: 12 }} />
                   </ScrollView>
                 );
               })()
@@ -478,7 +478,7 @@ export default function SavedScreen() {
           bonus={historyModalCoupon.bonus}
           superStar={historyModalCoupon.superStar ?? undefined}
           visible={!!historyModalCoupon}
-          onClose={() => setHistoryModalCoupon(null)}
+          onClose={() => { softHaptic(); setHistoryModalCoupon(null); }}
         />
       )}
     </View>
