@@ -88,7 +88,7 @@ export default function OnboardingScreen() {
 
       <View style={s.topBar}>
         {slide.skippable ? (
-          <Pressable onPress={() => goToSlide(SLIDES.length - 1)} hitSlop={8}>
+          <Pressable onPress={() => { softHaptic(); goToSlide(SLIDES.length - 1); }} hitSlop={8}>
             <Text style={s.skip}>Geç</Text>
           </Pressable>
         ) : (
@@ -129,7 +129,10 @@ export default function OnboardingScreen() {
               <View style={[s.warningBox, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
                 <Text style={s.warningText}>{t('onboarding_warning_text_1')}</Text>
                 <Text style={s.warningText}>{t('onboarding_warning_text_2')}</Text>
-                <Text style={[s.warningText, { color: c.brand, fontFamily: theme.font.bold }]} onPress={() => Linking.openURL('tel:115')}>
+                <Text
+                  style={[s.warningText, { color: c.brand, fontFamily: theme.font.bold }]}
+                  onPress={() => { softHaptic(); Linking.openURL('tel:115'); }}
+                >
                   {t('onboarding_warning_text_3')}
                 </Text>
               </View>
