@@ -77,7 +77,6 @@ export default function ProfileScreen() {
   const [tempName, setTempName] = useState('');
   const [totalCoupons, setTotalCoupons] = useState(0);
   const [bestResult, setBestResult] = useState(0);
-  
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   const loadData = async () => {
@@ -90,7 +89,6 @@ export default function ProfileScreen() {
         const coupons = JSON.parse(couponsData);
         setTotalCoupons(coupons.length);
         setBestResult(coupons.reduce((max: number, cp: any) => Math.max(max, cp.matchedCount || 0), 0));
-        
       }
 
       const notifData = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATION_SETTINGS);
@@ -123,10 +121,10 @@ export default function ProfileScreen() {
         text: 'Sil',
         style: 'destructive',
         onPress: async () => {
+          softHaptic();
           await AsyncStorage.clear();
           setTotalCoupons(0);
           setBestResult(0);
-          
           setName('');
           showAlert('Silindi', 'Tüm veriler temizlendi. Uygulamayı kapatıp açın.');
         },
@@ -148,7 +146,10 @@ export default function ProfileScreen() {
     onPress?: () => void;
     last?: boolean;
   }) => (
-    <PressableScale onPress={onPress} style={[s.menuRow, ...(!last ? [{ borderBottomWidth: 1, borderBottomColor: c.hairline }] : [])]}>
+    <PressableScale
+      onPress={() => { softHaptic(); onPress?.(); }}
+      style={[s.menuRow, ...(!last ? [{ borderBottomWidth: 1, borderBottomColor: c.hairline }] : [])]}
+    >
       <View style={[s.menuIcon, { backgroundColor: color + '1A' }]}>
         <Icon color={color} size={20} />
       </View>
@@ -190,12 +191,12 @@ export default function ProfileScreen() {
                 <Pressable onPress={saveName} style={[s.editBtn, { backgroundColor: c.brand }]} hitSlop={6}>
                   <CheckIcon color={c.brandText} size={18} />
                 </Pressable>
-                <Pressable onPress={() => setEditing(false)} style={[s.editBtn, { backgroundColor: c.surfaceAlt }]} hitSlop={6}>
+                <Pressable onPress={() => { softHaptic(); setEditing(false); }} style={[s.editBtn, { backgroundColor: c.surfaceAlt }]} hitSlop={6}>
                   <CloseIcon color={c.text2} size={18} />
                 </Pressable>
               </View>
             ) : (
-              <Pressable style={s.nameRow} onPress={() => { setTempName(name); setEditing(true); }}>
+              <Pressable style={s.nameRow} onPress={() => { softHaptic(); setTempName(name); setEditing(true); }}>
                 <Text style={s.nameText}>{name || 'İsim ekle'}</Text>
                 <EditIcon color={c.text3} size={16} />
               </Pressable>
@@ -206,8 +207,7 @@ export default function ProfileScreen() {
 
         <Surface style={s.statsCard}>
           <Stat value={String(totalCoupons)} label="Kupon" color={c.brand} theme={theme} divider />
-          <Stat value={String(bestResult)} label="En iyi" color={c.gold} theme={theme} divider />
-          
+          <Stat value={String(bestResult)} label="En iyi" color={c.gold} theme={theme} divider={false} />
         </Surface>
 
         <Surface style={s.card}>
@@ -218,7 +218,7 @@ export default function ProfileScreen() {
               return (
                 <Pressable
                   key={opt.key}
-                  onPress={() => { setPref(opt.key); }}
+                  onPress={() => { softHaptic(); setPref(opt.key); }}
                   style={[s.themeOpt, active && [{ backgroundColor: c.surface }, theme.shadowSm]]}
                 >
                   {opt.Glyph({ color: active ? c.text : c.text2 })}
@@ -269,7 +269,7 @@ export default function ProfileScreen() {
             Şans oyunları eğlence amaçlıdır, gelir kaynağı değildir. 18 yaş ve üzeri içindir. Oyun kontrolden çıktıysa{' '}
             <Text
               style={{ fontFamily: theme.font.bold, color: c.brand }}
-              onPress={() => Linking.openURL('tel:115')}
+              onPress={() => { softHaptic(); Linking.openURL('tel:115'); }}
             >
               Yeşilay 115
             </Text>{' '}
@@ -287,7 +287,7 @@ export default function ProfileScreen() {
         </Surface>
 
         <PressableScale
-          onPress={clearData}
+          onPress={() => { softHaptic(); clearData(); }}
           style={[s.danger, { backgroundColor: c.dangerSoft, borderColor: c.danger + '33' }]}
         >
           <TrashIcon color={c.danger} size={20} />
