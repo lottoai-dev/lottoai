@@ -331,6 +331,7 @@ export default function GenerateScreen() {
   };
 
   const handleGameSelect = (game: (typeof GAMES)[0]) => {
+    softHaptic();
     setSelectedGame(game);
     setGeneratedNumbers([]);
     setBonusNumbers([]);
@@ -346,6 +347,7 @@ export default function GenerateScreen() {
   };
 
   const handleRestore = (entry: HistoryEntry) => {
+    softHaptic();
     const game = GAMES.find((g) => g.name === entry.game);
     if (game) setSelectedGame(game);
     setGeneratedNumbers(entry.numbers);
@@ -356,6 +358,7 @@ export default function GenerateScreen() {
   };
 
   const handleClearHistory = async () => {
+    softHaptic();
     setHistory([]);
     await AsyncStorage.removeItem(STORAGE_KEYS.GENERATION_HISTORY);
   };
@@ -577,7 +580,7 @@ export default function GenerateScreen() {
             style={{ flex: 1 }}
           />
           <PressableScale
-            onPress={() => setShowFilter((v) => !v)}
+            onPress={() => { softHaptic(); setShowFilter((v) => !v); }}
             style={[
               s.filterBtn,
               {
@@ -603,7 +606,7 @@ export default function GenerateScreen() {
 
         {currentGameHistory.length > 0 ? (
           <PressableScale
-            onPress={() => setHistoryModal(true)}
+            onPress={() => { softHaptic(); setHistoryModal(true); }}
             style={[s.historyBtn, { backgroundColor: c.surface, borderColor: c.border }]}
           >
             <ClockIcon color={c.brand} size={17} />
@@ -616,14 +619,14 @@ export default function GenerateScreen() {
             <Text style={s.filterPanelTitle}>AKILLI FİLTRELER</Text>
 
             <Pressable
-              onPress={() => { setBalanced((b) => !b); if (!balanced) setEvenCount(null); }}
+              onPress={() => { softHaptic(); setBalanced((b) => !b); if (!balanced) setEvenCount(null); }}
               style={[s.toggleRow, { borderColor: balanced ? c.brand : c.border, backgroundColor: balanced ? c.brandSoft : 'transparent' }]}
             >
               <View style={{ flex: 1 }}>
                 <Text style={[s.toggleTitle, balanced && { color: c.brand }]}>Dengeli dağılım</Text>
                 <Text style={s.toggleDesc}>Düşük, orta ve yüksek sayılardan eşit oranda seçer</Text>
               </View>
-              <Toggle value={balanced} onChange={(v) => { setBalanced(v); if (v) setEvenCount(null); }} />
+              <Toggle value={balanced} onChange={(v) => { softHaptic(); setBalanced(v); if (v) setEvenCount(null); }} />
             </Pressable>
 
             <View style={s.divider} />
@@ -631,7 +634,7 @@ export default function GenerateScreen() {
             <View style={s.subHeader}>
               <Text style={s.subTitle}>Çift / Tek dengesi</Text>
               {evenCount !== null ? (
-                <Pressable onPress={() => setEvenCount(null)} hitSlop={8}>
+                <Pressable onPress={() => { softHaptic(); setEvenCount(null); }} hitSlop={8}>
                   <Text style={[s.clearBtn, { color: c.brand }]}>Temizle</Text>
                 </Pressable>
               ) : null}
@@ -643,7 +646,7 @@ export default function GenerateScreen() {
                 return (
                   <Pressable
                     key={n}
-                    onPress={() => { setEvenCount(n); setBalanced(false); }}
+                    onPress={() => { softHaptic(); setEvenCount(n); setBalanced(false); }}
                     style={[s.segment, { borderColor: sel ? mainColor : c.border, backgroundColor: sel ? mainColor : 'transparent' }]}
                   >
                     <Text style={[s.segmentTop, { color: sel ? '#fff' : c.text }]}>{n}</Text>
@@ -656,14 +659,14 @@ export default function GenerateScreen() {
             <View style={s.divider} />
 
             <Pressable
-              onPress={() => setNoConsecutive((v) => !v)}
+              onPress={() => { softHaptic(); setNoConsecutive((v) => !v); }}
               style={[s.toggleRow, { borderColor: noConsecutive ? c.brand : c.border, backgroundColor: noConsecutive ? c.brandSoft : 'transparent' }]}
             >
               <View style={{ flex: 1 }}>
                 <Text style={[s.toggleTitle, noConsecutive && { color: c.brand }]}>Ardışık sayıları engelle</Text>
                 <Text style={s.toggleDesc}>Yan yana 2{"'"}den fazla ardışık sayı olmasın</Text>
               </View>
-              <Toggle value={noConsecutive} onChange={setNoConsecutive} />
+              <Toggle value={noConsecutive} onChange={(v) => { softHaptic(); setNoConsecutive(v); }} />
             </Pressable>
 
             <View style={s.divider} />
@@ -671,7 +674,7 @@ export default function GenerateScreen() {
             <View style={s.subHeader}>
               <Text style={s.subTitle}>Toplam aralığı</Text>
               {sumMin.trim() !== '' || sumMax.trim() !== '' ? (
-                <Pressable onPress={() => { setSumMin(''); setSumMax(''); }} hitSlop={8}>
+                <Pressable onPress={() => { softHaptic(); setSumMin(''); setSumMax(''); }} hitSlop={8}>
                   <Text style={[s.clearBtn, { color: c.brand }]}>Temizle</Text>
                 </Pressable>
               ) : null}
@@ -688,7 +691,7 @@ export default function GenerateScreen() {
             <View style={s.subHeader}>
               <Text style={s.subTitle}>Zorunlu sayılar</Text>
               {includeText.trim() !== '' ? (
-                <Pressable onPress={() => setIncludeText('')} hitSlop={8}>
+                <Pressable onPress={() => { softHaptic(); setIncludeText(''); }} hitSlop={8}>
                   <Text style={[s.clearBtn, { color: c.brand }]}>Temizle</Text>
                 </Pressable>
               ) : null}
@@ -701,7 +704,7 @@ export default function GenerateScreen() {
             <View style={s.subHeader}>
               <Text style={s.subTitle}>Hariç tutulan sayılar</Text>
               {excludeText.trim() !== '' ? (
-                <Pressable onPress={() => setExcludeText('')} hitSlop={8}>
+                <Pressable onPress={() => { softHaptic(); setExcludeText(''); }} hitSlop={8}>
                   <Text style={[s.clearBtn, { color: c.brand }]}>Temizle</Text>
                 </Pressable>
               ) : null}
@@ -727,7 +730,7 @@ export default function GenerateScreen() {
                 <Text style={s.modalSubtitle}>{selectedGame.name} · son {MAX_HISTORY} üretim</Text>
               </View>
               <Pressable
-                onPress={() => setHistoryModal(false)}
+                onPress={() => { softHaptic(); setHistoryModal(false); }}
                 style={[s.modalClose, { backgroundColor: c.surfaceAlt }]}
                 hitSlop={8}
               >
