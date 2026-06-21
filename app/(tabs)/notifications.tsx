@@ -194,7 +194,7 @@ function GameCard({
               return (
                 <Pressable
                   key={opt}
-                  onPress={() => onBeforeMinutesChange(game.id, opt)}
+                  onPress={() => { toggleHaptic(); onBeforeMinutesChange(game.id, opt); }}
                   style={[
                     s.timeOption,
                     {
@@ -253,6 +253,7 @@ export default function NotificationsScreen() {
   }, []);
 
   const handleRequestPermission = async () => {
+    toggleHaptic();
     setHasPermission(await requestPermission());
   };
 
@@ -306,7 +307,7 @@ export default function NotificationsScreen() {
       >
         <View style={s.nav}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => { toggleHaptic(); router.back(); }}
             style={[s.navBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
             hitSlop={6}
           >
@@ -426,8 +427,6 @@ async function scheduleNotifications(gameId: GameId, settings: GameSettings) {
         } as any,
       });
     }
-
-    
   }
 }
 
