@@ -1,5 +1,6 @@
 // app/(tabs)/ai-assistant.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useMemo, useRef, useState } from 'react';
@@ -33,6 +34,14 @@ import { useTheme } from '../../lib/theme';
 
 /* ───────────────────────── cache ───────────────────────── */
 let cachedStatsText: string | null = null;
+
+function softHaptic() {
+  if (Platform.OS === 'android') {
+    Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Keyboard_Tap);
+  } else {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+  }
+}
 
 /* ───────────────────────── stats helpers ───────────────────────── */
 function combination(n: number, r: number): number {
@@ -280,7 +289,7 @@ export default function AIAssistantScreen() {
       {
         text: 'Temizle',
         style: 'destructive',
-        onPress: () => setMessages([]),
+        onPress: () => { softHaptic(); setMessages([]); },
       },
     ]);
   };
@@ -301,6 +310,7 @@ export default function AIAssistantScreen() {
     const content = (text ?? input).trim();
     if (!content || loading) return;
 
+    softHaptic();
     const userMsg: ChatMessage = { role: 'user', content };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
@@ -357,6 +367,7 @@ export default function AIAssistantScreen() {
 
   const saveCoupon = async (coupon: ChatMessage['coupon']) => {
     if (!coupon) return;
+    softHaptic();
     try {
       const existing = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_COUPONS);
       const coupons = existing ? JSON.parse(existing) : [];
@@ -391,7 +402,7 @@ export default function AIAssistantScreen() {
       <View style={{ paddingTop: insets.top + 6 }}>
         <View style={s.nav}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => { softHaptic(); router.back(); }}
             style={[s.navBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
             hitSlop={6}
           >
@@ -409,7 +420,7 @@ export default function AIAssistantScreen() {
           </View>
           {messages.length > 0 ? (
             <Pressable
-              onPress={handleClearMessages}
+              onPress={() => { softHaptic(); handleClearMessages(); }}
               style={[s.navBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
               hitSlop={6}
             >
@@ -441,7 +452,7 @@ export default function AIAssistantScreen() {
               {SUGGESTIONS.map((sug, i) => (
                 <PressableScale
                   key={i}
-                  onPress={() => send(sug)}
+                  onPress={() => { softHaptic(); send(sug); }}
                   style={[s.suggestion, { backgroundColor: c.surface, borderColor: c.border }]}
                 >
                   <Text style={s.suggestionText}>{sug}</Text>
