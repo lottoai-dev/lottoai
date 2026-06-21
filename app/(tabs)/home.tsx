@@ -1,5 +1,6 @@
 // app/(tabs)/home.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -7,6 +8,7 @@ import {
   Animated,
   Dimensions,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -48,6 +50,14 @@ import { useTheme } from '../../lib/theme';
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 64;
 const LAST_SEEN_PREFIX = 'lastSeenResult_';
+
+function softHaptic() {
+  if (Platform.OS === 'android') {
+    Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Keyboard_Tap);
+  } else {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+  }
+}
 
 /* ----------------------------- helpers ----------------------------- */
 function getTodayIndex(): number {
@@ -104,8 +114,6 @@ function parseNumbers(str: string): number[] {
   return str.split(' - ').map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
 }
 
-
-
 function gameMeta(name: string) {
   const game = getGameByName(name);
   const id = game?.id ?? 'cilgin';
@@ -120,7 +128,7 @@ function SectionHeader({ title, action, onAction }: { title: string; action?: st
     <View style={s.sectionHeader}>
       <Text style={s.sectionTitle}>{title}</Text>
       {action ? (
-        <Pressable onPress={onAction} hitSlop={8}>
+        <Pressable onPress={() => { softHaptic(); onAction?.(); }} hitSlop={8}>
           <Text style={s.sectionAction}>{action}</Text>
         </Pressable>
       ) : null}
@@ -291,6 +299,7 @@ export default function HomeScreen() {
   }, []);
 
   const handleBildirimPress = (bildirim: Bildirim) => {
+    softHaptic();
     markAsRead(bildirim.id);
     setBildirimModalVisible(false);
     if (bildirim.screen === 'saved') router.push('/(tabs)/saved');
@@ -335,17 +344,17 @@ export default function HomeScreen() {
         {/* Header */}
         <Animated.View style={[s.header, { opacity: fade, transform: [{ translateY: rise }] }]}>
           <View style={s.headerLeft}>
-            <BrandMark size={42}  />
+            <BrandMark size={42} />
             <View>
               <Text style={s.greeting}>{userName ? `Merhaba, ${userName}` : 'Merhaba'}</Text>
               <Text style={s.brand}>LottoAI</Text>
             </View>
           </View>
           <View style={s.headerActions}>
-            <PressableScale style={s.iconBtn} onPress={() => router.push('/(tabs)/ai-assistant' as any)}>
+            <PressableScale style={s.iconBtn} onPress={() => { softHaptic(); router.push('/(tabs)/ai-assistant' as any); }}>
               <AIAssistantIcon color={c.brand} size={20} />
             </PressableScale>
-            <PressableScale style={s.iconBtn} onPress={() => setBildirimModalVisible(true)}>
+            <PressableScale style={s.iconBtn} onPress={() => { softHaptic(); setBildirimModalVisible(true); }}>
               <BellIcon color={c.text2} size={20} />
               {unreadCount > 0 ? (
                 <View style={[s.dot, { borderColor: c.surface }]}>
@@ -362,7 +371,7 @@ export default function HomeScreen() {
           <Surface style={s.errorCard}>
             <WifiOffIcon color={c.danger} size={30} />
             <Text style={s.errorText}>{error}</Text>
-            <AppButton label="Tekrar dene" variant="secondary" size="md" fullWidth={false} onPress={loadAll} />
+            <AppButton label="Tekrar dene" variant="secondary" size="md" fullWidth={false} onPress={() => { softHaptic(); loadAll(); }} />
           </Surface>
         ) : null}
 
@@ -402,7 +411,7 @@ export default function HomeScreen() {
 
                 <AppButton
                   label="Kupon üret"
-                  onPress={() => router.push(`/(tabs)/generate?game=${nextDraw.game.id}` as any)}
+                  onPress={() => { softHaptic(); router.push(`/(tabs)/generate?game=${nextDraw.game.id}` as any); }}
                   iconRight={(color, size) => <ArrowRightIcon color={color} size={size} />}
                   style={{ marginTop: 16 }}
                 />
@@ -415,7 +424,7 @@ export default function HomeScreen() {
         {!error && (pendingCoupons > 0 || todayDrawCount > 0) ? (
           <Surface style={s.summary}>
             {pendingCoupons > 0 ? (
-              <PressableScale style={s.summaryRow} onPress={() => router.push('/(tabs)/saved' as any)}>
+              <PressableScale style={s.summaryRow} onPress={() => { softHaptic(); router.push('/(tabs)/saved' as any); }}>
                 <View style={[s.summaryIcon, { backgroundColor: c.brandSoft }]}>
                   <TicketIcon color={c.brand} size={20} />
                 </View>
@@ -427,7 +436,7 @@ export default function HomeScreen() {
             ) : null}
             {pendingCoupons > 0 && todayDrawCount > 0 ? <View style={s.divider} /> : null}
             {todayDrawCount > 0 ? (
-              <PressableScale style={s.summaryRow} onPress={() => router.push('/(tabs)/generate' as any)}>
+              <PressableScale style={s.summaryRow} onPress={() => { softHaptic(); router.push('/(tabs)/generate' as any); }}>
                 <View style={[s.summaryIcon, { backgroundColor: c.goldSoft }]}>
                   <SparkIcon color={c.gold} size={20} />
                 </View>
@@ -460,6 +469,7 @@ export default function HomeScreen() {
                   <PressableScale
                     key={index}
                     onPress={() => {
+                      softHaptic();
                       if (isNew) markSeen(draw.game);
                       router.push(`/results?game=${meta.id}` as any);
                     }}
@@ -517,7 +527,7 @@ export default function HomeScreen() {
             <Text style={s.emptyDesc}>Henüz çekiliş verisi yok. İlk kuponunu üreterek başla.</Text>
             <AppButton
               label="Kupon üret"
-              onPress={() => router.push('/(tabs)/generate' as any)}
+              onPress={() => { softHaptic(); router.push('/(tabs)/generate' as any); }}
               style={{ marginTop: 4 }}
             />
           </Surface>
@@ -582,11 +592,11 @@ export default function HomeScreen() {
               <Text style={s.modalTitle}>Bildirimler</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 {bildirimler.length > 0 ? (
-                  <Pressable onPress={markAllAsRead} hitSlop={8}>
+                  <Pressable onPress={() => { softHaptic(); markAllAsRead(); }} hitSlop={8}>
                     <Text style={[s.modalAction, { color: c.brand }]}>Tümünü okundu işaretle</Text>
                   </Pressable>
                 ) : null}
-                <Pressable onPress={() => setBildirimModalVisible(false)} style={[s.modalClose, { backgroundColor: c.surfaceAlt }]} hitSlop={8}>
+                <Pressable onPress={() => { softHaptic(); setBildirimModalVisible(false); }} style={[s.modalClose, { backgroundColor: c.surfaceAlt }]} hitSlop={8}>
                   <CloseIcon color={c.text2} size={20} />
                 </Pressable>
               </View>
@@ -643,7 +653,7 @@ function makeStyles(theme: AppTheme) {
     headerActions: { flexDirection: 'row', gap: spacing.sm },
     iconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', ...theme.shadowSm },
     dot: { position: 'absolute', top: 4, right: 4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: c.danger, borderWidth: 2, borderColor: c.surface, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-dotText: { fontSize: 10, fontFamily: theme.font.bold, color: '#fff', lineHeight: 14, textAlign: 'center', includeFontPadding: false },
+    dotText: { fontSize: 10, fontFamily: theme.font.bold, color: '#fff', lineHeight: 14, textAlign: 'center', includeFontPadding: false },
 
     errorCard: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.xxl, alignItems: 'center', gap: spacing.md },
     errorText: { ...ty.bodyMedium, color: c.text2, textAlign: 'center' },
@@ -703,7 +713,6 @@ dotText: { fontSize: 10, fontFamily: theme.font.bold, color: '#fff', lineHeight:
     gameChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 5, paddingLeft: 6, paddingRight: 10, borderRadius: radius.pill, borderWidth: 1 },
     gameChipText: { ...ty.caption, fontFamily: theme.font.semibold },
 
-    // Bildirim Modal Styles
     modalOverlay: { flex: 1, justifyContent: 'flex-end' },
     modalSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing.xl },
     modalGrabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: c.border, marginBottom: spacing.lg },
