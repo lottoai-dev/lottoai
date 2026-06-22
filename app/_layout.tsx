@@ -1,4 +1,5 @@
 // app/_layout.tsx
+import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
@@ -64,6 +65,46 @@ function RootContent() {
   useEffect(() => {
     registerPushToken();
 
+    // Deep link ile gelen auth token'ı yakala (e-posta doğrulama, şifre sıfırlama)
+    const handleDeepLink = async (url: string) => {
+      if (!url) return;
+
+      // URL'den token parametrelerini çıkar
+      if (url.includes('access_token') || url.includes('token_hash') || url.includes('type=signup') || url.includes('type=recovery')) {
+        try {
+          const urlObj = new URL(url);
+          const accessToken = urlObj.searchParams.get('access_token') ||
+            new URLSearchParams(urlObj.hash.replace('#', '')).get('access_token');
+          const refreshToken = urlObj.searchParams.get('refresh_token') ||
+            new URLSearchParams(urlObj.hash.replace('#', '')).get('refresh_token');
+
+          if (accessToken && refreshToken) {
+            const { error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            if (error) {
+              console.error('[deepLink] session error:', error);
+            } else {
+              console.log('[deepLink] oturum başarıyla alındı');
+            }
+          }
+        } catch (e) {
+          console.error('[deepLink] url parse error:', e);
+        }
+      }
+    };
+
+    // Uygulama kapalıyken gelen deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink(url);
+    });
+
+    // Uygulama açıkken gelen deep link
+    const linkingSub = Linking.addEventListener('url', ({ url }) => {
+      handleDeepLink(url);
+    });
+
     const subscription = Notifications.addNotificationReceivedListener((notification) => {
       const { title, body, data } = notification.request.content;
       addBildirim({
@@ -94,6 +135,7 @@ function RootContent() {
     });
 
     return () => {
+      linkingSub.remove();
       subscription.remove();
       responseListener.current?.remove();
     };
