@@ -1,7 +1,8 @@
 // app/login.tsx
 import { Ionicons } from '@expo/vector-icons';
+import { GoogleSignin, isErrorWithCode, statusCodes } from '@react-native-google-signin/google-signin';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -27,12 +28,66 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: '775120851198-fkplgqbpkljuf173g63d5ivpr6mt2c5o.apps.googleusercontent.com',
+      scopes: ['email', 'profile'],
+    });
+  }, []);
 
   const resetState = () => {
     setError(null);
     setSuccessMessage(null);
+  };
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    setError(null);
+    try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken;
+
+      if (!idToken) {
+        setError('Google girişi başarısız. Tekrar dene.');
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: idToken,
+      });
+
+      if (error) {
+        console.error('[Supabase Google]', error);
+        setError('Google ile giriş yapılamadı. Tekrar dene.');
+        return;
+      }
+
+      router.canGoBack() ? router.back() : router.replace('/(tabs)/home');
+
+    } catch (err: any) {
+      if (isErrorWithCode(err)) {
+        if (err.code === statusCodes.SIGN_IN_CANCELLED) {
+          // Kullanıcı iptal etti, hata gösterme
+        } else if (err.code === statusCodes.IN_PROGRESS) {
+          setError('Giriş işlemi zaten devam ediyor.');
+        } else if (err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+          setError('Google Play Servisleri kullanılamıyor.');
+        } else {
+          setError('Google ile giriş yapılamadı. Tekrar dene.');
+        }
+      } else {
+        console.error('[Google SignIn]', err);
+        setError('Bir sorun oluştu. Tekrar dene.');
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -209,7 +264,7 @@ export default function LoginScreen() {
       justifyContent: 'center',
       alignItems: 'center',
       marginTop: 8,
-      marginBottom: 24,
+      marginBottom: 16,
     },
     submitButtonDisabled: {
       opacity: 0.6,
@@ -218,6 +273,41 @@ export default function LoginScreen() {
       color: theme.colors.brandText,
       fontSize: 16,
       fontWeight: '700',
+    },
+    dividerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 16,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: theme.colors.border,
+    },
+    dividerText: {
+      fontSize: 13,
+      color: theme.colors.text3,
+    },
+    googleButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 14,
+      height: 54,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: 24,
+    },
+    googleButtonDisabled: {
+      opacity: 0.6,
+    },
+    googleButtonText: {
+      color: theme.colors.text,
+      fontSize: 15,
+      fontWeight: '600',
     },
     switchRow: {
       flexDirection: 'row',
@@ -352,6 +442,31 @@ export default function LoginScreen() {
             <Text style={s.submitButtonText}>{buttonLabels[mode]}</Text>
           )}
         </Pressable>
+
+        {mode !== 'forgot' && (
+          <>
+            <View style={s.dividerRow}>
+              <View style={s.dividerLine} />
+              <Text style={s.dividerText}>veya</Text>
+              <View style={s.dividerLine} />
+            </View>
+
+            <Pressable
+              style={[s.googleButton, googleLoading && s.googleButtonDisabled]}
+              onPress={handleGoogleSignIn}
+              disabled={googleLoading}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color={theme.colors.text} />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color="#4285F4" />
+                  <Text style={s.googleButtonText}>Google ile devam et</Text>
+                </>
+              )}
+            </Pressable>
+          </>
+        )}
 
         {mode === 'login' && (
           <>

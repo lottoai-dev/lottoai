@@ -79,7 +79,13 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-localization"
+      "expo-localization",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.775120851198-fkplgqbpkljuf173g63d5ivpr6mt2c5o"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
