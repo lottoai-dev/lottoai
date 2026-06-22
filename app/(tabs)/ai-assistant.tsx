@@ -25,6 +25,7 @@ import { PressableScale } from '../../components/ui/surface';
 import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme, GameAccent } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { chatWithAI } from '../../lib/deepseek';
 import { GameEmblem } from '../../lib/emblems';
 import { GAMES, getGameByName } from '../../lib/games';
@@ -32,7 +33,7 @@ import { AIAssistantIcon, BackIcon, BookmarkIcon, CloseIcon, SendIcon } from '..
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
 
-/* ───────────────────────── cache ───────────────────────── */
+/* ─────────────────────────── cache ─────────────────────────── */
 let cachedStatsText: string | null = null;
 
 function softHaptic() {
@@ -43,7 +44,7 @@ function softHaptic() {
   }
 }
 
-/* ───────────────────────── stats helpers ───────────────────────── */
+/* ─────────────────────────── stats helpers ─────────────────────────── */
 function combination(n: number, r: number): number {
   if (r > n) return 0;
   if (r === 0 || r === n) return 1;
@@ -193,7 +194,7 @@ Süper Loto için (6 numara 1-60, ek numara yok):
 { "game": "Süper Loto", "numbers": [3, 11, 22, 34, 45, 58], "superStar": null, "bonus": null, "explanation": "Seçim sebebi..." }
 \`\`\`
 
-Şans Tobu için (5 ana numara 1-34, 1 Şans Topu 1-14):
+Şans Topu için (5 ana numara 1-34, 1 Şans Topu 1-14):
 \`\`\`json
 { "game": "Şans Topu", "numbers": [4, 12, 19, 25, 31], "superStar": null, "bonus": 7, "explanation": "Seçim sebebi..." }
 \`\`\`
@@ -269,6 +270,7 @@ export default function AIAssistantScreen() {
   const s = useMemo(() => makeStyles(theme), [theme]);
   const scrollRef = useRef<ScrollView>(null);
   const { showAlert } = useAlert();
+  const { user } = useAuth();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -309,6 +311,13 @@ export default function AIAssistantScreen() {
   const send = async (text?: string) => {
     const content = (text ?? input).trim();
     if (!content || loading) return;
+
+    // Giriş yapılmamışsa login ekranına yönlendir
+    if (!user) {
+      softHaptic();
+      router.push('/login' as any);
+      return;
+    }
 
     softHaptic();
     const userMsg: ChatMessage = { role: 'user', content };
@@ -446,19 +455,29 @@ export default function AIAssistantScreen() {
             </View>
             <Text style={s.emptyTitle}>Merhaba, ben Lota</Text>
             <Text style={s.emptyDesc}>
-              Loto hakkında soru sor ya da senin için kupon üreteyim. Şununla başlayabilirsin:
+              {user
+                ? 'Loto hakkında soru sor ya da senin için kupon üreteyim. Şununla başlayabilirsin:'
+                : 'Loto hakkında soru sormak veya kupon ürettirmek için giriş yapman gerekiyor.'}
             </Text>
-            <View style={s.suggestions}>
-              {SUGGESTIONS.map((sug, i) => (
-                <PressableScale
-                  key={i}
-                  onPress={() => { softHaptic(); send(sug); }}
-                  style={[s.suggestion, { backgroundColor: c.surface, borderColor: c.border }]}
-                >
-                  <Text style={s.suggestionText}>{sug}</Text>
-                </PressableScale>
-              ))}
-            </View>
+            {user ? (
+              <View style={s.suggestions}>
+                {SUGGESTIONS.map((sug, i) => (
+                  <PressableScale
+                    key={i}
+                    onPress={() => { softHaptic(); send(sug); }}
+                    style={[s.suggestion, { backgroundColor: c.surface, borderColor: c.border }]}
+                  >
+                    <Text style={s.suggestionText}>{sug}</Text>
+                  </PressableScale>
+                ))}
+              </View>
+            ) : (
+              <AppButton
+                label="Giriş Yap"
+                onPress={() => router.push('/login' as any)}
+                style={{ marginTop: 24, width: '100%' }}
+              />
+            )}
           </ScrollView>
         ) : (
           <ScrollView
@@ -508,7 +527,7 @@ export default function AIAssistantScreen() {
             style={[s.input, { backgroundColor: c.surface, borderColor: c.border, color: c.text }]}
             value={input}
             onChangeText={setInput}
-            placeholder="Lota'ya bir şey yaz…"
+            placeholder={user ? "Lota'ya bir şey yaz…" : "Kullanmak için giriş yap…"}
             placeholderTextColor={c.text3}
             multiline
             editable={!loading}

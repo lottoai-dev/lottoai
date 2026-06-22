@@ -12,6 +12,7 @@ import { PressableScale, Surface } from '../../components/ui/surface';
 import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { BrandMark } from '../../lib/emblems';
 import {
   BellIcon,
@@ -71,6 +72,7 @@ export default function ProfileScreen() {
   const s = useMemo(() => makeStyles(theme), [theme]);
   const { pref, setPref } = useThemeControls();
   const { showAlert } = useAlert();
+  const { user, signOut } = useAuth();
 
   const [name, setName] = useState('');
   const [editing, setEditing] = useState(false);
@@ -132,6 +134,20 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const handleSignOut = () => {
+    showAlert('Çıkış yap', 'Hesabından çıkmak istediğine emin misin?', [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'Çıkış Yap',
+        style: 'destructive',
+        onPress: async () => {
+          softHaptic();
+          await signOut();
+        },
+      },
+    ]);
+  };
+
   const themeOptions: { key: 'light' | 'system' | 'dark'; label: string; Glyph: (p: { color: string }) => React.ReactNode }[] = [
     { key: 'light', label: 'Açık', Glyph: SunGlyph },
     { key: 'system', label: 'Sistem', Glyph: AutoGlyph },
@@ -173,6 +189,20 @@ export default function ProfileScreen() {
           <Text style={s.title}>Profil</Text>
         </View>
 
+        {/* Giriş yapılmamışsa banner göster */}
+        {!user && (
+          <Pressable
+            onPress={() => { softHaptic(); router.push('/login' as any); }}
+            style={[s.loginBanner, { backgroundColor: c.brandSoft, borderColor: c.brandBorder }]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[s.loginBannerTitle, { color: c.brand }]}>Hesabına giriş yap</Text>
+              <Text style={[s.loginBannerSub, { color: c.text2 }]}>Kuponlarını kaydet ve her cihazdan eriş</Text>
+            </View>
+            <ChevronRightIcon color={c.brand} size={20} />
+          </Pressable>
+        )}
+
         <Surface style={s.avatarCard}>
           <View style={[s.avatar, { backgroundColor: c.brand }]}>
             <Text style={s.avatarText}>{name ? name.charAt(0).toUpperCase() : 'L'}</Text>
@@ -201,7 +231,11 @@ export default function ProfileScreen() {
                 <EditIcon color={c.text3} size={16} />
               </Pressable>
             )}
-            {!editing ? <Text style={s.memberText}>LottoAI kullanıcısı</Text> : null}
+            {!editing && (
+              <Text style={s.memberText}>
+                {user ? user.email : 'LottoAI kullanıcısı'}
+              </Text>
+            )}
           </View>
         </Surface>
 
@@ -286,6 +320,17 @@ export default function ProfileScreen() {
           <MenuRow Icon={InfoIcon} color={c.text3} title="Versiyon" sub="1.0.0" last />
         </Surface>
 
+        {/* Çıkış yap butonu — sadece giriş yapılmışsa göster */}
+        {user && (
+          <PressableScale
+            onPress={() => { softHaptic(); handleSignOut(); }}
+            style={[s.danger, { backgroundColor: c.dangerSoft, borderColor: c.danger + '33' }]}
+          >
+            <TrashIcon color={c.danger} size={20} />
+            <Text style={[s.dangerText, { color: c.danger }]}>Çıkış Yap</Text>
+          </PressableScale>
+        )}
+
         <PressableScale
           onPress={() => { softHaptic(); clearData(); }}
           style={[s.danger, { backgroundColor: c.dangerSoft, borderColor: c.danger + '33' }]}
@@ -334,6 +379,14 @@ function makeStyles(theme: AppTheme) {
     container: { flex: 1, backgroundColor: c.bg },
     header: { paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
     title: { ...ty.h1, color: c.text },
+
+    loginBanner: {
+      flexDirection: 'row', alignItems: 'center',
+      marginHorizontal: spacing.xl, marginBottom: spacing.md,
+      padding: 16, borderRadius: radius.xl, borderWidth: 1,
+    },
+    loginBannerTitle: { ...ty.bodySemibold },
+    loginBannerSub: { ...ty.caption, marginTop: 2 },
 
     avatarCard: {
       marginHorizontal: spacing.xl, marginBottom: spacing.md,

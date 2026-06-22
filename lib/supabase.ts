@@ -1,4 +1,5 @@
 // lib/supabase.ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://tsxzukctomvnyzalgxap.supabase.co';
@@ -6,7 +7,10 @@ const SUPABASE_ANON_KEY = 'sb_publishable_R4PXW8J2-BxE77dlN7cS-w_6NfFrcl0';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    persistSession: false,
+    persistSession: true,
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
   },
   global: {
     fetch: (url, options) => {

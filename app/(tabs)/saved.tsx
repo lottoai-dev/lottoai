@@ -28,6 +28,7 @@ import { PressableScale, Surface } from '../../components/ui/surface';
 import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme, GameAccent } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
+import { useAuth } from '../../contexts/AuthContext';
 import CouponHistory from '../../lib/CouponHistory';
 import { GameEmblem } from '../../lib/emblems';
 import { getGameByName } from '../../lib/games';
@@ -88,6 +89,7 @@ export default function SavedScreen() {
   const s = useMemo(() => makeStyles(theme), [theme]);
   const scrollRef = useRef<ScrollView>(null);
   const { showAlert } = useAlert();
+  const { user } = useAuth();
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [checkModal, setCheckModal] = useState(false);
@@ -97,6 +99,15 @@ export default function SavedScreen() {
   const [historyModalCoupon, setHistoryModalCoupon] = useState<Coupon | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [isLoading, setIsLoading] = useState(true);
+
+  // Giriş yapılmamışsa login ekranına yönlendir
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) {
+        router.replace('/login' as any);
+      }
+    }, [user])
+  );
 
   const loadCoupons = async () => {
     try {
@@ -218,12 +229,13 @@ export default function SavedScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      if (!user) return;
       setIsLoading(true);
       loadCoupons().then(() => {
         autoCheckAllPending(false);
         setIsLoading(false);
       });
-    }, [autoCheckAllPending])
+    }, [autoCheckAllPending, user])
   );
 
   const filteredCoupons = useMemo(() => {

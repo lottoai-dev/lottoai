@@ -6,6 +6,7 @@ import { Platform, View } from 'react-native';
 
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { AlertProvider } from '../contexts/AlertContext';
+import { AuthProvider } from '../contexts/AuthContext';
 import { BildirimProvider, useBildirim } from '../contexts/BildirimContext';
 import { OfflineBanner } from '../lib/OfflineBanner';
 import { useAppFonts } from '../lib/fonts';
@@ -109,6 +110,7 @@ function RootContent() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="onboarding" />
+        <Stack.Screen name="login" />
       </Stack>
     </View>
   );
@@ -118,11 +120,13 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AlertProvider>
-        <BildirimProvider>
-          <ErrorBoundary>
-            <RootContent />
-          </ErrorBoundary>
-        </BildirimProvider>
+        <AuthProvider>
+          <BildirimProvider>
+            <ErrorBoundary>
+              <RootContent />
+            </ErrorBoundary>
+          </BildirimProvider>
+        </AuthProvider>
       </AlertProvider>
     </ThemeProvider>
   );
