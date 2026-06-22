@@ -3,20 +3,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../lib/theme';
 
-type Mode = 'login' | 'register';
+type Mode = 'login' | 'register' | 'forgot';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -30,16 +30,25 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const handleSubmit = async () => {
+  const resetState = () => {
     setError(null);
     setSuccessMessage(null);
+  };
 
-    if (!email.trim() || !password.trim()) {
-      setError('E-posta ve şifre boş bırakılamaz.');
+  const handleSubmit = async () => {
+    resetState();
+
+    if (!email.trim()) {
+      setError('E-posta boş bırakılamaz.');
       return;
     }
 
-    if (password.length < 6) {
+    if (mode !== 'forgot' && !password.trim()) {
+      setError('Şifre boş bırakılamaz.');
+      return;
+    }
+
+    if (mode !== 'forgot' && password.length < 6) {
       setError('Şifre en az 6 karakter olmalıdır.');
       return;
     }
@@ -64,9 +73,9 @@ export default function LoginScreen() {
           return;
         }
 
-        router.back();
+        router.canGoBack() ? router.back() : router.replace('/(tabs)/home');
 
-      } else {
+      } else if (mode === 'register') {
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
@@ -85,6 +94,19 @@ export default function LoginScreen() {
 
         setSuccessMessage('Hesabın oluşturuldu! E-posta adresine bir doğrulama bağlantısı gönderdik. Doğruladıktan sonra giriş yapabilirsin.');
         setMode('login');
+        setPassword('');
+
+      } else if (mode === 'forgot') {
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+
+        if (error) {
+          setError('Şifre sıfırlama maili gönderilemedi. E-posta adresini kontrol et.');
+          return;
+        }
+
+        setSuccessMessage('Şifre sıfırlama bağlantısı e-posta adresine gönderildi. Gelen kutunu kontrol et.');
+        setMode('login');
+        setEmail('');
         setPassword('');
       }
     } catch (err) {
@@ -202,6 +224,7 @@ export default function LoginScreen() {
       justifyContent: 'center',
       alignItems: 'center',
       gap: 4,
+      marginBottom: 12,
     },
     switchText: {
       fontSize: 14,
@@ -212,8 +235,16 @@ export default function LoginScreen() {
       color: theme.colors.brand,
       fontWeight: '600',
     },
+    forgotButton: {
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    forgotText: {
+      fontSize: 14,
+      color: theme.colors.text2,
+    },
     guestButton: {
-      marginTop: 20,
+      marginTop: 8,
       alignItems: 'center',
     },
     guestText: {
@@ -223,26 +254,41 @@ export default function LoginScreen() {
     },
   });
 
+  const titles: Record<Mode, string> = {
+    login: 'Hoş Geldin!',
+    register: 'Hesap Oluştur',
+    forgot: 'Şifremi Unuttum',
+  };
+
+  const subtitles: Record<Mode, string> = {
+    login: 'Kuponlarına her yerden eriş',
+    register: 'Ücretsiz hesap oluştur, kuponlarını kaydet',
+    forgot: 'E-posta adresini gir, sıfırlama bağlantısı gönderelim',
+  };
+
+  const buttonLabels: Record<Mode, string> = {
+    login: 'Giriş Yap',
+    register: 'Kayıt Ol',
+    forgot: 'Sıfırlama Maili Gönder',
+  };
+
   return (
     <KeyboardAvoidingView
       style={s.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <Pressable style={s.backButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')}>
+      <Pressable
+        style={s.backButton}
+        onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')}
+      >
         <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
       </Pressable>
 
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
         <View style={s.logo}>
           <Text style={s.logoIcon}>🍀</Text>
-          <Text style={s.title}>
-            {mode === 'login' ? 'Hoş Geldin!' : 'Hesap Oluştur'}
-          </Text>
-          <Text style={s.subtitle}>
-            {mode === 'login'
-              ? 'Kuponlarına her yerden eriş'
-              : 'Ücretsiz hesap oluştur, kuponlarını kaydet'}
-          </Text>
+          <Text style={s.title}>{titles[mode]}</Text>
+          <Text style={s.subtitle}>{subtitles[mode]}</Text>
         </View>
 
         <Text style={s.label}>E-posta</Text>
@@ -259,25 +305,29 @@ export default function LoginScreen() {
           />
         </View>
 
-        <Text style={s.label}>Şifre</Text>
-        <View style={s.inputWrapper}>
-          <TextInput
-            style={s.input}
-            placeholder="En az 6 karakter"
-            placeholderTextColor={theme.colors.text3}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!passwordVisible}
-            autoCapitalize="none"
-          />
-          <Pressable style={s.eyeButton} onPress={() => setPasswordVisible(!passwordVisible)}>
-            <Ionicons
-              name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
-              size={20}
-              color={theme.colors.text2}
-            />
-          </Pressable>
-        </View>
+        {mode !== 'forgot' && (
+          <>
+            <Text style={s.label}>Şifre</Text>
+            <View style={s.inputWrapper}>
+              <TextInput
+                style={s.input}
+                placeholder="En az 6 karakter"
+                placeholderTextColor={theme.colors.text3}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!passwordVisible}
+                autoCapitalize="none"
+              />
+              <Pressable style={s.eyeButton} onPress={() => setPasswordVisible(!passwordVisible)}>
+                <Ionicons
+                  name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={theme.colors.text2}
+                />
+              </Pressable>
+            </View>
+          </>
+        )}
 
         {error && (
           <View style={s.errorBox}>
@@ -299,30 +349,49 @@ export default function LoginScreen() {
           {loading ? (
             <ActivityIndicator color={theme.colors.brandText} />
           ) : (
-            <Text style={s.submitButtonText}>
-              {mode === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}
-            </Text>
+            <Text style={s.submitButtonText}>{buttonLabels[mode]}</Text>
           )}
         </Pressable>
 
-        <View style={s.switchRow}>
-          <Text style={s.switchText}>
-            {mode === 'login' ? 'Hesabın yok mu?' : 'Zaten hesabın var mı?'}
-          </Text>
-          <Pressable onPress={() => {
-            setMode(mode === 'login' ? 'register' : 'login');
-            setError(null);
-            setSuccessMessage(null);
-          }}>
-            <Text style={s.switchLink}>
-              {mode === 'login' ? 'Kayıt Ol' : 'Giriş Yap'}
-            </Text>
-          </Pressable>
-        </View>
+        {mode === 'login' && (
+          <>
+            <View style={s.switchRow}>
+              <Text style={s.switchText}>Hesabın yok mu?</Text>
+              <Pressable onPress={() => { setMode('register'); resetState(); }}>
+                <Text style={s.switchLink}>Kayıt Ol</Text>
+              </Pressable>
+            </View>
+            <Pressable style={s.forgotButton} onPress={() => { setMode('forgot'); resetState(); }}>
+              <Text style={s.forgotText}>Şifremi unuttum</Text>
+            </Pressable>
+          </>
+        )}
 
-        <Pressable style={s.guestButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')}>
-          <Text style={s.guestText}>Şimdilik devam et, giriş yapma</Text>
-        </Pressable>
+        {mode === 'register' && (
+          <View style={s.switchRow}>
+            <Text style={s.switchText}>Zaten hesabın var mı?</Text>
+            <Pressable onPress={() => { setMode('login'); resetState(); }}>
+              <Text style={s.switchLink}>Giriş Yap</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {mode === 'forgot' && (
+          <View style={s.switchRow}>
+            <Pressable onPress={() => { setMode('login'); resetState(); }}>
+              <Text style={s.switchLink}>Giriş ekranına dön</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {mode !== 'forgot' && (
+          <Pressable
+            style={s.guestButton}
+            onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')}
+          >
+            <Text style={s.guestText}>Şimdilik devam et, giriş yapma</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
