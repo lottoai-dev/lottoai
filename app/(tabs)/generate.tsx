@@ -25,6 +25,7 @@ import { Toggle } from '../../components/ui/toggle';
 import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme, GameAccent } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { GameEmblem } from '../../lib/emblems';
 import { GAMES } from '../../lib/games';
 import GameSelector from '../../lib/GameSelector';
@@ -206,6 +207,7 @@ export default function GenerateScreen() {
   const c = theme.colors;
   const s = useMemo(() => makeStyles(theme), [theme]);
   const { showAlert } = useAlert();
+  const { user } = useAuth();
 
   const [selectedGame, setSelectedGame] = useState(GAMES[0]);
   const [generatedNumbers, setGeneratedNumbers] = useState<number[]>([]);
@@ -398,9 +400,15 @@ export default function GenerateScreen() {
       return (entry.superStar ?? null) === (cp.superStar ?? null);
     });
 
-  const handleSaveAllHistory = async () => {
-    setSavingAll(true);
-    try {
+    const handleSaveAllHistory = async () => {
+      if (!user) {
+        softHaptic();
+        setHistoryModal(false);
+        router.push('/login' as any);
+        return;
+      }
+      setSavingAll(true);
+      try {
       const existing = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_COUPONS);
       const coupons = existing ? JSON.parse(existing) : [];
       let savedCount = 0;
@@ -435,6 +443,11 @@ export default function GenerateScreen() {
   const handleSave = async () => {
     if (generatedNumbers.length === 0) {
       showAlert('Uyarı', 'Önce bir kupon üretin.');
+      return;
+    }
+    if (!user) {
+      softHaptic();
+      router.push('/login' as any);
       return;
     }
     const entry = {
