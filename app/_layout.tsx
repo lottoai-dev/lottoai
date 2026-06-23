@@ -1,4 +1,5 @@
 // app/_layout.tsx
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
@@ -107,6 +108,7 @@ function RootContent() {
 
     const subscription = Notifications.addNotificationReceivedListener((notification) => {
       const { title, body, data } = notification.request.content;
+      if (!title && !body) return;
       addBildirim({
         title: title || 'Bildirim',
         body: body || '',
@@ -116,6 +118,7 @@ function RootContent() {
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
       const { title, body, data } = response.notification.request.content;
+      if (!title && !body) return;
       addBildirim({
         title: title || 'Bildirim',
         body: body || '',
@@ -126,10 +129,20 @@ function RootContent() {
       else if (screen === 'generate') router.push('/(tabs)/generate');
     });
 
-    Notifications.getLastNotificationResponseAsync().then((response) => {
+    Notifications.getLastNotificationResponseAsync().then(async (response) => {
       if (!response) return;
-      const { data } = response.notification.request.content;
+      const notifId = response.notification.request.identifier;
+      const lastHandled = await AsyncStorage.getItem('lastHandledNotificationId');
+      if (lastHandled === notifId) return;
+      await AsyncStorage.setItem('lastHandledNotificationId', notifId);
+      const { data, title, body } = response.notification.request.content;
+      if (!title && !body) return;
       const { screen } = data ?? {};
+      addBildirim({
+        title: title || 'Bildirim',
+        body: body || '',
+        screen: screen as string | undefined,
+      });
       if (screen === 'saved') router.push('/(tabs)/saved');
       else if (screen === 'generate') router.push('/(tabs)/generate');
     });
