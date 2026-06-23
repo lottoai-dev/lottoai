@@ -316,7 +316,7 @@ export default function ProfileScreen() {
           <MenuRow Icon={ShieldIcon} color={c.text2} title="Gizlilik politikası" sub="Kişisel verilerin" onPress={() => Linking.openURL('https://lottoai-dev.github.io/lottoai-legal')} />
           <MenuRow Icon={DocIcon} color={c.text2} title="Kullanım koşulları" sub="Uygulama kuralları" onPress={() => Linking.openURL('https://lottoai-dev.github.io/lottoai-legal')} />
           <MenuRow Icon={InfoIcon} color={c.text2} title="Sık sorulan sorular" sub="Uygulama hakkında" onPress={() => router.push('/legal')} />
-          <MenuRow Icon={MailIcon} color={c.text2} title="Bize ulaş" sub="lottoai.destek@gmail.com" onPress={() => Linking.openURL('mailto:lottoai.destek@gmail.com')} />
+          <MenuRow Icon={MailIcon} color={c.text2} title="Bize ulaş" sub="support@getlottoai.app" onPress={() => Linking.openURL('mailto:support@getlottoai.app')} />
           <MenuRow Icon={InfoIcon} color={c.text3} title="Versiyon" sub="1.0.0" last />
         </Surface>
 
