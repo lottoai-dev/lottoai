@@ -14,6 +14,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BrandMark } from '../lib/emblems';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../lib/theme';
 
@@ -22,6 +24,8 @@ type Mode = 'login' | 'register' | 'forgot';
 export default function LoginScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const c = theme.colors;
 
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
@@ -63,7 +67,6 @@ export default function LoginScreen() {
       });
 
       if (error) {
-        console.error('[Supabase Google]', error);
         setError('Google ile giriş yapılamadı. Tekrar dene.');
         return;
       }
@@ -73,7 +76,7 @@ export default function LoginScreen() {
     } catch (err: any) {
       if (isErrorWithCode(err)) {
         if (err.code === statusCodes.SIGN_IN_CANCELLED) {
-          // Kullanıcı iptal etti, hata gösterme
+          // kullanıcı iptal etti
         } else if (err.code === statusCodes.IN_PROGRESS) {
           setError('Giriş işlemi zaten devam ediyor.');
         } else if (err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
@@ -82,7 +85,6 @@ export default function LoginScreen() {
           setError('Google ile giriş yapılamadı. Tekrar dene.');
         }
       } else {
-        console.error('[Google SignIn]', err);
         setError('Bir sorun oluştu. Tekrar dene.');
       }
     } finally {
@@ -97,26 +99,22 @@ export default function LoginScreen() {
       setError('E-posta boş bırakılamaz.');
       return;
     }
-
     if (mode !== 'forgot' && !password.trim()) {
       setError('Şifre boş bırakılamaz.');
       return;
     }
-
     if (mode !== 'forgot' && password.length < 6) {
       setError('Şifre en az 6 karakter olmalıdır.');
       return;
     }
 
     setLoading(true);
-
     try {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
         });
-
         if (error) {
           if (error.message.includes('Invalid login credentials')) {
             setError('E-posta veya şifre hatalı.');
@@ -127,7 +125,6 @@ export default function LoginScreen() {
           }
           return;
         }
-
         router.canGoBack() ? router.back() : router.replace('/(tabs)/home');
 
       } else if (mode === 'register') {
@@ -135,7 +132,6 @@ export default function LoginScreen() {
           email: email.trim(),
           password,
         });
-
         if (error) {
           if (error.message.includes('already registered')) {
             setError('Bu e-posta adresi zaten kayıtlı.');
@@ -146,203 +142,27 @@ export default function LoginScreen() {
           }
           return;
         }
-
         setSuccessMessage('Hesabın oluşturuldu! E-posta adresine bir doğrulama bağlantısı gönderdik. Doğruladıktan sonra giriş yapabilirsin.');
         setMode('login');
         setPassword('');
 
       } else if (mode === 'forgot') {
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
-
         if (error) {
           setError('Şifre sıfırlama maili gönderilemedi. E-posta adresini kontrol et.');
           return;
         }
-
         setSuccessMessage('Şifre sıfırlama bağlantısı e-posta adresine gönderildi. Gelen kutunu kontrol et.');
         setMode('login');
         setEmail('');
         setPassword('');
       }
-    } catch (err) {
+    } catch {
       setError('Bir sorun oluştu. İnternet bağlantını kontrol et.');
     } finally {
       setLoading(false);
     }
   };
-
-  const s = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.bg,
-    },
-    scroll: {
-      flexGrow: 1,
-      justifyContent: 'center',
-      paddingHorizontal: 24,
-      paddingVertical: 40,
-    },
-    backButton: {
-      position: 'absolute',
-      top: 56,
-      left: 20,
-      zIndex: 10,
-      padding: 8,
-    },
-    logo: {
-      alignItems: 'center',
-      marginBottom: 40,
-    },
-    logoIcon: {
-      fontSize: 48,
-      marginBottom: 12,
-    },
-    title: {
-      fontSize: 26,
-      fontWeight: '700',
-      color: theme.colors.text,
-      textAlign: 'center',
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 15,
-      color: theme.colors.text2,
-      textAlign: 'center',
-      marginBottom: 32,
-    },
-    label: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: theme.colors.text,
-      marginBottom: 8,
-    },
-    inputWrapper: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: theme.colors.surface,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      marginBottom: 16,
-      paddingHorizontal: 14,
-    },
-    input: {
-      flex: 1,
-      height: 52,
-      fontSize: 15,
-      color: theme.colors.text,
-    },
-    eyeButton: {
-      padding: 8,
-    },
-    errorBox: {
-      backgroundColor: theme.colors.dangerSoft,
-      borderRadius: 10,
-      padding: 12,
-      marginBottom: 16,
-    },
-    errorText: {
-      color: theme.colors.danger,
-      fontSize: 14,
-      textAlign: 'center',
-    },
-    successBox: {
-      backgroundColor: theme.colors.brandSoft,
-      borderRadius: 10,
-      padding: 12,
-      marginBottom: 16,
-    },
-    successText: {
-      color: theme.colors.brand,
-      fontSize: 14,
-      textAlign: 'center',
-    },
-    submitButton: {
-      backgroundColor: theme.colors.brand,
-      borderRadius: 14,
-      height: 54,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginTop: 8,
-      marginBottom: 16,
-    },
-    submitButtonDisabled: {
-      opacity: 0.6,
-    },
-    submitButtonText: {
-      color: theme.colors.brandText,
-      fontSize: 16,
-      fontWeight: '700',
-    },
-    dividerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      marginBottom: 16,
-    },
-    dividerLine: {
-      flex: 1,
-      height: 1,
-      backgroundColor: theme.colors.border,
-    },
-    dividerText: {
-      fontSize: 13,
-      color: theme.colors.text3,
-    },
-    googleButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 10,
-      backgroundColor: theme.colors.surface,
-      borderRadius: 14,
-      height: 54,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      marginBottom: 24,
-    },
-    googleButtonDisabled: {
-      opacity: 0.6,
-    },
-    googleButtonText: {
-      color: theme.colors.text,
-      fontSize: 15,
-      fontWeight: '600',
-    },
-    switchRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: 4,
-      marginBottom: 12,
-    },
-    switchText: {
-      fontSize: 14,
-      color: theme.colors.text2,
-    },
-    switchLink: {
-      fontSize: 14,
-      color: theme.colors.brand,
-      fontWeight: '600',
-    },
-    forgotButton: {
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    forgotText: {
-      fontSize: 14,
-      color: theme.colors.text2,
-    },
-    guestButton: {
-      marginTop: 8,
-      alignItems: 'center',
-    },
-    guestText: {
-      fontSize: 14,
-      color: theme.colors.text3,
-      textDecorationLine: 'underline',
-    },
-  });
 
   const titles: Record<Mode, string> = {
     login: 'Hoş Geldin!',
@@ -353,7 +173,7 @@ export default function LoginScreen() {
   const subtitles: Record<Mode, string> = {
     login: 'Kuponlarına her yerden eriş',
     register: 'Ücretsiz hesap oluştur, kuponlarını kaydet',
-    forgot: 'E-posta adresini gir, sıfırlama bağlantısı gönderelim',
+    forgot: 'E-postanı gir, sıfırlama bağlantısı gönderelim',
   };
 
   const buttonLabels: Record<Mode, string> = {
@@ -361,6 +181,195 @@ export default function LoginScreen() {
     register: 'Kayıt Ol',
     forgot: 'Sıfırlama Maili Gönder',
   };
+
+  const s = StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    backButton: {
+      position: 'absolute',
+      top: insets.top + 8,
+      left: 16,
+      zIndex: 10,
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    scroll: {
+      flexGrow: 1,
+      paddingHorizontal: 24,
+      paddingTop: insets.top + 60,
+      paddingBottom: insets.bottom + 32,
+    },
+    hero: {
+      alignItems: 'center',
+      marginBottom: 36,
+    },
+    
+    title: {
+      fontFamily: theme.font.extrabold,
+      fontSize: 26,
+      color: c.text,
+      marginBottom: 6,
+    },
+    subtitle: {
+      fontFamily: theme.font.regular,
+      fontSize: 15,
+      color: c.text2,
+      textAlign: 'center',
+    },
+    form: {
+      gap: 4,
+    },
+    label: {
+      fontFamily: theme.font.semibold,
+      fontSize: 13,
+      color: c.text2,
+      marginBottom: 6,
+      marginTop: 12,
+    },
+    inputWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: c.border,
+      paddingHorizontal: 16,
+      height: 52,
+    },
+    inputWrapperFocused: {
+      borderColor: c.brand,
+    },
+    input: {
+      flex: 1,
+      fontFamily: theme.font.regular,
+      fontSize: 15,
+      color: c.text,
+    },
+    eyeButton: { padding: 4 },
+    errorBox: {
+      backgroundColor: c.dangerSoft,
+      borderRadius: 12,
+      padding: 14,
+      marginTop: 12,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+    },
+    errorText: {
+      fontFamily: theme.font.medium,
+      color: c.danger,
+      fontSize: 14,
+      flex: 1,
+      lineHeight: 20,
+    },
+    successBox: {
+      backgroundColor: c.brandSoft,
+      borderRadius: 12,
+      padding: 14,
+      marginTop: 12,
+      borderWidth: 1,
+      borderColor: c.brandBorder,
+    },
+    successText: {
+      fontFamily: theme.font.medium,
+      color: c.brand,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    submitButton: {
+      backgroundColor: c.brand,
+      borderRadius: 14,
+      height: 54,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 20,
+    },
+    submitButtonDisabled: { opacity: 0.6 },
+    submitButtonText: {
+      fontFamily: theme.font.bold,
+      color: c.brandText,
+      fontSize: 16,
+    },
+    dividerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginTop: 20,
+    },
+    dividerLine: { flex: 1, height: 1, backgroundColor: c.hairline },
+    dividerText: {
+      fontFamily: theme.font.medium,
+      fontSize: 13,
+      color: c.text3,
+    },
+    googleButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      height: 54,
+      borderWidth: 1,
+      borderColor: c.border,
+      marginTop: 12,
+    },
+    googleButtonDisabled: { opacity: 0.6 },
+    googleLetter: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: '#4285F4',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    googleLetterText: {
+      color: '#fff',
+      fontSize: 12,
+      fontFamily: theme.font.bold,
+    },
+    googleButtonText: {
+      fontFamily: theme.font.semibold,
+      color: c.text,
+      fontSize: 15,
+    },
+    footer: {
+      marginTop: 28,
+      gap: 14,
+      alignItems: 'center',
+    },
+    switchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    switchText: {
+      fontFamily: theme.font.regular,
+      fontSize: 14,
+      color: c.text2,
+    },
+    switchLink: {
+      fontFamily: theme.font.bold,
+      fontSize: 14,
+      color: c.brand,
+    },
+    forgotText: {
+      fontFamily: theme.font.medium,
+      fontSize: 14,
+      color: c.text3,
+    },
+    guestText: {
+      fontFamily: theme.font.medium,
+      fontSize: 13,
+      color: c.text3,
+      textDecorationLine: 'underline',
+    },
+  });
 
   return (
     <KeyboardAvoidingView
@@ -371,142 +380,149 @@ export default function LoginScreen() {
         style={s.backButton}
         onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')}
       >
-        <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        <Ionicons name="arrow-back" size={20} color={c.text2} />
       </Pressable>
 
-      <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-        <View style={s.logo}>
-          <Text style={s.logoIcon}>🍀</Text>
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero */}
+        <View style={s.hero}>
+        <BrandMark size={72} />
           <Text style={s.title}>{titles[mode]}</Text>
           <Text style={s.subtitle}>{subtitles[mode]}</Text>
         </View>
 
-        <Text style={s.label}>E-posta</Text>
-        <View style={s.inputWrapper}>
-          <TextInput
-            style={s.input}
-            placeholder="ornek@email.com"
-            placeholderTextColor={theme.colors.text3}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+        {/* Form */}
+        <View style={s.form}>
+          <Text style={s.label}>E-POSTA</Text>
+          <View style={s.inputWrapper}>
+            <TextInput
+              style={s.input}
+              placeholder="ornek@email.com"
+              placeholderTextColor={c.text3}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          {mode !== 'forgot' && (
+            <>
+              <Text style={s.label}>ŞİFRE</Text>
+              <View style={s.inputWrapper}>
+                <TextInput
+                  style={s.input}
+                  placeholder="En az 6 karakter"
+                  placeholderTextColor={c.text3}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!passwordVisible}
+                  autoCapitalize="none"
+                />
+                <Pressable style={s.eyeButton} onPress={() => setPasswordVisible(!passwordVisible)}>
+                  <Ionicons
+                    name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={c.text3}
+                  />
+                </Pressable>
+              </View>
+            </>
+          )}
+
+          {error && (
+            <View style={s.errorBox}>
+              <Ionicons name="alert-circle-outline" size={18} color={c.danger} />
+              <Text style={s.errorText}>{error}</Text>
+            </View>
+          )}
+
+          {successMessage && (
+            <View style={s.successBox}>
+              <Text style={s.successText}>{successMessage}</Text>
+            </View>
+          )}
+
+          <Pressable
+            style={[s.submitButton, loading && s.submitButtonDisabled]}
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            {loading
+              ? <ActivityIndicator color={c.brandText} />
+              : <Text style={s.submitButtonText}>{buttonLabels[mode]}</Text>
+            }
+          </Pressable>
+
+          {mode !== 'forgot' && (
+            <>
+              <View style={s.dividerRow}>
+                <View style={s.dividerLine} />
+                <Text style={s.dividerText}>veya</Text>
+                <View style={s.dividerLine} />
+              </View>
+
+              <Pressable
+                style={[s.googleButton, googleLoading && s.googleButtonDisabled]}
+                onPress={handleGoogleSignIn}
+                disabled={googleLoading}
+              >
+                {googleLoading
+                  ? <ActivityIndicator color={c.text} />
+                  : (
+                    <>
+                      <Ionicons name="logo-google" size={20} color="#4285F4" />
+                      <Text style={s.googleButtonText}>Google ile devam et</Text>
+                    </>
+                  )
+                }
+              </Pressable>
+            </>
+          )}
         </View>
 
-        {mode !== 'forgot' && (
-          <>
-            <Text style={s.label}>Şifre</Text>
-            <View style={s.inputWrapper}>
-              <TextInput
-                style={s.input}
-                placeholder="En az 6 karakter"
-                placeholderTextColor={theme.colors.text3}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!passwordVisible}
-                autoCapitalize="none"
-              />
-              <Pressable style={s.eyeButton} onPress={() => setPasswordVisible(!passwordVisible)}>
-                <Ionicons
-                  name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color={theme.colors.text2}
-                />
+        {/* Footer */}
+        <View style={s.footer}>
+          {mode === 'login' && (
+            <>
+              <View style={s.switchRow}>
+                <Text style={s.switchText}>Hesabın yok mu?</Text>
+                <Pressable onPress={() => { setMode('register'); resetState(); }}>
+                  <Text style={s.switchLink}>Kayıt Ol</Text>
+                </Pressable>
+              </View>
+              <Pressable onPress={() => { setMode('forgot'); resetState(); }}>
+                <Text style={s.forgotText}>Şifremi unuttum</Text>
               </Pressable>
-            </View>
-          </>
-        )}
-
-        {error && (
-          <View style={s.errorBox}>
-            <Text style={s.errorText}>{error}</Text>
-          </View>
-        )}
-
-        {successMessage && (
-          <View style={s.successBox}>
-            <Text style={s.successText}>{successMessage}</Text>
-          </View>
-        )}
-
-        <Pressable
-          style={[s.submitButton, loading && s.submitButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color={theme.colors.brandText} />
-          ) : (
-            <Text style={s.submitButtonText}>{buttonLabels[mode]}</Text>
+            </>
           )}
-        </Pressable>
 
-        {mode !== 'forgot' && (
-          <>
-            <View style={s.dividerRow}>
-              <View style={s.dividerLine} />
-              <Text style={s.dividerText}>veya</Text>
-              <View style={s.dividerLine} />
-            </View>
-
-            <Pressable
-              style={[s.googleButton, googleLoading && s.googleButtonDisabled]}
-              onPress={handleGoogleSignIn}
-              disabled={googleLoading}
-            >
-              {googleLoading ? (
-                <ActivityIndicator color={theme.colors.text} />
-              ) : (
-                <>
-                  <Ionicons name="logo-google" size={20} color="#4285F4" />
-                  <Text style={s.googleButtonText}>Google ile devam et</Text>
-                </>
-              )}
-            </Pressable>
-          </>
-        )}
-
-        {mode === 'login' && (
-          <>
+          {mode === 'register' && (
             <View style={s.switchRow}>
-              <Text style={s.switchText}>Hesabın yok mu?</Text>
-              <Pressable onPress={() => { setMode('register'); resetState(); }}>
-                <Text style={s.switchLink}>Kayıt Ol</Text>
+              <Text style={s.switchText}>Zaten hesabın var mı?</Text>
+              <Pressable onPress={() => { setMode('login'); resetState(); }}>
+                <Text style={s.switchLink}>Giriş Yap</Text>
               </Pressable>
             </View>
-            <Pressable style={s.forgotButton} onPress={() => { setMode('forgot'); resetState(); }}>
-              <Text style={s.forgotText}>Şifremi unuttum</Text>
-            </Pressable>
-          </>
-        )}
+          )}
 
-        {mode === 'register' && (
-          <View style={s.switchRow}>
-            <Text style={s.switchText}>Zaten hesabın var mı?</Text>
-            <Pressable onPress={() => { setMode('login'); resetState(); }}>
-              <Text style={s.switchLink}>Giriş Yap</Text>
-            </Pressable>
-          </View>
-        )}
-
-        {mode === 'forgot' && (
-          <View style={s.switchRow}>
+          {mode === 'forgot' && (
             <Pressable onPress={() => { setMode('login'); resetState(); }}>
               <Text style={s.switchLink}>Giriş ekranına dön</Text>
             </Pressable>
-          </View>
-        )}
+          )}
 
-        {mode !== 'forgot' && (
-          <Pressable
-            style={s.guestButton}
-            onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')}
-          >
-            <Text style={s.guestText}>Şimdilik devam et, giriş yapma</Text>
-          </Pressable>
-        )}
+          {mode !== 'forgot' && (
+            <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')}>
+              <Text style={s.guestText}>Şimdilik devam et, giriş yapma</Text>
+            </Pressable>
+          )}
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
