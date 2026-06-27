@@ -64,6 +64,10 @@ function AutoGlyph({ color }: { color: string }) {
   );
 }
 
+const LEGAL_URL = 'https://lottoai-dev.github.io/lottoai-legal';
+const PRIVACY_URL = `${LEGAL_URL}?tab=privacy`;
+const TERMS_URL = `${LEGAL_URL}?tab=terms`;
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -189,7 +193,6 @@ export default function ProfileScreen() {
           <Text style={s.title}>Profil</Text>
         </View>
 
-        {/* Giriş yapılmamışsa banner göster */}
         {!user && (
           <Pressable
             onPress={() => { softHaptic(); router.push('/login' as any); }}
@@ -313,14 +316,13 @@ export default function ProfileScreen() {
 
         <Surface style={s.card}>
           <Text style={s.cardLabel}>HAKKINDA</Text>
-          <MenuRow Icon={ShieldIcon} color={c.text2} title="Gizlilik politikası" sub="Kişisel verilerin" onPress={() => Linking.openURL('https://lottoai-dev.github.io/lottoai-legal')} />
-          <MenuRow Icon={DocIcon} color={c.text2} title="Kullanım koşulları" sub="Uygulama kuralları" onPress={() => Linking.openURL('https://lottoai-dev.github.io/lottoai-legal')} />
+          <MenuRow Icon={ShieldIcon} color={c.text2} title="Gizlilik politikası" sub="Kişisel verilerin" onPress={() => Linking.openURL(PRIVACY_URL)} />
+          <MenuRow Icon={DocIcon} color={c.text2} title="Kullanım koşulları" sub="Uygulama kuralları" onPress={() => Linking.openURL(TERMS_URL)} />
           <MenuRow Icon={InfoIcon} color={c.text2} title="Sık sorulan sorular" sub="Uygulama hakkında" onPress={() => router.push('/legal')} />
           <MenuRow Icon={MailIcon} color={c.text2} title="Bize ulaş" sub="support@getlottoai.app" onPress={() => Linking.openURL('mailto:support@getlottoai.app')} />
           <MenuRow Icon={InfoIcon} color={c.text3} title="Versiyon" sub="1.0.0" last />
         </Surface>
 
-        {/* Çıkış yap butonu — sadece giriş yapılmışsa göster */}
         {user && (
           <PressableScale
             onPress={() => { softHaptic(); handleSignOut(); }}
