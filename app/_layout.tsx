@@ -16,6 +16,17 @@ import { logError } from '../lib/logger';
 import { supabase } from '../lib/supabase';
 import { ThemeProvider, useTheme } from '../lib/theme';
 
+const PENDING_NOTIFICATIONS_KEY = 'pendingNotifications';
+// Bildirim handler'ı — uygulama açıkken bildirimleri göster
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 async function registerPushToken() {
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -56,6 +67,16 @@ async function registerPushToken() {
   }
 }
 
+// Bildirimi bekleyen listeye kaydet (uygulama kapalıyken gelenleri sakla)
+async function savePendingNotification(title: string, body: string, screen?: string) {
+  try {
+    const existing = await AsyncStorage.getItem(PENDING_NOTIFICATIONS_KEY);
+    const pending = existing ? JSON.parse(existing) : [];
+    pending.push({ title, body, screen, savedAt: new Date().toISOString() });
+    await AsyncStorage.setItem(PENDING_NOTIFICATIONS_KEY, JSON.stringify(pending));
+  } catch {}
+}
+
 function RootContent() {
   const router = useRouter();
   const theme = useTheme();
@@ -66,11 +87,9 @@ function RootContent() {
   useEffect(() => {
     registerPushToken();
 
-    // Deep link ile gelen auth token'ı yakala (e-posta doğrulama, şifre sıfırlama)
+    // Deep link ile gelen auth token'ı yakala
     const handleDeepLink = async (url: string) => {
       if (!url) return;
-
-      // URL'den token parametrelerini çıkar
       if (url.includes('access_token') || url.includes('token_hash') || url.includes('type=signup') || url.includes('type=recovery')) {
         try {
           const urlObj = new URL(url);
@@ -96,16 +115,15 @@ function RootContent() {
       }
     };
 
-    // Uygulama kapalıyken gelen deep link
     Linking.getInitialURL().then((url) => {
       if (url) handleDeepLink(url);
     });
 
-    // Uygulama açıkken gelen deep link
     const linkingSub = Linking.addEventListener('url', ({ url }) => {
       handleDeepLink(url);
     });
 
+    // Uygulama açıkken gelen bildirimler
     const subscription = Notifications.addNotificationReceivedListener((notification) => {
       const { title, body, data } = notification.request.content;
       if (!title && !body) return;
@@ -116,6 +134,7 @@ function RootContent() {
       });
     });
 
+    // Kullanıcı bildirime tıklayınca
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
       const { title, body, data } = response.notification.request.content;
       if (!title && !body) return;
@@ -129,8 +148,28 @@ function RootContent() {
       else if (screen === 'generate') router.push('/(tabs)/generate');
     });
 
+    // Uygulama kapalıyken gelen ve tıklanmayan bildirimleri işle
     Notifications.getLastNotificationResponseAsync().then(async (response) => {
-      if (!response) return;
+      if (!response) {
+        // Kullanıcı bildirime tıklamadan uygulamayı açtı
+        // Bekleyen bildirimleri AsyncStorage'dan yükle
+        try {
+          const pending = await AsyncStorage.getItem(PENDING_NOTIFICATIONS_KEY);
+          if (pending) {
+            const pendingList = JSON.parse(pending);
+            for (const notif of pendingList) {
+              addBildirim({
+                title: notif.title,
+                body: notif.body,
+                screen: notif.screen,
+              });
+            }
+            await AsyncStorage.removeItem(PENDING_NOTIFICATIONS_KEY);
+          }
+        } catch {}
+        return;
+      }
+
       const notifId = response.notification.request.identifier;
       const lastHandled = await AsyncStorage.getItem('lastHandledNotificationId');
       if (lastHandled === notifId) return;
