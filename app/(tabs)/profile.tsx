@@ -64,9 +64,9 @@ function AutoGlyph({ color }: { color: string }) {
   );
 }
 
-const LEGAL_URL = 'https://lottoai-dev.github.io/lottoai-legal';
-const PRIVACY_URL = `${LEGAL_URL}?tab=privacy`;
-const TERMS_URL = `${LEGAL_URL}?tab=terms`;
+const LEGAL_URL = 'https://getlottoai.app/legal';
+const PRIVACY_URL = `${LEGAL_URL}`;
+const TERMS_URL = `${LEGAL_URL}`;
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();

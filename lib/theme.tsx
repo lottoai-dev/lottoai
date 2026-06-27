@@ -2,7 +2,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from 'react-native';
-
 import { STORAGE_KEYS } from '../constants/storage-keys';
 import { AppTheme, ThemeMode, themes } from '../constants/theme';
 
@@ -15,7 +14,9 @@ interface ThemeContextValue {
   setPref: (p: Pref) => void;
 }
 
-const ThemeContext = createContext<ThemeContextValue | null>(null);
+// Tema context'ini ikiye böl — sık değişen ve az değişen
+const ThemeValueContext = createContext<{ theme: AppTheme; mode: ThemeMode } | null>(null);
+const ThemeControlContext = createContext<{ pref: Pref; setPref: (p: Pref) => void } | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const system = useColorScheme();
@@ -24,7 +25,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEYS.THEME_PREF)
       .then((v) => {
-        if (v === 'light' || v === 'dark' || v === 'system') setPrefState(v);
+        if (v === 'light' || v === 'dark' || v === 'system') {
+          setPrefState(v);
+        }
       })
       .catch(() => {});
   }, []);
@@ -34,24 +37,31 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEYS.THEME_PREF, p).catch(() => {});
   }, []);
 
-  const mode: ThemeMode = pref === 'system' ? (system === 'dark' ? 'dark' : 'light') : pref;
+  const mode: ThemeMode = pref === 'system'
+    ? (system === 'dark' ? 'dark' : 'light')
+    : pref;
 
-  const value = useMemo<ThemeContextValue>(
-    () => ({ theme: themes[mode], mode, pref, setPref }),
-    [mode, pref, setPref]
+  const themeValue = useMemo(() => ({ theme: themes[mode], mode }), [mode]);
+  const controlValue = useMemo(() => ({ pref, setPref }), [pref, setPref]);
+
+  return (
+    <ThemeValueContext.Provider value={themeValue}>
+      <ThemeControlContext.Provider value={controlValue}>
+        {children}
+      </ThemeControlContext.Provider>
+    </ThemeValueContext.Provider>
   );
-
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme(): AppTheme {
-  const ctx = useContext(ThemeContext);
+  const ctx = useContext(ThemeValueContext);
   if (!ctx) throw new Error('useTheme must be used within ThemeProvider');
   return ctx.theme;
 }
 
 export function useThemeControls() {
-  const ctx = useContext(ThemeContext);
-  if (!ctx) throw new Error('useThemeControls must be used within ThemeProvider');
-  return ctx;
+  const themeCtx = useContext(ThemeValueContext);
+  const controlCtx = useContext(ThemeControlContext);
+  if (!themeCtx || !controlCtx) throw new Error('useThemeControls must be used within ThemeProvider');
+  return { ...themeCtx, ...controlCtx };
 }
