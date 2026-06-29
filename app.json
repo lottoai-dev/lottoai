@@ -4,19 +4,19 @@
     "slug": "luckypick",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/LottoAI-AppStore-1024.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "description": "LottoAI, Türkiye'nin en akıllı loto asistanı! Çılgın Sayısal Loto, Süper Loto, Şans Topu ve On Numara için akıllı kuponlar üret, çekiliş sonuçlarını anında takip et, detaylı istatistikler ve AI analizi ile şansını artır. 18 yaş ve üzeri içindir. Şans oyunları bağımlılık yapabilir, sorumlu oynayın.",
     "primaryColor": "#1C9E73",
-    "privacy": "https://lottoai-dev.github.io/lottoai-legal/",
+    "privacy": "https://getlottoai.app/legal",
     "keywords": ["loto", "kupon", "çekiliş", "sayısal", "şans", "istatistik", "analiz", "AI"],
     "categories": ["utilities", "entertainment"],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.lottoai.app",
       "buildNumber": "1",
-      "icon": "./assets/images/ios-icon.png",
+      "icon": "./assets/images/LottoAI-iOS-180.png",
       "infoPlist": {
         "NSUserNotificationsUsageDescription": "Çekiliş saatlerinde hatırlatıcı bildirimi almak için izin gereklidir.",
         "ITSAppUsesNonExemptEncryption": false
@@ -52,7 +52,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon-192.png"
+      "favicon": "./assets/images/LottoAI-favicon-192.png"
     },
     "plugins": [
       "expo-router",
@@ -72,8 +72,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
-          "color": "#6C63FF",
+          "icon": "./assets/images/LottoAI-AppStore-1024.png",
+          "color": "#1C9E73",
           "sounds": []
         }
       ],

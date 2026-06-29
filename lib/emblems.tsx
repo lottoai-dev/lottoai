@@ -50,7 +50,7 @@ export const GameEmblem = React.memo(function GameEmblem({ game, size = 40 }: Em
 export function BrandMark({ size = 40 }: { size?: number }) {
   return (
     <Image
-      source={require('../assets/images/icon.png')}
+    source={require('../assets/images/LottoAI-AppStore-1024.png')}
       style={[styles.brandImage, { width: size, height: size, borderRadius: size * 0.3 }]}
       resizeMode="contain"
     />
