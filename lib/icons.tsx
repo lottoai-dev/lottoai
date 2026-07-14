@@ -56,11 +56,22 @@ export function ProfileIcon({ color, size = 24, active }: IconProps) {
 
 /* ---------------- Feature icons ---------------- */
 export function AIAssistantIcon({ color, size = 24 }: IconProps) {
+  const petal = color + '40';
   return (
     <Svg {...base(size)}>
-      <Path d="M12 4.5l1.4 3.6 3.6 1.4-3.6 1.4L12 14.5l-1.4-3.6L7 9.5l3.6-1.4L12 4.5z" fill={color} />
-      <Circle cx={6} cy={17} r={1.6} fill={color} />
-      <Circle cx={18} cy={16.5} r={1.1} fill={color} />
+      <Circle cx={12} cy={7.8} r={3.2} fill={petal} />
+      <Circle cx={16.2} cy={12} r={3.2} fill={petal} />
+      <Circle cx={12} cy={16.2} r={3.2} fill={petal} />
+      <Circle cx={7.8} cy={12} r={3.2} fill={petal} />
+      <Path
+        d="M12 7l1.3 3.8 3.8 1.3-3.8 1.3L12 17l-1.3-3.8-3.8-1.3 3.8-1.3L12 7z"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        fill={color}
+      />
+      <Circle cx={18.8} cy={5.2} r={1.15} fill={color} />
+      <Circle cx={5.2} cy={18.2} r={0.95} fill={color} />
     </Svg>
   );
 }
@@ -183,6 +194,20 @@ export function TrashIcon({ color, size = 24, strokeWidth = 1.7 }: IconProps) {
     <Svg {...base(size)}>
       <Path d="M4 6.5h16M9 6.5V4.5a1.5 1.5 0 011.5-1.5h3A1.5 1.5 0 0115 4.5v2M6.5 6.5l.8 13a1.5 1.5 0 001.5 1.4h6.4a1.5 1.5 0 001.5-1.4l.8-13"
         stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function LogOutIcon({ color, size = 24, strokeWidth = 1.8 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path
+        d="M10 5.5H6.5A1.5 1.5 0 005 7v10a1.5 1.5 0 001.5 1.5H10M14 8.5l4 3.5-4 3.5M18 12H10"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </Svg>
   );
 }
@@ -338,13 +363,10 @@ export function BackIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
 export function ShareIcon({ color, size = 24, strokeWidth = 1.8 }: IconProps) {
   return (
     <Svg {...base(size)}>
-      <Path
-        d="M12 3v13M7 8l5-5 5 5M8 17H6a2 2 0 00-2 2v1a1 1 0 001 1h14a1 1 0 001-1v-1a2 2 0 00-2-2h-2"
-        stroke={color}
-        strokeWidth={strokeWidth}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <Circle cx={18} cy={5} r={2.5} stroke={color} strokeWidth={strokeWidth} />
+      <Circle cx={6} cy={12} r={2.5} stroke={color} strokeWidth={strokeWidth} />
+      <Circle cx={18} cy={19} r={2.5} stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M8.4 10.8l7.2-4.1M8.4 13.2l7.2 4.1" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
     </Svg>
   );
 }

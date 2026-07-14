@@ -118,6 +118,7 @@ export default function TabLayout() {
 
       {/* Secondary screens reachable via navigation, hidden from the bar */}
       <Tabs.Screen name="ai-assistant" options={{ href: null }} />
+      <Tabs.Screen name="bildirimler" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="legal" options={{ href: null }} />
     </Tabs>

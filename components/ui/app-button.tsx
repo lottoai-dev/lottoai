@@ -1,10 +1,9 @@
 // components/ui/app-button.tsx
-// Primary/secondary/ghost button with press-scale animation.
+// Primary/secondary/ghost button.
 
-import React, { useRef } from 'react';
+import React from 'react';
 import {
   ActivityIndicator,
-  Animated,
   Pressable,
   StyleSheet,
   Text,
@@ -43,7 +42,6 @@ export function AppButton({
 }) {
   const theme = useTheme();
   const c = theme.colors;
-  const scale = useRef(new Animated.Value(1)).current;
 
   const brand = accent ?? c.brand;
   const height = size === 'lg' ? 52 : size === 'md' ? 46 : 40;
@@ -56,15 +54,10 @@ export function AppButton({
   if (variant === 'secondary') { bg = c.surfaceAlt; fg = c.text; border = { borderWidth: 1, borderColor: c.border }; }
   if (variant === 'ghost') { bg = 'transparent'; fg = brand; }
 
-  const press = (to: number) =>
-    Animated.spring(scale, { toValue: to, useNativeDriver: true, speed: 40, bounciness: 0 }).start();
-
   return (
-    <Animated.View style={[{ transform: [{ scale }] }, fullWidth && { width: '100%' }, style]}>
+    <View style={[fullWidth && { width: '100%' }, style]}>
       <Pressable
         disabled={disabled || loading}
-        onPressIn={() => press(0.96)}
-        onPressOut={() => press(1)}
         onPress={() => {
           onPress?.();
         }}
@@ -93,7 +86,7 @@ export function AppButton({
           </View>
         )}
       </Pressable>
-    </Animated.View>
+    </View>
   );
 }
 

@@ -28,7 +28,12 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 export async function safeQuery<T>(
-  queryFn: () => Promise<{ data: T | null; error: any }>,
+  // Supabase'in sorgu nesnesi (.from().select()...) gerçek bir Promise değil,
+  // kendi then() metodunu uygulayan bir "thenable" — PromiseLike bunu doğru
+  // kabul ediyor, Promise ise TypeScript'te reddediyordu (bkz. StatisticsTab.tsx
+  // ve benzer ekranlardaki data.length/forEach hataları — hepsi bu tek satırın
+  // yan etkisiydi, runtime'da hiçbir sorun yoktu, sadece tip çıkarımı bozuktu).
+  queryFn: () => PromiseLike<{ data: T | null; error: any }>,
   errorMessage = 'Veriler yüklenirken bir sorun oluştu.'
 ): Promise<{ data: T | null; error: string | null }> {
   try {

@@ -1,23 +1,18 @@
 // components/results/ResultsTab.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { NumberBall } from '../ui/number-ball';
-import { AppButton } from '../ui/app-button';
-import { PressableScale, Surface } from '../ui/surface';
-import { EmptyState, ErrorState, LoadingState } from '../ui/states';
 import { AppTheme, GameAccent } from '../../constants/theme';
-import { GameEmblem } from '../../lib/emblems';
 import type { Game } from '../../lib/games';
 import { CalendarIcon, ChevronDownIcon } from '../../lib/icons';
 import { safeQuery, supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import { AppButton } from '../ui/app-button';
+import { NumberBall } from '../ui/number-ball';
+import { EmptyState, ErrorState, LoadingState } from '../ui/states';
+import { PressableScale, Surface } from '../ui/surface';
 
 type DrawResult = {
   id: number;
@@ -105,7 +100,6 @@ export function ResultsTab({ game, onSeen }: { game: Game; onSeen: (gameName: st
   }, [game.id]);
 
   const toggle = (id: number) => {
-    LayoutAnimation.configureNext(LayoutAnimation.create(180, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
     setExpanded(expanded === id ? null : id);
   };
 
@@ -183,13 +177,13 @@ export function ResultsTab({ game, onSeen }: { game: Game; onSeen: (gameName: st
               {latest.bonus && latest.bonus !== '-' ? (
                 <View style={s.bonusRow}>
                   <Text style={s.bonusLabel}>{bonusLabel}</Text>
-                  <NumberBall value={latest.bonus} variant="bonus" size={36} />
+                  <NumberBall value={latest.bonus} variant="bonus" size={40} />
                 </View>
               ) : null}
               {latest.superstar != null && latest.superstar > 0 ? (
                 <View style={s.bonusRow}>
                   <Text style={s.bonusLabel}>SüperStar</Text>
-                  <NumberBall value={latest.superstar} variant="star" size={36} />
+                  <NumberBall value={latest.superstar} variant="star" size={40} />
                 </View>
               ) : null}
             </View>

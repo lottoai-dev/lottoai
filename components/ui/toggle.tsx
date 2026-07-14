@@ -1,6 +1,6 @@
 // components/ui/toggle.tsx
-import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable } from 'react-native';
+import React from 'react';
+import { Pressable, View } from 'react-native';
 import { useTheme } from '../../lib/theme';
 
 export function Toggle({
@@ -15,14 +15,6 @@ export function Toggle({
   const theme = useTheme();
   const c = theme.colors;
   const on = accent ?? c.brand;
-  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.spring(anim, { toValue: value ? 1 : 0, useNativeDriver: false, speed: 30, bounciness: 4 }).start();
-  }, [value, anim]);
-
-  const bg = anim.interpolate({ inputRange: [0, 1], outputRange: [c.border, on] });
-  const x = anim.interpolate({ inputRange: [0, 1], outputRange: [3, 21] });
 
   return (
     <Pressable
@@ -31,14 +23,22 @@ export function Toggle({
       }}
       hitSlop={8}
     >
-      <Animated.View style={{ width: 46, height: 28, borderRadius: 14, backgroundColor: bg, justifyContent: 'center' }}>
-        <Animated.View
+      <View
+        style={{
+          width: 46,
+          height: 28,
+          borderRadius: 14,
+          backgroundColor: value ? on : c.border,
+          justifyContent: 'center',
+        }}
+      >
+        <View
           style={{
             width: 22,
             height: 22,
             borderRadius: 11,
             backgroundColor: '#fff',
-            transform: [{ translateX: x }],
+            transform: [{ translateX: value ? 21 : 3 }],
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.25,
@@ -46,7 +46,7 @@ export function Toggle({
             elevation: 2,
           }}
         />
-      </Animated.View>
+      </View>
     </Pressable>
   );
 }

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -20,6 +21,9 @@ import { supabase } from '../lib/supabase';
 import { useTheme } from '../lib/theme';
 
 type Mode = 'login' | 'register' | 'forgot';
+
+const TERMS_URL = 'https://getlottoai.app/legal#terms';
+const PRIVACY_URL = 'https://getlottoai.app/legal';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -369,6 +373,19 @@ export default function LoginScreen() {
       color: c.text3,
       textDecorationLine: 'underline',
     },
+    consentText: {
+      fontFamily: theme.font.regular,
+      fontSize: 12.5,
+      color: c.text3,
+      textAlign: 'center',
+      lineHeight: 18,
+      marginTop: 14,
+    },
+    consentLink: {
+      fontFamily: theme.font.semibold,
+      color: c.text2,
+      textDecorationLine: 'underline',
+    },
   });
 
   return (
@@ -446,6 +463,20 @@ export default function LoginScreen() {
             <View style={s.successBox}>
               <Text style={s.successText}>{successMessage}</Text>
             </View>
+          )}
+
+          {mode !== 'forgot' && (
+            <Text style={s.consentText}>
+              {mode === 'register' ? 'Kayıt olarak' : 'Giriş yaparak veya hesap oluşturarak'}{' '}
+              <Text style={s.consentLink} onPress={() => Linking.openURL(TERMS_URL)}>
+                Kullanım Koşulları
+              </Text>
+              {"'"}nı ve{' '}
+              <Text style={s.consentLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
+                Gizlilik Politikası
+              </Text>
+              {"'"}nı kabul etmiş, 18 yaşından büyük olduğunu beyan etmiş olursun.
+            </Text>
           )}
 
           <Pressable

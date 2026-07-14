@@ -6,9 +6,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated,
-  Easing,
-  LayoutAnimation,
   Modal,
   Platform,
   Pressable,
@@ -16,13 +13,13 @@ import {
   Share,
   StyleSheet,
   Text,
-  UIManager,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '../../components/ui/app-button';
 import { NumberBall } from '../../components/ui/number-ball';
+import { Segmented } from '../../components/ui/segmented';
 import { EmptyState, LoadingState } from '../../components/ui/states';
 import { PressableScale, Surface } from '../../components/ui/surface';
 import { STORAGE_KEYS } from '../../constants/storage-keys';
@@ -36,10 +33,6 @@ import { CloseIcon, ShareIcon, StatsIcon, TicketIcon, TrashIcon, TrophyIcon } fr
 import { formatPrize, getPrizeTable, type PrizeEstimate } from '../../lib/prizeEstimates';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 function softHaptic() {
   if (Platform.OS === 'android') {
@@ -79,6 +72,12 @@ type FilterStatus = 'all' | 'pending' | 'checked';
 
 function parseNumbers(str: string): number[] {
   return str.split(' - ').map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
+}
+
+function matchesFilter(coupon: Coupon, filter: FilterStatus): boolean {
+  if (filter === 'all') return true;
+  const isPending = coupon.matchedCount === undefined || coupon.matchedCount === null;
+  return filter === 'pending' ? isPending : !isPending;
 }
 
 export default function SavedScreen() {
@@ -238,17 +237,31 @@ export default function SavedScreen() {
     }, [autoCheckAllPending, user])
   );
 
-  const filteredCoupons = useMemo(() => {
-    let result = coupons;
-    if (filterStatus === 'pending') result = result.filter((cp) => cp.matchedCount === undefined || cp.matchedCount === null);
-    else if (filterStatus === 'checked') result = result.filter((cp) => cp.matchedCount !== undefined && cp.matchedCount !== null);
-    return result;
-  }, [coupons, filterStatus]);
+  const handleFilterChange = useCallback((key: FilterStatus) => {
+    if (key === filterStatus) return;
+    softHaptic();
+    setFilterStatus(key);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [filterStatus]);
+
+  const filteredCoupons = useMemo(
+    () => coupons.filter((cp) => matchesFilter(cp, filterStatus)),
+    [coupons, filterStatus]
+  );
 
   const totalCoupons = filteredCoupons.length;
   const bestResult = coupons.reduce((max, cp) => Math.max(max, cp.matchedCount || 0), 0);
   const pendingCount = coupons.filter((cp) => cp.matchedCount === undefined || cp.matchedCount === null).length;
   const checkedCount = coupons.length - pendingCount;
+
+  const filterOptions = useMemo(
+    () => [
+      { key: 'all', label: `Tümü (${coupons.length})` },
+      { key: 'pending', label: `Bekleyen (${pendingCount})` },
+      { key: 'checked', label: `Kontrol (${checkedCount})` },
+    ],
+    [coupons.length, pendingCount, checkedCount]
+  );
 
   const handleDelete = (id: number) => {
     showAlert('Kuponu sil', 'Bu kupon kalıcı olarak silinecek.', [
@@ -258,7 +271,6 @@ export default function SavedScreen() {
         style: 'destructive',
         onPress: async () => {
           softHaptic();
-          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           const updated = coupons.filter((cp) => cp.id !== id);
           setCoupons(updated);
           await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(updated));
@@ -368,20 +380,11 @@ export default function SavedScreen() {
               <Stat value={String(bestResult)} label="En iyi" color={c.gold} theme={theme} />
             </Surface>
 
-            <View style={s.statusRow}>
-              {([['all', `Tümü (${coupons.length})`], ['pending', `Bekleyen (${pendingCount})`], ['checked', `Kontrol (${checkedCount})`]] as [FilterStatus, string][]).map(([key, label]) => {
-                const active = filterStatus === key;
-                return (
-                  <Pressable
-                    key={key}
-                    onPress={() => { softHaptic(); setFilterStatus(key); }}
-                    style={[s.statusBtn, { backgroundColor: active ? c.brand : c.surface, borderColor: active ? c.brand : c.border }]}
-                  >
-                    <Text style={[s.statusBtnText, { color: active ? c.brandText : c.text2 }]} numberOfLines={1}>{label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <Segmented
+              options={filterOptions}
+              value={filterStatus}
+              onChange={(key) => handleFilterChange(key as FilterStatus)}
+            />
 
             <View style={s.topRow}>
               <Text style={s.sectionTitle}>{totalCoupons} kupon</Text>
@@ -390,7 +393,7 @@ export default function SavedScreen() {
               </Pressable>
             </View>
 
-            {filteredCoupons.length === 0 ? (
+            {totalCoupons === 0 ? (
               <EmptyState
                 icon={<TicketIcon color={c.brand} size={30} />}
                 title={filterStatus === 'pending' ? 'Bekleyen kupon yok' : filterStatus === 'checked' ? 'Kontrol edilmiş kupon yok' : 'Kupon bulunamadı'}
@@ -415,7 +418,7 @@ export default function SavedScreen() {
         )}
       </ScrollView>
 
-      <Modal visible={checkModal} transparent animationType="slide" onRequestClose={() => setCheckModal(false)}>
+      <Modal visible={checkModal} transparent animationType="none" onRequestClose={() => setCheckModal(false)}>
         <View style={[s.overlay, { backgroundColor: c.overlay }]}>
           <View style={[s.sheet, { backgroundColor: c.surface, paddingBottom: insets.bottom + 16 }]}>
             <View style={s.grabber} />
@@ -523,14 +526,8 @@ const CouponTicket = React.memo(function CouponTicket({
   const isChecked = coupon.matchedCount !== undefined && coupon.matchedCount !== null;
   const score = isChecked ? getScoreLabel(coupon.matchedCount as number, coupon.game) : null;
 
-  const anim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(anim, { toValue: 1, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  }, []);
-
   return (
-    <Animated.View style={{ opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
-      <View style={s.ticket}>
+    <View style={s.ticket}>
         <View style={[s.ticketStripe, { backgroundColor: mainColor }]} />
         <View style={s.ticketBody}>
           <View style={s.ticketHead}>
@@ -565,9 +562,9 @@ const CouponTicket = React.memo(function CouponTicket({
           {coupon.bonus && coupon.bonus.length > 0 ? (
             <View style={s.ticketBalls}>
               {coupon.bonus.map((num, i) => {
-                if (!isChecked) return <NumberBall key={i} value={num} variant="muted" size={32} />;
+                if (!isChecked) return <NumberBall key={i} value={num} variant="muted" size={36} />;
                 const hit = coupon.matchedBonus?.includes(num);
-                return <NumberBall key={i} value={num} variant={hit ? 'bonus' : 'muted'} size={32} />;
+                return <NumberBall key={i} value={num} variant={hit ? 'bonus' : 'muted'} size={36} />;
               })}
             </View>
           ) : null}
@@ -575,9 +572,9 @@ const CouponTicket = React.memo(function CouponTicket({
           {coupon.superStar != null ? (
             <View style={s.ticketBalls}>
               {(() => {
-                if (!isChecked) return <NumberBall value={coupon.superStar} variant="muted" size={32} />;
+                if (!isChecked) return <NumberBall value={coupon.superStar} variant="muted" size={36} />;
                 const hit = coupon.matchedSuperStar;
-                return <NumberBall value={coupon.superStar} variant={hit ? 'star' : 'muted'} size={32} />;
+                return <NumberBall value={coupon.superStar} variant={hit ? 'star' : 'muted'} size={36} />;
               })()}
             </View>
           ) : null}
@@ -592,20 +589,21 @@ const CouponTicket = React.memo(function CouponTicket({
             </PressableScale>
             <PressableScale
               onPress={onShare}
-              style={[s.actionBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+              style={[s.historyBtn, { flex: 1, borderColor: mainColor + '22' }]}
             >
-              <ShareIcon color={c.text2} size={20} />
+              <ShareIcon color={mainColor} size={16} />
+              <Text style={[s.historyBtnText, { color: mainColor }]}>Paylaş</Text>
             </PressableScale>
             <PressableScale
               onPress={onDelete}
-              style={[s.actionBtn, { backgroundColor: c.danger + '18', borderColor: c.danger + '44' }]}
+              style={[s.historyBtn, { flex: 1, borderColor: c.danger + '33' }]}
             >
-              <TrashIcon color={c.danger} size={20} />
+              <TrashIcon color={c.danger} size={16} />
+              <Text style={[s.historyBtnText, { color: c.danger }]}>Sil</Text>
             </PressableScale>
           </View>
         </View>
       </View>
-    </Animated.View>
   );
 });
 
@@ -652,15 +650,6 @@ function makeStyles(theme: AppTheme) {
     ticketBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 8 },
 
     ticketActions: { flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'center' },
-    actionBtn: {
-      width: 42,
-      height: 42,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.md,
-      borderWidth: 1,
-    },
-    actionText: { ...ty.label, fontFamily: theme.font.semibold },
     historyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, paddingHorizontal: 12, borderRadius: radius.md, borderWidth: 1 },
     historyBtnText: { ...ty.label, fontFamily: theme.font.bold },
 

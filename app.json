@@ -14,7 +14,7 @@
     "categories": ["utilities", "entertainment"],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.lottoai.app",
+      "bundleIdentifier": "app.getlottoai.ios",
       "buildNumber": "1",
       "icon": "./assets/images/LottoAI-iOS-180.png",
       "infoPlist": {
@@ -22,19 +22,13 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "splash": {
-        "image": "./assets/images/splash-icon-light.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#ffffff",
-        "dark": {
-          "image": "./assets/images/splash-icon-dark.png",
-          "backgroundColor": "#1a1a2e"
-        }
+        "backgroundColor": "#0E1212"
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
+        "backgroundColor": "#1C9E73",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "package": "com.lottoai.app",
@@ -59,20 +53,16 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon-light.png",
+          "backgroundColor": "#0E1212",
+          "image": "./assets/images/splash-icon-dark.png",
           "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "image": "./assets/images/splash-icon-dark.png",
-            "backgroundColor": "#1a1a2e"
-          }
+          "resizeMode": "contain"
         }
       ],
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/LottoAI-AppStore-1024.png",
+          "icon": "./assets/images/android-notification-icon.png",
           "color": "#1C9E73",
           "sounds": []
         }
@@ -84,6 +74,14 @@
         "@react-native-google-signin/google-signin",
         {
           "iosUrlScheme": "com.googleusercontent.apps.775120851198-fkplgqbpkljuf173g63d5ivpr6mt2c5o"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
         }
       ]
     ],

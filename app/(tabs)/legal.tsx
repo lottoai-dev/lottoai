@@ -2,17 +2,13 @@
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useMemo, useState } from 'react';
-import { LayoutAnimation, Platform, Pressable, ScrollView, StyleSheet, Text, UIManager, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '../../components/ui/surface';
 import { AppTheme } from '../../constants/theme';
 import { BackIcon, ChevronDownIcon } from '../../lib/icons';
 import { useTheme } from '../../lib/theme';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const FAQ = [
   { q: 'LottoAI nedir?', a: "LottoAI, Türkiye'deki şans oyunları için kupon üretme, sonuç takibi, AI destekli analiz ve istatistik yapmanızı sağlayan ücretsiz bir yardımcı uygulamadır." },
@@ -25,7 +21,7 @@ const FAQ = [
   { q: 'Kuponlarım otomatik kontrol ediliyor mu?', a: 'Evet. Kaydettiğiniz kuponlar, çekiliş sonuçları girildiğinde otomatik kontrol edilir. Tutan sayılar kupon kartında renkli gösterilir.' },
   { q: 'Hatırlatıcılar nasıl çalışır?', a: 'Profil > Hatırlatıcılar ekranından istediğiniz oyunlar için çekiliş öncesi ve sonrası bildirimleri açabilirsiniz.' },
   { q: 'Uygulama internet gerektiriyor mu?', a: 'Sonuçlar, istatistikler ve AI Asistan için internet gerekir. Kupon üretme ve kaydetme çevrimdışı da çalışır.' },
-  { q: 'Verilerim güvende mi?', a: 'Evet. Tüm kişisel verileriniz cihazınızda yerel saklanır. AI sohbet geçmişi oturum kapanınca silinir. Verileriniz üçüncü şahıslarla paylaşılmaz.' },
+  { q: 'Verilerim güvende mi?', a: 'Evet. Hesap ve kupon verileriniz güvenli sunucularda saklanır. AI Asistan ile yaptığınız sohbetler, yanıtların kalitesini artırmak amacıyla hesabınızla ilişkilendirilerek kaydedilir; bu kayıtlara yalnızca LottoAI ekibi erişebilir, üçüncü şahıslarla paylaşılmaz veya satılmaz. Detaylar için Gizlilik Politikamıza göz atabilirsiniz.' },
   { q: 'Bu uygulama kumar teşvik ediyor mu?', a: 'Hayır. LottoAI yalnızca bilgilendirme amaçlı bir araçtır. Şans oyunları bağımlılık yapabilir. Lütfen sorumlu oynayın. Yardım için: Yeşilay 115.' },
 ];
 
@@ -38,7 +34,6 @@ export default function LegalScreen() {
   const [expanded, setExpanded] = useState<number | null>(null);
 
   const toggle = (i: number) => {
-    LayoutAnimation.configureNext(LayoutAnimation.create(180, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
     setExpanded(expanded === i ? null : i);
   };
 

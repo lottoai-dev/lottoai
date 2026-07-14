@@ -5,8 +5,8 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale, Surface } from '../../components/ui/surface';
@@ -17,18 +17,8 @@ import { GameEmblem } from '../../lib/emblems';
 import { GAMES, type Game, type GameId } from '../../lib/games';
 import { t } from '../../lib/i18n';
 import { BackIcon, BellIcon, CalendarIcon, CheckIcon, ClockIcon } from '../../lib/icons';
-import { supabase } from '../../lib/supabase';
+import { syncNotifyResults } from '../../lib/push-token';
 import { useTheme } from '../../lib/theme';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
 
 type GameSettings = {
   before: boolean;
@@ -133,6 +123,7 @@ function GameCard({
   expandedGame,
   onToggleBefore,
   onToggleAfter,
+  onExpandBefore,
   onBeforeMinutesChange,
   theme,
 }: {
@@ -141,6 +132,7 @@ function GameCard({
   expandedGame: GameId | null;
   onToggleBefore: (gameId: GameId, value: boolean) => void;
   onToggleAfter: (gameId: GameId, value: boolean) => void;
+  onExpandBefore: (gameId: GameId) => void;
   onBeforeMinutesChange: (gameId: GameId, minutes: number) => void;
   theme: AppTheme;
 }) {
@@ -172,14 +164,24 @@ function GameCard({
         </View>
 
         <View style={[s.toggleRow, { borderTopColor: c.hairline }]}>
-          <View style={{ flex: 1 }}>
+          <Pressable
+            style={{ flex: 1 }}
+            onPress={() => {
+              if (!settings.before) return;
+              toggleHaptic();
+              onExpandBefore(game.id);
+            }}
+            disabled={!settings.before}
+          >
             <Text style={s.toggleLabel}>Çekiliş hatırlatıcısı</Text>
             <Text style={s.toggleDesc}>
               {settings.before
-                ? `Çekilişten ${formatMinutes(settings.beforeMinutes)} önce bildirim`
+                ? expanded
+                  ? `Süreyi seç · ${formatMinutes(settings.beforeMinutes)}`
+                  : `Çekilişten ${formatMinutes(settings.beforeMinutes)} önce bildirim`
                 : 'Kapalı'}
             </Text>
-          </View>
+          </Pressable>
           <Toggle
             value={settings.before}
             onChange={(v) => { toggleHaptic(); onToggleBefore(game.id, v); }}
@@ -214,9 +216,14 @@ function GameCard({
 
         <View style={[s.toggleRow, { borderTopColor: c.hairline }]}>
           <View style={{ flex: 1 }}>
-            <Text style={s.toggleLabel}>Sonuç bildirimi</Text>
+            <Text style={s.toggleLabel}>{t('notifToggleAfterLabel')}</Text>
             <Text style={s.toggleDesc}>
-              {settings.after ? 'Sonuç açıklandığında anında bildirim' : 'Kapalı'}
+              {settings.after
+                ? t('notifToggleAfterDesc', {
+                    hour: String(game.notifyAfterHour).padStart(2, '0'),
+                    minute: String(game.notifyAfterMinute).padStart(2, '0'),
+                  })
+                : 'Kapalı'}
             </Text>
           </View>
           <Toggle
@@ -238,30 +245,118 @@ export default function NotificationsScreen() {
   const s = useMemo(() => makeStyles(theme), [theme]);
 
   const [hasPermission, setHasPermission] = useState(false);
+  const [canAskAgain, setCanAskAgain] = useState(true);
   const [settings, setSettings] = useState<NotifSettings>({});
   const [expandedGame, setExpandedGame] = useState<GameId | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const { status } = await Notifications.getPermissionsAsync();
-      setHasPermission(status === 'granted');
-      try {
-        const raw = await AsyncStorage.getItem(SETTINGS_KEY);
-        if (raw) setSettings(JSON.parse(raw));
-      } catch {}
-    })();
+  const refreshPermission = useCallback(async () => {
+    const { status, canAskAgain: askAgain } = await Notifications.getPermissionsAsync();
+    const granted = status === 'granted';
+    setHasPermission(granted);
+    setCanAskAgain(askAgain !== false);
+    return granted;
   }, []);
 
-  const handleRequestPermission = async () => {
+  const applySettingsAfterPermission = useCallback(async (loaded: NotifSettings) => {
+    await rescheduleAll(loaded);
+    const anyAfter = Object.values(loaded).some((gs) => gs?.after);
+    await syncNotifyResults(!!anyAfter);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const granted = await refreshPermission();
+
+      let loaded: NotifSettings = {};
+      try {
+        const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+        if (raw) loaded = JSON.parse(raw);
+      } catch {}
+
+      setSettings(loaded);
+
+      if (!granted) return;
+      await applySettingsAfterPermission(loaded);
+    })();
+  }, [applySettingsAfterPermission, refreshPermission]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (state) => {
+      if (state !== 'active') return;
+      const wasGranted = hasPermission;
+      const granted = await refreshPermission();
+      // Kullanıcı Ayarlar'dan izin verdiyse ayarları yeniden uygula
+      if (!wasGranted && granted) {
+        try {
+          const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+          const loaded: NotifSettings = raw ? JSON.parse(raw) : {};
+          setSettings(loaded);
+          await applySettingsAfterPermission(loaded);
+        } catch {}
+      }
+    });
+    return () => sub.remove();
+  }, [applySettingsAfterPermission, hasPermission, refreshPermission]);
+
+  const openSystemSettings = () => {
     toggleHaptic();
-    setHasPermission(await requestPermission());
+    Linking.openSettings();
+  };
+
+  const handleRequestPermission = async (): Promise<boolean> => {
+    toggleHaptic();
+    if (!canAskAgain) {
+      openSystemSettings();
+      return false;
+    }
+    const granted = await requestPermission();
+    await refreshPermission();
+    if (granted) {
+      try {
+        const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+        const loaded: NotifSettings = raw ? JSON.parse(raw) : settings;
+        await applySettingsAfterPermission(loaded);
+      } catch {}
+    }
+    return granted;
+  };
+
+  const ensurePermission = async (): Promise<boolean> => {
+    if (hasPermission) return true;
+    if (!canAskAgain) {
+      Alert.alert(t('notifPermRequired'), t('notifPermSettings'), [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Ayarları aç', onPress: () => Linking.openSettings() },
+      ]);
+      return false;
+    }
+    return handleRequestPermission();
   };
 
   const getGameSettings = (gameId: GameId): GameSettings =>
     settings[gameId] ?? { before: false, beforeMinutes: 30, after: false };
 
+  const activeSummary = useMemo(() => {
+    let beforeCount = 0;
+    let afterCount = 0;
+    for (const game of GAMES) {
+      const gs = settings[game.id];
+      if (gs?.before) beforeCount++;
+      if (gs?.after) afterCount++;
+    }
+    if (beforeCount === 0 && afterCount === 0) return null;
+    const parts: string[] = [];
+    if (beforeCount > 0) parts.push(`${beforeCount} çekiliş hatırlatıcısı`);
+    if (afterCount > 0) parts.push(`${afterCount} sonuç bildirimi`);
+    return parts.join(' · ');
+  }, [settings]);
+
+  const handleExpandBefore = (gameId: GameId) => {
+    setExpandedGame((prev) => (prev === gameId ? null : gameId));
+  };
+
   const handleToggleBefore = async (gameId: GameId, value: boolean) => {
-    if (!hasPermission) { await handleRequestPermission(); return; }
+    if (!(await ensurePermission())) return;
     const gs = getGameSettings(gameId);
     const updated: GameSettings = { ...gs, before: value };
     const newSettings = { ...settings, [gameId]: updated };
@@ -272,23 +367,19 @@ export default function NotificationsScreen() {
   };
 
   const handleToggleAfter = async (gameId: GameId, value: boolean) => {
-    if (!hasPermission) { await handleRequestPermission(); return; }
+    if (!(await ensurePermission())) return;
     const gs = getGameSettings(gameId);
     const updated: GameSettings = { ...gs, after: value };
     const newSettings = { ...settings, [gameId]: updated };
     setSettings(newSettings);
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
-    const anyAfter = Object.values(newSettings).some((s) => s.after);
-    await supabase
-      .from('push_tokens')
-      .update({ notify_results: anyAfter })
-      .eq('token', (await Notifications.getExpoPushTokenAsync({
-        projectId: '1686d4a1-7dbf-4293-a0b3-a71afc9e4a61',
-      })).data);
+    await scheduleNotifications(gameId, updated);
+    const anyAfter = Object.values(newSettings).some((entry) => entry?.after);
+    await syncNotifyResults(anyAfter);
   };
 
   const handleBeforeMinutesChange = async (gameId: GameId, minutes: number) => {
-    if (!hasPermission) { await handleRequestPermission(); return; }
+    if (!(await ensurePermission())) return;
     const gs = getGameSettings(gameId);
     const updated: GameSettings = { ...gs, beforeMinutes: minutes };
     const newSettings = { ...settings, [gameId]: updated };
@@ -319,24 +410,39 @@ export default function NotificationsScreen() {
 
         <Text style={s.subtitle}>Çekiliş öncesi ve sonrası bildirim al</Text>
 
+        {activeSummary ? (
+          <View style={[s.summary, { backgroundColor: c.surfaceAlt, borderColor: c.hairline }]}>
+            <BellIcon color={c.brand} size={15} />
+            <Text style={s.summaryText}>{activeSummary}</Text>
+          </View>
+        ) : null}
+
         {!hasPermission ? (
           <PressableScale
-            onPress={handleRequestPermission}
+            onPress={canAskAgain ? handleRequestPermission : openSystemSettings}
             style={[s.permCard, { backgroundColor: c.brandSoft, borderColor: c.brandBorder }]}
           >
             <View style={[s.permIcon, { backgroundColor: c.brand }]}>
               <BellIcon color={c.brandText} size={20} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.permTitle}>Bildirim izni gerekli</Text>
-              <Text style={s.permDesc}>Hatırlatıcıları kullanmak için izin ver</Text>
+              <Text style={s.permTitle}>
+                {canAskAgain ? t('notifPermission') : 'Bildirim izni kapalı'}
+              </Text>
+              <Text style={s.permDesc}>
+                {canAskAgain
+                  ? t('notifPermissionDesc')
+                  : 'Hatırlatıcılar için Ayarlar\'dan bildirim iznini aç'}
+              </Text>
             </View>
-            <Text style={[s.permBtn, { color: c.brand }]}>İzin ver</Text>
+            <Text style={[s.permBtn, { color: c.brand }]}>
+              {canAskAgain ? 'İzin ver' : 'Ayarları aç'}
+            </Text>
           </PressableScale>
         ) : (
           <View style={[s.granted, { backgroundColor: c.brandSoft, borderColor: c.brandBorder }]}>
             <CheckIcon color={c.brand} size={18} />
-            <Text style={[s.grantedText, { color: c.brand }]}>Bildirim izni verildi</Text>
+            <Text style={[s.grantedText, { color: c.brand }]}>{t('notifGranted')}</Text>
           </View>
         )}
 
@@ -350,6 +456,7 @@ export default function NotificationsScreen() {
             expandedGame={expandedGame}
             onToggleBefore={handleToggleBefore}
             onToggleAfter={handleToggleAfter}
+            onExpandBefore={handleExpandBefore}
             onBeforeMinutesChange={handleBeforeMinutesChange}
             theme={theme}
           />
@@ -358,8 +465,8 @@ export default function NotificationsScreen() {
         <View style={[s.note, { backgroundColor: c.surfaceAlt, borderColor: c.hairline }]}>
           <ClockIcon color={c.text3} size={15} />
           <Text style={s.noteText}>
-            Bildirimler çekiliş kapanış saatinden seçtiğiniz süre kadar önce gönderilir.
-            Sonuç bildirimleri ise sonuçlar açıklandığı anda iletilir.
+            Çekiliş hatırlatıcıları kapanış saatinden seçtiğiniz süre kadar önce gelir.
+            Sonuç bildirimleri her oyunun sonuç saatinde gönderilir; Kuponlarım'a yönlendirir.
           </Text>
         </View>
       </ScrollView>
@@ -372,12 +479,32 @@ async function requestPermission(): Promise<boolean> {
     Alert.alert(t('notifTitle'), t('notifDeviceWarning'));
     return false;
   }
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  const { status } = existing === 'granted'
-    ? { status: existing }
-    : await Notifications.requestPermissionsAsync();
+  const existing = await Notifications.getPermissionsAsync();
+  if (existing.status === 'granted') {
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('lottoai', {
+        name: t('notifChannelName'),
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+      });
+    }
+    return true;
+  }
+
+  if (existing.canAskAgain === false) {
+    Alert.alert(t('notifPermRequired'), t('notifPermSettings'), [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Ayarları aç', onPress: () => Linking.openSettings() },
+    ]);
+    return false;
+  }
+
+  const { status } = await Notifications.requestPermissionsAsync();
   if (status !== 'granted') {
-    Alert.alert(t('notifPermRequired'), t('notifPermSettings'));
+    Alert.alert(t('notifPermRequired'), t('notifPermSettings'), [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Ayarları aç', onPress: () => Linking.openSettings() },
+    ]);
     return false;
   }
   if (Platform.OS === 'android') {
@@ -388,6 +515,15 @@ async function requestPermission(): Promise<boolean> {
     });
   }
   return true;
+}
+
+async function rescheduleAll(settings: NotifSettings) {
+  await Promise.all(
+    GAMES.map((game) => {
+      const gs = settings[game.id] ?? { before: false, beforeMinutes: 30, after: false };
+      return scheduleNotifications(game.id, gs);
+    })
+  );
 }
 
 async function scheduleNotifications(gameId: GameId, settings: GameSettings) {
@@ -402,6 +538,7 @@ async function scheduleNotifications(gameId: GameId, settings: GameSettings) {
 
   const hourStr = String(game.drawHour).padStart(2, '0');
   const minuteStr = String(game.drawMinute).padStart(2, '0');
+  const channelId = Platform.OS === 'android' ? 'lottoai' : undefined;
 
   for (const day of game.drawDays) {
     const weekday = day === 0 ? 1 : day + 1;
@@ -417,12 +554,32 @@ async function scheduleNotifications(gameId: GameId, settings: GameSettings) {
           body: t('notifBeforeBody', { hour: hourStr, minute: minuteStr }),
           sound: true,
           data: { gameId, type: 'before', screen: 'generate' },
+          ...(channelId ? { channelId } : {}),
         },
         trigger: {
           type: 'weekly',
           weekday,
           hour: beforeDate.getHours(),
           minute: beforeDate.getMinutes(),
+          repeats: true,
+        } as any,
+      });
+    }
+
+    if (settings.after) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: t('notifAfterTitle', { name: game.name }),
+          body: t('notifAfterBody'),
+          sound: true,
+          data: { gameId, type: 'after', screen: 'saved' },
+          ...(channelId ? { channelId } : {}),
+        },
+        trigger: {
+          type: 'weekly',
+          weekday,
+          hour: game.notifyAfterHour,
+          minute: game.notifyAfterMinute,
           repeats: true,
         } as any,
       });
@@ -441,7 +598,14 @@ function makeStyles(theme: AppTheme) {
     },
     navBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
     navTitle: { ...ty.h3, color: c.text },
-    subtitle: { ...ty.bodyMedium, color: c.text2, paddingHorizontal: spacing.xl, marginBottom: spacing.lg },
+    subtitle: { ...ty.bodyMedium, color: c.text2, paddingHorizontal: spacing.xl, marginBottom: spacing.md },
+    summary: {
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      marginHorizontal: spacing.xl, marginBottom: spacing.lg,
+      paddingHorizontal: 14, paddingVertical: 11,
+      borderRadius: radius.md, borderWidth: 1,
+    },
+    summaryText: { ...ty.caption, color: c.text2, flex: 1, fontFamily: theme.font.medium },
 
     permCard: {
       flexDirection: 'row', alignItems: 'center', gap: 12,

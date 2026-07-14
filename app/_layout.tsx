@@ -3,8 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from 'react';
-import { Platform, View } from 'react-native';
+import { AppState, View } from 'react-native';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { AlertProvider } from '../contexts/AlertContext';
@@ -12,9 +14,37 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { BildirimProvider, useBildirim } from '../contexts/BildirimContext';
 import { OfflineBanner } from '../lib/OfflineBanner';
 import { useAppFonts } from '../lib/fonts';
-import { logError } from '../lib/logger';
+import { EXPO_PROJECT_ID, registerPushToken } from '../lib/push-token';
 import { supabase } from '../lib/supabase';
 import { ThemeProvider, useTheme } from '../lib/theme';
+
+// Native (statik) splash'i JS tarafı hazır olana kadar elde tutuyoruz.
+// Bu çağrı herhangi bir await'ten ÖNCE, modülün en üstünde olmalı — aksi
+// halde splash otomatik kapanır ve aşağıdaki kontrollü geçiş hiç işe yaramaz.
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Zaten gizliyse (ör. hot reload) ya da platform desteklemiyorsa sessizce
+  // geç — bu kritik bir hata değil, uygulamayı durdurmamalı.
+});
+
+// YT Music tarzı: fade yok — logo bir süre ortada kalır, sonra anında kesilir.
+// duration: 0 Android'deki varsayılan fade'i kapatır; fade: false iOS içindir.
+SplashScreen.setOptions({ duration: 0, fade: false });
+
+const SPLASH_BG = '#0E1212';
+// Logo en az bu kadar görünsün (fontlar daha erken hazır olsa bile).
+const SPLASH_MIN_MS = 1000;
+// Fontlar hiç yüklenmezse splash sonsuza dek takılı kalmasın.
+const SPLASH_SAFETY_TIMEOUT_MS = 8000;
+const splashStartedAt = Date.now();
+
+async function hideSplashWhenReady() {
+  const elapsed = Date.now() - splashStartedAt;
+  const wait = Math.max(0, SPLASH_MIN_MS - elapsed);
+  if (wait > 0) {
+    await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+  await SplashScreen.hideAsync().catch(() => {});
+}
 
 // Bildirim handler'ı — uygulama açıkken bildirimleri göster
 Notifications.setNotificationHandler({
@@ -27,48 +57,12 @@ Notifications.setNotificationHandler({
   }),
 });
 
-async function registerPushToken(): Promise<string | null> {
-  try {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus === 'granted') {
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: '1686d4a1-7dbf-4293-a0b3-a71afc9e4a61',
-      });
-
-      const token = tokenData.data;
-      console.log('Expo Push Token:', token);
-
-      const { error } = await supabase
-        .from('push_tokens')
-        .upsert(
-          { token, platform: Platform.OS, updated_at: new Date().toISOString() },
-          { onConflict: 'token' }
-        );
-
-      if (error) logError('registerPushToken', error);
-      else console.log('Token Supabase\'e kaydedildi.');
-
-      return token;
-    }
-  } catch (err) {
-    logError('registerPushToken', err);
-  }
-  return null;
-}
-
 async function fetchUnreadNotifications(
   addBildirim: (b: { title: string; body: string; screen?: string }) => void
 ) {
   try {
     const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: '1686d4a1-7dbf-4293-a0b3-a71afc9e4a61',
+      projectId: EXPO_PROJECT_ID,
     }).catch(() => null);
 
     if (!tokenData) return;
@@ -125,6 +119,21 @@ function RootContent() {
     fetchUnreadNotifications(addBildirim);
   }, [addBildirim]);
 
+  // Fontlar hazır olunca splash'i en az SPLASH_MIN_MS tutup animasyonsuz kapat.
+  useEffect(() => {
+    if (!fontsLoaded) return;
+    hideSplashWhenReady();
+  }, [fontsLoaded]);
+
+  // Güvenlik ağı: fontsLoaded herhangi bir sebeple hiç true olmazsa bile,
+  // uygulama splash ekranında sonsuza dek takılı kalmasın.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, SPLASH_SAFETY_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     registerPushToken();
 
@@ -162,7 +171,12 @@ function RootContent() {
 
     const subscription = Notifications.addNotificationReceivedListener((notification) => {
       const { title, body, data } = notification.request.content;
-      if (!title && !body) return;
+      // Bazı result push'ları foreground'da title/body taşımayabiliyor.
+      // Bu durumda DB'deki okunmamış kayıtları çekerek çan rozetini güncel tut.
+      if (!title && !body) {
+        fetchUnreadNotifications(addBildirim);
+        return;
+      }
       addBildirim({
         title: title || 'Bildirim',
         body: body || '',
@@ -197,21 +211,34 @@ function RootContent() {
       else if (screen === 'generate') router.push('/(tabs)/generate');
     });
 
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        fetchUnreadNotifications(addBildirim);
+      }
+    });
+
     return () => {
       linkingSub.remove();
       subscription.remove();
       responseListener.current?.remove();
+      appStateSub.remove();
     };
   }, [router, addBildirim]);
 
   if (!fontsLoaded) {
-    return <View style={{ flex: 1, backgroundColor: theme.colors.bg }} />;
+    return <View style={{ flex: 1, backgroundColor: SPLASH_BG }} />;
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <OfflineBanner />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.bg } }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'none',
+          contentStyle: { backgroundColor: theme.colors.bg },
+        }}
+      >
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="onboarding" />
@@ -223,16 +250,18 @@ function RootContent() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <AlertProvider>
-        <AuthProvider>
-          <BildirimProvider>
-            <ErrorBoundary>
-              <RootContent />
-            </ErrorBoundary>
-          </BildirimProvider>
-        </AuthProvider>
-      </AlertProvider>
-    </ThemeProvider>
+    <KeyboardProvider>
+      <ThemeProvider>
+        <AlertProvider>
+          <AuthProvider>
+            <BildirimProvider>
+              <ErrorBoundary>
+                <RootContent />
+              </ErrorBoundary>
+            </BildirimProvider>
+          </AuthProvider>
+        </AlertProvider>
+      </ThemeProvider>
+    </KeyboardProvider>
   );
 }

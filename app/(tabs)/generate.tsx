@@ -3,18 +3,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Animated,
-  Easing,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -30,14 +28,14 @@ import { GameEmblem } from '../../lib/emblems';
 import { GAMES } from '../../lib/games';
 import GameSelector from '../../lib/GameSelector';
 import {
-  BookmarkIcon,
-  CheckIcon,
-  ClockIcon,
-  CloseIcon,
-  DiceIcon,
-  InfoIcon,
-  SlidersIcon,
-  TrashIcon,
+    BookmarkIcon,
+    CheckIcon,
+    ClockIcon,
+    CloseIcon,
+    DiceIcon,
+    InfoIcon,
+    SlidersIcon,
+    TrashIcon,
 } from '../../lib/icons';
 import { useTheme } from '../../lib/theme';
 
@@ -154,7 +152,38 @@ function generateWithConstraints(
       const remaining = count - constraints.includeNumbers.length;
       const poolFiltered = pool.filter((n) => !constraints.includeNumbers.includes(n));
       if (poolFiltered.length < remaining) continue;
-      const picks = [...poolFiltered].sort(() => Math.random() - 0.5).slice(0, remaining);
+
+      // Toplam aralığı isteniyorsa, sayı seçimi TAMAMEN RASTGELE kalmaya devam
+      // eder (hâlâ Math.random() ile) ama "kör" değil, hedef ortalamaya hafifçe
+      // eğilimli seçilir — her sayı hedefe olan uzaklığına göre bir ağırlık alır,
+      // hiçbir sayı tamamen elenmez. Bu, dar toplam aralıklarını (ör. "50-100
+      // arası") bulma ihtimalini büyük ölçüde artırır ama sonucu asla sabitlemez.
+      let picks: number[];
+      if ((constraints.sumMin !== null || constraints.sumMax !== null) && remaining > 0) {
+        const includedSum = constraints.includeNumbers.reduce((a, b) => a + b, 0);
+        const lo = constraints.sumMin ?? calcMinSum(count);
+        const hi = constraints.sumMax ?? calcMaxSum(count, max);
+        const targetAvg = ((lo + hi) / 2 - includedSum) / remaining;
+        const spread = Math.max(max / 3, 10);
+
+        const workingPool = [...poolFiltered];
+        picks = [];
+        for (let i = 0; i < remaining; i++) {
+          const weights = workingPool.map((n) => Math.max(1, spread - Math.abs(n - targetAvg)));
+          const totalWeight = weights.reduce((a, b) => a + b, 0);
+          let r = Math.random() * totalWeight;
+          let chosenIdx = workingPool.length - 1;
+          for (let j = 0; j < workingPool.length; j++) {
+            r -= weights[j];
+            if (r <= 0) { chosenIdx = j; break; }
+          }
+          picks.push(workingPool[chosenIdx]);
+          workingPool.splice(chosenIdx, 1);
+        }
+      } else {
+        picks = [...poolFiltered].sort(() => Math.random() - 0.5).slice(0, remaining);
+      }
+
       nums = [...constraints.includeNumbers, ...picks].sort((a, b) => a - b);
     }
 
@@ -178,25 +207,6 @@ type HistoryEntry = {
 };
 
 const MAX_HISTORY = 5;
-
-/* ───────────────────────── animated ball ───────────────────────── */
-function DrawBall({ index, children }: { index: number; children: React.ReactNode }) {
-  const a = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(a, {
-      toValue: 1,
-      duration: 300,
-      delay: index * 55,
-      easing: Easing.out(Easing.back(1.5)),
-      useNativeDriver: true,
-    }).start();
-  }, [a, index]);
-  return (
-    <Animated.View style={{ opacity: a, transform: [{ scale: a.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }}>
-      {children}
-    </Animated.View>
-  );
-}
 
 /* ───────────────────────── screen ───────────────────────── */
 export default function GenerateScreen() {
@@ -269,7 +279,11 @@ export default function GenerateScreen() {
 
   const saveToHistory = useCallback(
     async (entry: HistoryEntry) => {
-      const updated = [entry, ...history].slice(0, MAX_HISTORY);
+      // Keep newest-first overall, but cap at MAX_HISTORY per game.
+      const updated = [entry, ...history].filter((h, idx, arr) => {
+        const sameGameBefore = arr.slice(0, idx).filter((x) => x.gameId === h.gameId).length;
+        return sameGameBefore < MAX_HISTORY;
+      });
       setHistory(updated);
       await AsyncStorage.setItem(STORAGE_KEYS.GENERATION_HISTORY, JSON.stringify(updated));
     },
@@ -359,10 +373,34 @@ export default function GenerateScreen() {
     setHistoryModal(false);
   };
 
-  const handleClearHistory = async () => {
+  const handleClearHistory = () => {
     softHaptic();
-    setHistory([]);
-    await AsyncStorage.removeItem(STORAGE_KEYS.GENERATION_HISTORY);
+    const count = currentGameHistory.length;
+    if (count === 0) return;
+
+    showAlert(
+      'Geçmişi temizle',
+      `${selectedGame.name} geçmişindeki ${count} kupon silinecek. Emin misin?`,
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Temizle',
+          style: 'destructive',
+          onPress: async () => {
+            const updated = history.filter((h) => h.gameId !== selectedGame.id);
+            setHistory(updated);
+            if (updated.length === 0) {
+              await AsyncStorage.removeItem(STORAGE_KEYS.GENERATION_HISTORY);
+            } else {
+              await AsyncStorage.setItem(STORAGE_KEYS.GENERATION_HISTORY, JSON.stringify(updated));
+            }
+            setHistoryModal(false);
+            softHaptic();
+            showAlert('Temizlendi', `${selectedGame.name} geçmişi temizlendi.`);
+          },
+        },
+      ]
+    );
   };
 
   const buildCoupon = (
@@ -419,19 +457,26 @@ export default function GenerateScreen() {
       }
       if (savedCount > 0) {
         await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(coupons));
-        softHaptic();
+      }
+      const updatedHistory = history.filter((h) => h.gameId !== selectedGame.id);
+      setHistory(updatedHistory);
+      if (updatedHistory.length === 0) {
+        await AsyncStorage.removeItem(STORAGE_KEYS.GENERATION_HISTORY);
+      } else {
+        await AsyncStorage.setItem(STORAGE_KEYS.GENERATION_HISTORY, JSON.stringify(updatedHistory));
+      }
+      setHistoryModal(false);
+      softHaptic();
+      if (savedCount > 0) {
         showAlert('Kaydedildi', `${savedCount} kupon Kuponlarım'a eklendi.`, [
           { text: 'Tamam' },
           {
             text: 'Kuponlarıma git',
-            onPress: () => {
-              setHistoryModal(false);
-              router.push('/(tabs)/saved');
-            },
+            onPress: () => router.push('/(tabs)/saved'),
           },
         ]);
       } else {
-        showAlert('Bilgi', 'Geçmişteki tüm kuponlar zaten kayıtlı.');
+        showAlert('Bilgi', 'Geçmişteki tüm kuponlar zaten kayıtlı. Liste temizlendi.');
       }
     } catch {
       showAlert('Hata', 'Kuponlar kaydedilemedi.');
@@ -509,8 +554,22 @@ export default function GenerateScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}
       >
         <View style={s.header}>
-          <Text style={s.title}>Kupon Üret</Text>
-          <Text style={s.subtitle}>Sayılarını sistem senin için seçsin</Text>
+          <View style={s.headerText}>
+            <Text style={s.title}>Kupon Üret</Text>
+            <Text style={s.subtitle}>Sayılarını sistem senin için seçsin</Text>
+          </View>
+          <PressableScale
+            onPress={() => { softHaptic(); setHistoryModal(true); }}
+            style={[s.historyHeaderBtn, { backgroundColor: c.surface, borderColor: c.border }]}
+          >
+            <ClockIcon color={c.brand} size={18} />
+            <Text style={[s.historyHeaderBtnText, { color: c.brand }]}>Geçmiş</Text>
+            {currentGameHistory.length > 0 ? (
+              <View style={[s.historyBadge, { backgroundColor: c.brand }]}>
+                <Text style={s.historyBadgeText}>{currentGameHistory.length}</Text>
+              </View>
+            ) : null}
+          </PressableScale>
         </View>
 
         <Text style={s.sectionLabel}>OYUN SEÇ</Text>
@@ -528,14 +587,13 @@ export default function GenerateScreen() {
             <>
               <View style={s.balls} key={`n-${genId}`}>
                 {generatedNumbers.map((num, i) => (
-                  <DrawBall key={`${genId}-${i}`} index={i}>
-                    <NumberBall
-                      value={num}
-                      color={includeNumbers.includes(num) ? c.gold : mainColor}
-                      size={46}
-                      variant={includeNumbers.includes(num) ? 'bonus' : 'game'}
-                    />
-                  </DrawBall>
+                  <NumberBall
+                    key={`${genId}-${i}`}
+                    value={num}
+                    color={includeNumbers.includes(num) ? c.gold : mainColor}
+                    size={46}
+                    variant={includeNumbers.includes(num) ? 'bonus' : 'game'}
+                  />
                 ))}
               </View>
 
@@ -544,9 +602,7 @@ export default function GenerateScreen() {
                   <Text style={s.bonusLabel}>ŞANS TOPU</Text>
                   <View style={s.balls}>
                     {bonusNumbers.map((num, i) => (
-                      <DrawBall key={`b-${genId}-${i}`} index={generatedNumbers.length + i}>
-                        <NumberBall value={num} variant="bonus" size={46} />
-                      </DrawBall>
+                      <NumberBall key={`b-${genId}-${i}`} value={num} variant="bonus" size={46} />
                     ))}
                   </View>
                 </View>
@@ -556,9 +612,7 @@ export default function GenerateScreen() {
                 <View style={s.bonusBlock}>
                   <Text style={s.bonusLabel}>SÜPERSTAR</Text>
                   <View style={s.balls}>
-                    <DrawBall index={generatedNumbers.length} key={`ss-${genId}`}>
-                      <NumberBall value={superStarNumber} variant="star" size={46} />
-                    </DrawBall>
+                    <NumberBall key={`ss-${genId}`} value={superStarNumber} variant="star" size={46} />
                   </View>
                 </View>
               ) : null}
@@ -615,16 +669,6 @@ export default function GenerateScreen() {
             fullWidth={false}
             style={s.saveBtn}
           />
-        ) : null}
-
-        {currentGameHistory.length > 0 ? (
-          <PressableScale
-            onPress={() => { softHaptic(); setHistoryModal(true); }}
-            style={[s.historyBtn, { backgroundColor: c.surface, borderColor: c.border }]}
-          >
-            <ClockIcon color={c.brand} size={17} />
-            <Text style={[s.historyBtnText, { color: c.brand }]}>Geçmiş ({currentGameHistory.length})</Text>
-          </PressableScale>
         ) : null}
 
         {showFilter ? (
@@ -733,14 +777,19 @@ export default function GenerateScreen() {
         </View>
       </ScrollView>
 
-      <Modal visible={historyModal} transparent animationType="slide" onRequestClose={() => setHistoryModal(false)}>
+      <Modal visible={historyModal} transparent animationType="none" onRequestClose={() => setHistoryModal(false)}>
         <View style={[s.modalOverlay, { backgroundColor: c.overlay }]}>
           <View style={[s.modalSheet, { backgroundColor: c.surface, paddingBottom: insets.bottom + 16 }]}>
             <View style={s.modalGrabber} />
             <View style={s.modalHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={s.modalTitle}>Kupon geçmişi</Text>
-                <Text style={s.modalSubtitle}>{selectedGame.name} · son {MAX_HISTORY} üretim</Text>
+                <Text style={s.modalSubtitle}>
+                  {selectedGame.name}
+                  {currentGameHistory.length > 0
+                    ? ` · son ${Math.min(currentGameHistory.length, MAX_HISTORY)} / ${MAX_HISTORY}`
+                    : ` · oyun başına ${MAX_HISTORY}`}
+                </Text>
               </View>
               <Pressable
                 onPress={() => { softHaptic(); setHistoryModal(false); }}
@@ -751,53 +800,65 @@ export default function GenerateScreen() {
               </Pressable>
             </View>
 
-            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
-              {currentGameHistory.map((entry, index) => {
-                const entryColor = GameAccent[entry.gameId] ?? c.brand;
-                const timeAgo = Math.floor((Date.now() - entry.timestamp) / 60000);
-                const timeStr = timeAgo < 1 ? 'az önce' : timeAgo < 60 ? `${timeAgo} dk önce` : '1+ saat önce';
-                return (
-                  <PressableScale
-                    key={index}
-                    onPress={() => handleRestore(entry)}
-                    style={[s.historyEntry, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
-                  >
-                    <View style={s.historyEntryHead}>
-                      <View style={s.historyEntryGameRow}>
-                        <GameEmblem game={entry.gameId} size={22} />
-                        <Text style={s.historyEntryGame}>{entry.game}</Text>
-                      </View>
-                      <Text style={s.historyEntryTime}>{timeStr}</Text>
-                    </View>
-                    <View style={s.historyEntryBalls}>
-                      {entry.numbers.map((num, i) => (
-                        <NumberBall key={i} value={num} color={entryColor} size={28} />
-                      ))}
-                      {entry.bonus.map((num, i) => (
-                        <NumberBall key={`b${i}`} value={num} variant="bonus" size={28} />
-                      ))}
-                      {entry.superStar ? <NumberBall value={entry.superStar} variant="star" size={28} /> : null}
-                    </View>
-                  </PressableScale>
-                );
-              })}
-            </ScrollView>
+            {currentGameHistory.length === 0 ? (
+              <View style={s.historyEmpty}>
+                <View style={[s.historyEmptyIcon, { backgroundColor: c.brandSoft }]}>
+                  <ClockIcon color={c.brand} size={28} />
+                </View>
+                <Text style={s.historyEmptyTitle}>Henüz geçmiş yok</Text>
+                <Text style={s.historyEmptyText}>Ürettiğin son kuponlar burada görünür.</Text>
+              </View>
+            ) : (
+              <>
+                <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+                  {currentGameHistory.map((entry, index) => {
+                    const entryColor = GameAccent[entry.gameId] ?? c.brand;
+                    const timeAgo = Math.floor((Date.now() - entry.timestamp) / 60000);
+                    const timeStr = timeAgo < 1 ? 'az önce' : timeAgo < 60 ? `${timeAgo} dk önce` : '1+ saat önce';
+                    return (
+                      <PressableScale
+                        key={`${entry.timestamp}-${index}`}
+                        onPress={() => handleRestore(entry)}
+                        style={[s.historyEntry, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+                      >
+                        <View style={s.historyEntryHead}>
+                          <View style={s.historyEntryGameRow}>
+                            <GameEmblem game={entry.gameId} size={22} />
+                            <Text style={s.historyEntryGame}>{entry.game}</Text>
+                          </View>
+                          <Text style={s.historyEntryTime}>{timeStr}</Text>
+                        </View>
+                        <View style={s.historyEntryBalls}>
+                          {entry.numbers.map((num, i) => (
+                            <NumberBall key={i} value={num} color={entryColor} size={28} />
+                          ))}
+                          {entry.bonus.map((num, i) => (
+                            <NumberBall key={`b${i}`} value={num} variant="bonus" size={28} />
+                          ))}
+                          {entry.superStar ? <NumberBall value={entry.superStar} variant="star" size={28} /> : null}
+                        </View>
+                      </PressableScale>
+                    );
+                  })}
+                </ScrollView>
 
-            <View style={s.modalActions}>
-              <AppButton
-                label={savingAll ? 'Kaydediliyor…' : 'Tümünü kaydet'}
-                onPress={handleSaveAllHistory}
-                disabled={savingAll}
-                iconLeft={(color, size) => <CheckIcon color={color} size={size} />}
-              />
-              <AppButton
-                label="Geçmişi temizle"
-                variant="ghost"
-                accent={c.danger}
-                onPress={handleClearHistory}
-                iconLeft={(color, size) => <TrashIcon color={color} size={size} />}
-              />
-            </View>
+                <View style={s.modalActions}>
+                  <AppButton
+                    label={savingAll ? 'Kaydediliyor…' : 'Tümünü kaydet'}
+                    onPress={handleSaveAllHistory}
+                    disabled={savingAll}
+                    iconLeft={(color, size) => <CheckIcon color={color} size={size} />}
+                  />
+                  <AppButton
+                    label="Geçmişi temizle"
+                    variant="ghost"
+                    accent={c.danger}
+                    onPress={handleClearHistory}
+                    iconLeft={(color, size) => <TrashIcon color={color} size={size} />}
+                  />
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -811,9 +872,29 @@ function makeStyles(theme: AppTheme) {
   const { spacing, radius, typography: ty } = theme;
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
-    header: { paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
+    header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
+    headerText: { flex: 1 },
     title: { ...ty.h1, color: c.text },
     subtitle: { ...ty.bodyMedium, color: c.text2, marginTop: 3 },
+    historyHeaderBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+    },
+    historyHeaderBtnText: { ...ty.label },
+    historyBadge: {
+      minWidth: 18,
+      height: 18,
+      borderRadius: 9,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 5,
+    },
+    historyBadgeText: { fontFamily: theme.font.bold, fontSize: 11, color: '#fff' },
     sectionLabel: { ...ty.micro, color: c.text2, paddingHorizontal: spacing.xl, marginBottom: 10 },
 
     resultCard: { marginHorizontal: spacing.xl, marginTop: spacing.lg, borderRadius: radius.xxl, paddingVertical: 24, paddingHorizontal: spacing.xl },
@@ -835,9 +916,6 @@ function makeStyles(theme: AppTheme) {
     filterDot: { position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: 4 },
 
     saveBtn: { marginHorizontal: spacing.xl, marginTop: 10, alignSelf: 'stretch' },
-
-    historyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginHorizontal: spacing.xl, marginTop: 10, paddingVertical: 13, borderRadius: radius.lg, borderWidth: 1 },
-    historyBtnText: { ...ty.label },
 
     filterPanel: { marginHorizontal: spacing.xl, marginTop: spacing.md, padding: spacing.lg },
     filterPanelTitle: { ...ty.micro, color: c.text2, marginBottom: spacing.md },
@@ -868,6 +946,10 @@ function makeStyles(theme: AppTheme) {
     modalTitle: { ...ty.h2, color: c.text },
     modalSubtitle: { ...ty.caption, color: c.text2, marginTop: 3 },
     modalClose: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+    historyEmpty: { alignItems: 'center', paddingVertical: 36, paddingHorizontal: spacing.lg, gap: 10 },
+    historyEmptyIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+    historyEmptyTitle: { ...ty.title, color: c.text },
+    historyEmptyText: { ...ty.bodyMedium, color: c.text3, textAlign: 'center', maxWidth: 240 },
     historyEntry: { padding: 12, borderRadius: radius.lg, borderWidth: 1, marginBottom: 10 },
     historyEntryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
     historyEntryGameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

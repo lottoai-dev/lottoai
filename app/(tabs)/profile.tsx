@@ -7,12 +7,13 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import Svg, { Circle, Path } from 'react-native-svg';
 import { PressableScale, Surface } from '../../components/ui/surface';
 import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useBildirim } from '../../contexts/BildirimContext';
+import { clearAllAppData } from '../../lib/clear-app-data';
 import { BrandMark } from '../../lib/emblems';
 import {
   BellIcon,
@@ -22,13 +23,14 @@ import {
   DocIcon,
   EditIcon,
   InfoIcon,
+  LogOutIcon,
   MailIcon,
   SearchIcon,
   ShieldIcon,
   StatsIcon,
   TrashIcon,
 } from '../../lib/icons';
-import { useTheme, useThemeControls } from '../../lib/theme';
+import { useTheme } from '../../lib/theme';
 
 function softHaptic() {
   if (Platform.OS === 'android') {
@@ -38,35 +40,9 @@ function softHaptic() {
   }
 }
 
-function SunGlyph({ color }: { color: string }) {
-  return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={12} r={4} stroke={color} strokeWidth={1.8} />
-      <Path d="M12 2.5v2.5M12 19v2.5M4.5 12H2M22 12h-2.5M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-    </Svg>
-  );
-}
-
-function MoonGlyph({ color }: { color: string }) {
-  return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-      <Path d="M20 13.5A8 8 0 1110.5 4a6.5 6.5 0 009.5 9.5z" stroke={color} strokeWidth={1.8} strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
-function AutoGlyph({ color }: { color: string }) {
-  return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={12} r={8.5} stroke={color} strokeWidth={1.8} />
-      <Path d="M12 3.5v17a8.5 8.5 0 000-17z" fill={color} />
-    </Svg>
-  );
-}
-
 const LEGAL_URL = 'https://getlottoai.app/legal';
 const PRIVACY_URL = `${LEGAL_URL}`;
-const TERMS_URL = `${LEGAL_URL}`;
+const TERMS_URL = `${LEGAL_URL}#terms`;
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -74,9 +50,9 @@ export default function ProfileScreen() {
   const theme = useTheme();
   const c = theme.colors;
   const s = useMemo(() => makeStyles(theme), [theme]);
-  const { pref, setPref } = useThemeControls();
   const { showAlert } = useAlert();
   const { user, signOut } = useAuth();
+  const { clearAll: clearBildirimler } = useBildirim();
 
   const [name, setName] = useState('');
   const [editing, setEditing] = useState(false);
@@ -128,11 +104,20 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: async () => {
           softHaptic();
-          await AsyncStorage.clear();
-          setTotalCoupons(0);
-          setBestResult(0);
-          setName('');
-          showAlert('Silindi', 'Tüm veriler temizlendi. Uygulamayı kapatıp açın.');
+          try {
+            await clearAllAppData();
+            clearBildirimler();
+            setTotalCoupons(0);
+            setBestResult(0);
+            setName('');
+            setNotificationsEnabled(false);
+            setEditing(false);
+            showAlert('Silindi', 'Tüm verilerin temizlendi.', [
+              { text: 'Tamam', onPress: () => router.replace('/onboarding') },
+            ]);
+          } catch {
+            showAlert('Hata', 'Veriler silinirken bir sorun oluştu.');
+          }
         },
       },
     ]);
@@ -151,12 +136,6 @@ export default function ProfileScreen() {
       },
     ]);
   };
-
-  const themeOptions: { key: 'light' | 'system' | 'dark'; label: string; Glyph: (p: { color: string }) => React.ReactNode }[] = [
-    { key: 'light', label: 'Açık', Glyph: SunGlyph },
-    { key: 'system', label: 'Sistem', Glyph: AutoGlyph },
-    { key: 'dark', label: 'Koyu', Glyph: MoonGlyph },
-  ];
 
   const MenuRow = ({ Icon, color, title, sub, onPress, last }: {
     Icon: (p: any) => React.ReactNode;
@@ -183,7 +162,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={s.container}>
-      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style="light" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -244,31 +223,7 @@ export default function ProfileScreen() {
 
         <Surface style={s.statsCard}>
           <Stat value={String(totalCoupons)} label="Kupon" color={c.brand} theme={theme} divider />
-          <Stat value={String(bestResult)} label="En iyi" color={c.gold} theme={theme} divider={false} />
-        </Surface>
-
-        <Surface style={s.card}>
-          <Text style={s.cardLabel}>GÖRÜNÜM</Text>
-          <View style={[s.themeSeg, { backgroundColor: theme.mode === 'dark' ? c.surfaceAlt : '#ECEEF1' }]}>
-            {themeOptions.map((opt) => {
-              const active = pref === opt.key;
-              return (
-                <Pressable
-                  key={opt.key}
-                  onPress={() => { softHaptic(); setPref(opt.key); }}
-                  style={[s.themeOpt, active && [{ backgroundColor: c.surface }, theme.shadowSm]]}
-                >
-                  {opt.Glyph({ color: active ? c.text : c.text2 })}
-                  <Text style={[
-                    s.themeOptText,
-                    { color: active ? c.text : c.text2, fontFamily: active ? theme.font.bold : theme.font.semibold }
-                  ]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Stat value={String(bestResult)} label="En çok tutan" color={c.gold} theme={theme} divider={false} />
         </Surface>
 
         <Surface style={s.card}>
@@ -328,7 +283,7 @@ export default function ProfileScreen() {
             onPress={() => { softHaptic(); handleSignOut(); }}
             style={[s.danger, { backgroundColor: c.dangerSoft, borderColor: c.danger + '33' }]}
           >
-            <TrashIcon color={c.danger} size={20} />
+            <LogOutIcon color={c.danger} size={20} />
             <Text style={[s.dangerText, { color: c.danger }]}>Çıkış Yap</Text>
           </PressableScale>
         )}
@@ -411,13 +366,6 @@ function makeStyles(theme: AppTheme) {
 
     card: { marginHorizontal: spacing.xl, marginBottom: spacing.md, paddingHorizontal: 18, paddingVertical: 16 },
     cardLabel: { ...ty.micro, color: c.text2, marginBottom: 10 },
-
-    themeSeg: { flexDirection: 'row', gap: 3, padding: 4, borderRadius: 13 },
-    themeOpt: {
-      flex: 1, flexDirection: 'row', alignItems: 'center',
-      justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10,
-    },
-    themeOptText: { fontSize: 13 },
 
     menuRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13 },
     menuIcon: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },

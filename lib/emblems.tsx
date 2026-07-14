@@ -1,8 +1,9 @@
 // lib/emblems.tsx
 import React from 'react';
-import { Image, StyleSheet } from 'react-native';
+import { Image } from 'react-native';
 import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
 import { GameAccent } from '../constants/theme';
+import { useTheme } from './theme';
 
 type EmblemProps = { game: string; size?: number };
 
@@ -46,17 +47,18 @@ export const GameEmblem = React.memo(function GameEmblem({ game, size = 40 }: Em
   );
 });
 
-// bg ve fg prop'ları kaldırıldı — icon.png kullandığı için bu renkler etkisiz
 export function BrandMark({ size = 40 }: { size?: number }) {
+  const theme = useTheme();
+  const source =
+    theme.mode === 'dark'
+      ? require('../assets/images/LottoAI-clover-white-1024.png')
+      : require('../assets/images/LottoAI-clover-emerald-1024.png');
+
   return (
     <Image
-    source={require('../assets/images/LottoAI-AppStore-1024.png')}
-      style={[styles.brandImage, { width: size, height: size, borderRadius: size * 0.3 }]}
+      source={source}
+      style={{ width: size, height: size }}
       resizeMode="contain"
     />
   );
 }
-
-const styles = StyleSheet.create({
-  brandImage: {},
-});

@@ -131,7 +131,7 @@ export default function CouponHistory({ game, numbers, bonus, superStar, visible
   }, [visible]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View style={[s.overlay, { backgroundColor: c.overlay }]}>
         <View style={[s.sheet, { backgroundColor: c.surface, paddingBottom: insets.bottom + 16 }]}>
           <View style={s.grabber} />

@@ -7,4 +7,5 @@ export const STORAGE_KEYS = {
     USER_NAME: 'userName',
     THEME_PREF: 'themePref',
     BILDIRIMLER: 'bildirimler',
+    LAST_DRAWS_CACHE: 'lastDrawsCache',
   } as const;

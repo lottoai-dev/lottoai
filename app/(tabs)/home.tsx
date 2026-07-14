@@ -3,19 +3,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Animated,
-  Dimensions,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    Platform,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatPrize } from '../../lib/prizeEstimates';
@@ -23,32 +20,33 @@ import { formatPrize } from '../../lib/prizeEstimates';
 import { AppButton } from '../../components/ui/app-button';
 import { NumberBall } from '../../components/ui/number-ball';
 import { PressableScale, Surface } from '../../components/ui/surface';
+import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme, GameAccent } from '../../constants/theme';
-import { useBildirim, type Bildirim } from '../../contexts/BildirimContext';
+import { useBildirim } from '../../contexts/BildirimContext';
 import { BrandMark, GameEmblem } from '../../lib/emblems';
 import {
-  getDayLabel,
-  getDefaultCountry,
-  getGameByName,
-  getGamesByCountry,
+    getDayLabel,
+    getDefaultCountry,
+    getGameByName,
+    getGamesByCountry,
 } from '../../lib/games';
 import {
-  AIAssistantIcon,
-  ArrowRightIcon,
-  BellIcon,
-  CalendarIcon,
-  ChevronRightIcon,
-  ClockIcon,
-  CloseIcon,
-  SparkIcon,
-  TicketIcon,
-  WifiOffIcon,
+    AIAssistantIcon,
+    ArrowRightIcon,
+    BellIcon,
+    CalendarIcon,
+    ChevronRightIcon,
+    ClockIcon,
+    SparkIcon,
+    TicketIcon,
+    WifiOffIcon,
 } from '../../lib/icons';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 64;
+const ON_NUMARA_PREVIEW_COUNT = 7;
 const LAST_SEEN_PREFIX = 'lastSeenResult_';
 
 function softHaptic() {
@@ -143,7 +141,7 @@ export default function HomeScreen() {
   const theme = useTheme();
   const c = theme.colors;
   const s = useMemo(() => makeStyles(theme), [theme]);
-  const { bildirimler, unreadCount, markAsRead, markAllAsRead } = useBildirim();
+  const { unreadCount } = useBildirim();
 
   const [nextDraw, setNextDraw] = useState(getNextDraw());
   const [parts, setParts] = useState(countdownParts(nextDraw?.diff ?? 0));
@@ -155,10 +153,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [bildirimModalVisible, setBildirimModalVisible] = useState(false);
 
-  const fade = useRef(new Animated.Value(0)).current;
-  const rise = useRef(new Animated.Value(16)).current;
   const todayIndex = getTodayIndex();
 
   const userCountry = getDefaultCountry();
@@ -178,17 +173,13 @@ export default function HomeScreen() {
   }, [countryGames, locale]);
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fade, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(rise, { toValue: 0, friction: 9, useNativeDriver: true }),
-    ]).start();
     const interval = setInterval(() => {
       const next = getNextDraw();
       setNextDraw(next);
       if (next) setParts(countdownParts(next.diff));
     }, 1000);
     return () => clearInterval(interval);
-  }, [fade, rise]);
+  }, []);
 
   const loadSmartSummary = useCallback(async () => {
     try {
@@ -215,26 +206,29 @@ export default function HomeScreen() {
 
   const checkNewResults = useCallback(async () => {
     try {
-      const newGames: string[] = [];
       const today = new Date();
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      for (const game of countryGames) {
-        const { data } = await supabase
-          .from('draws')
-          .select('draw_date')
-          .eq('game', game.name)
-          .order('draw_date_parsed', { ascending: false })
-          .limit(1)
-          .single();
-        if (!data) continue;
-        const lastSeen = await AsyncStorage.getItem(LAST_SEEN_PREFIX + game.name);
-        if (lastSeen !== data.draw_date) {
+
+      const settled = await Promise.all(
+        countryGames.map(async (game) => {
+          const [{ data }, lastSeen] = await Promise.all([
+            supabase
+              .from('draws')
+              .select('draw_date')
+              .eq('game', game.name)
+              .order('draw_date_parsed', { ascending: false })
+              .limit(1)
+              .single(),
+            AsyncStorage.getItem(LAST_SEEN_PREFIX + game.name),
+          ]);
+          if (!data) return null;
+          if (lastSeen === data.draw_date) return null;
           const drawDate = new Date(data.draw_date.split('.').reverse().join('-'));
-          if (drawDate >= yesterday) newGames.push(game.name);
-        }
-      }
-      setNewResults(newGames);
+          return drawDate >= yesterday ? game.name : null;
+        })
+      );
+      setNewResults(settled.filter((name): name is string => name != null));
     } catch {}
   }, [countryGames]);
 
@@ -261,8 +255,28 @@ export default function HomeScreen() {
         return db.localeCompare(da);
       });
       setLastDraws(results);
+      AsyncStorage.setItem(STORAGE_KEYS.LAST_DRAWS_CACHE, JSON.stringify(results)).catch(() => {});
     } catch {}
   }, [countryGames]);
+
+  // Önceki oturumdan cache'i hemen göster — ağ gelene kadar boş ekran olmasın
+  useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem(STORAGE_KEYS.LAST_DRAWS_CACHE)
+      .then((raw) => {
+        if (cancelled || !raw) return;
+        try {
+          const cached = JSON.parse(raw) as LastDraw[];
+          if (Array.isArray(cached) && cached.length > 0) {
+            setLastDraws((prev) => (prev.length > 0 ? prev : cached));
+          }
+        } catch {}
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loadAll = useCallback(async () => {
     setError(null);
@@ -298,26 +312,6 @@ export default function HomeScreen() {
     } catch {}
   }, []);
 
-  const handleBildirimPress = (bildirim: Bildirim) => {
-    softHaptic();
-    markAsRead(bildirim.id);
-    setBildirimModalVisible(false);
-    if (bildirim.screen === 'saved') router.push('/(tabs)/saved');
-    else if (bildirim.screen === 'generate') router.push('/(tabs)/generate');
-  };
-
-  const formatBildirimTime = (isoString: string) => {
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return 'az önce';
-    if (diffMin < 60) return `${diffMin} dk önce`;
-    const diffHour = Math.floor(diffMin / 60);
-    if (diffHour < 24) return `${diffHour} saat önce`;
-    return date.toLocaleDateString('tr-TR');
-  };
-
   const next = nextDraw ? gameMeta(nextDraw.game.name) : null;
   const showDays = parts.days > 0;
 
@@ -342,7 +336,7 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.brand} colors={[c.brand]} />}
       >
         {/* Header */}
-        <Animated.View style={[s.header, { opacity: fade, transform: [{ translateY: rise }] }]}>
+        <View style={s.header}>
           <View style={s.headerLeft}>
             <BrandMark size={42} />
             <View>
@@ -354,7 +348,7 @@ export default function HomeScreen() {
             <PressableScale style={s.iconBtn} onPress={() => { softHaptic(); router.push('/(tabs)/ai-assistant' as any); }}>
               <AIAssistantIcon color={c.brand} size={20} />
             </PressableScale>
-            <PressableScale style={s.iconBtn} onPress={() => { softHaptic(); setBildirimModalVisible(true); }}>
+            <PressableScale style={s.iconBtn} onPress={() => { softHaptic(); router.push('/(tabs)/bildirimler' as any); }}>
               <BellIcon color={c.text2} size={20} />
               {unreadCount > 0 ? (
                 <View style={[s.dot, { borderColor: c.surface }]}>
@@ -365,7 +359,7 @@ export default function HomeScreen() {
               ) : null}
             </PressableScale>
           </View>
-        </Animated.View>
+        </View>
 
         {error ? (
           <Surface style={s.errorCard}>
@@ -377,8 +371,7 @@ export default function HomeScreen() {
 
         {/* Countdown hero */}
         {!error && next ? (
-          <Animated.View style={{ opacity: fade, transform: [{ translateY: rise }] }}>
-            <Surface elevated style={s.hero}>
+          <Surface elevated style={s.hero}>
               <View style={[s.heroAccent, { backgroundColor: next.color }]} />
               <View style={s.heroBody}>
                 <View style={s.heroTop}>
@@ -390,14 +383,14 @@ export default function HomeScreen() {
                 </View>
 
                 <View style={s.timerRow}>
-                  {blocks.map((b, i) => (
-                    <React.Fragment key={b.l}>
-                      <View style={s.timerBlock}>
-                        <Text style={s.timerNum}>{b.v}</Text>
-                        <Text style={s.timerUnit}>{b.l.toUpperCase()}</Text>
-                      </View>
-                      {i < blocks.length - 1 ? <Text style={s.timerColon}>:</Text> : null}
-                    </React.Fragment>
+                  {blocks.map((b) => (
+                    <View
+                      key={b.l}
+                      style={[s.timerBlock, { backgroundColor: next.color + '10', borderColor: next.color + '22' }]}
+                    >
+                      <Text style={s.timerNum}>{b.v}</Text>
+                      <Text style={s.timerUnit}>{b.l}</Text>
+                    </View>
                   ))}
                 </View>
 
@@ -417,7 +410,6 @@ export default function HomeScreen() {
                 />
               </View>
             </Surface>
-          </Animated.View>
         ) : null}
 
         {/* Smart summary */}
@@ -463,6 +455,9 @@ export default function HomeScreen() {
               {lastDraws.map((draw, index) => {
                 const meta = gameMeta(draw.game);
                 const nums = parseNumbers(draw.numbers);
+                const isOnNumara = meta.id === 'onnumara';
+                const displayNums = isOnNumara ? nums.slice(0, ON_NUMARA_PREVIEW_COUNT) : nums;
+                const hiddenCount = isOnNumara ? Math.max(0, nums.length - ON_NUMARA_PREVIEW_COUNT) : 0;
                 const currency = meta.game?.currency || 'TRY';
                 const isNew = newResults.includes(draw.game);
                 return (
@@ -491,17 +486,22 @@ export default function HomeScreen() {
                       </View>
                     </View>
                     <View style={s.drawNumbers}>
-                      {nums.map((n, i) => (
+                      {displayNums.map((n, i) => (
                         <NumberBall key={i} value={n} color={meta.color} size={34} />
                       ))}
-                      {draw.bonus && draw.bonus !== '-' ? (
-                        <>
-                          <View style={s.ballDivider} />
-                          <NumberBall value={draw.bonus} variant="bonus" size={34} />
-                        </>
+                      {!isOnNumara && draw.bonus && draw.bonus !== '-' ? (
+                        <NumberBall value={draw.bonus} variant="bonus" size={34} />
                       ) : null}
-                      {draw.superstar != null && draw.superstar > 0 ? (
+                      {!isOnNumara && draw.superstar != null && draw.superstar > 0 ? (
                         <NumberBall value={draw.superstar} variant="star" size={34} />
+                      ) : null}
+                      {hiddenCount > 0 ? (
+                        <NumberBall
+                          value={`+${hiddenCount}`}
+                          variant="muted"
+                          size={34}
+                          style={{ backgroundColor: `${meta.color}28`, borderColor: `${meta.color}55` }}
+                        />
                       ) : null}
                     </View>
                     {draw.estimated_prize != null && draw.estimated_prize > 0 ? (
@@ -577,64 +577,6 @@ export default function HomeScreen() {
           </>
         ) : null}
       </ScrollView>
-
-      {/* Bildirim Modalı */}
-      <Modal
-        visible={bildirimModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setBildirimModalVisible(false)}
-      >
-        <View style={[s.modalOverlay, { backgroundColor: c.overlay }]}>
-          <View style={[s.modalSheet, { backgroundColor: c.surface, paddingBottom: insets.bottom + 16 }]}>
-            <View style={s.modalGrabber} />
-            <View style={s.modalHead}>
-              <Text style={s.modalTitle}>Bildirimler</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                {bildirimler.length > 0 ? (
-                  <Pressable onPress={() => { softHaptic(); markAllAsRead(); }} hitSlop={8}>
-                    <Text style={[s.modalAction, { color: c.brand }]}>Tümünü okundu işaretle</Text>
-                  </Pressable>
-                ) : null}
-                <Pressable onPress={() => { softHaptic(); setBildirimModalVisible(false); }} style={[s.modalClose, { backgroundColor: c.surfaceAlt }]} hitSlop={8}>
-                  <CloseIcon color={c.text2} size={20} />
-                </Pressable>
-              </View>
-            </View>
-
-            {bildirimler.length === 0 ? (
-              <View style={s.emptyBildirim}>
-                <BellIcon color={c.text3} size={40} />
-                <Text style={[s.emptyBildirimText, { color: c.text3 }]}>Henüz bildirim yok</Text>
-              </View>
-            ) : (
-              <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
-                {bildirimler.map((b) => (
-                  <TouchableOpacity
-                    key={b.id}
-                    style={[s.bildirimItem, !b.isRead && { backgroundColor: c.brandSoft }]}
-                    onPress={() => handleBildirimPress(b)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[s.bildirimDot, { backgroundColor: b.isRead ? 'transparent' : c.brand }]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.bildirimTitle, { color: c.text }]} numberOfLines={1}>
-                        {b.title}
-                      </Text>
-                      <Text style={[s.bildirimBody, { color: c.text2 }]} numberOfLines={2}>
-                        {b.body}
-                      </Text>
-                      <Text style={[s.bildirimTime, { color: c.text3 }]}>
-                        {formatBildirimTime(b.createdAt)}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -666,11 +608,10 @@ function makeStyles(theme: AppTheme) {
     gamePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill },
     gameDot: { width: 7, height: 7, borderRadius: 4 },
     gamePillText: { ...ty.label, fontSize: 12 },
-    timerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: spacing.md },
-    timerBlock: { alignItems: 'center' },
-    timerNum: { fontFamily: theme.font.extrabold, fontSize: 46, lineHeight: 48, color: c.text, fontVariant: ['tabular-nums'], letterSpacing: -1.4, includeFontPadding: false },
-    timerUnit: { ...ty.micro, color: c.text3, marginTop: 6 },
-    timerColon: { fontFamily: theme.font.bold, fontSize: 34, color: c.text3, marginBottom: 12 },
+    timerRow: { flexDirection: 'row', gap: 8, marginTop: spacing.md },
+    timerBlock: { flex: 1, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 6, borderRadius: radius.lg, borderWidth: 1 },
+    timerNum: { fontFamily: theme.font.bold, fontSize: 32, lineHeight: 36, color: c.text, letterSpacing: -0.4, includeFontPadding: false },
+    timerUnit: { ...ty.caption, color: c.text3, marginTop: 4 },
     heroDateRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: spacing.md },
     heroDate: { ...ty.caption, color: c.text2, textTransform: 'capitalize' },
 
@@ -693,7 +634,6 @@ function makeStyles(theme: AppTheme) {
     drawDateRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
     drawDate: { ...ty.caption, color: c.text3 },
     drawNumbers: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7 },
-    ballDivider: { width: 1, height: 30, backgroundColor: c.hairline, marginHorizontal: 2 },
     prizeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg, paddingTop: 14, borderTopWidth: 1, borderTopColor: c.hairline },
     prizeLabel: { ...ty.caption, color: c.text2 },
     prizeAmount: { fontFamily: theme.font.extrabold, fontSize: 15, color: c.text, fontVariant: ['tabular-nums'] },
@@ -712,20 +652,5 @@ function makeStyles(theme: AppTheme) {
     scheduleEmpty: { ...ty.caption, color: c.text3 },
     gameChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 5, paddingLeft: 6, paddingRight: 10, borderRadius: radius.pill, borderWidth: 1 },
     gameChipText: { ...ty.caption, fontFamily: theme.font.semibold },
-
-    modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-    modalSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing.xl },
-    modalGrabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: c.border, marginBottom: spacing.lg },
-    modalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
-    modalTitle: { ...ty.h2, color: c.text },
-    modalAction: { ...ty.label, color: c.brand },
-    modalClose: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-    emptyBildirim: { alignItems: 'center', paddingVertical: 40, gap: 12 },
-    emptyBildirimText: { ...ty.body, color: c.text3 },
-    bildirimItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, borderRadius: radius.lg, marginBottom: 6 },
-    bildirimDot: { width: 10, height: 10, borderRadius: 5, marginTop: 6 },
-    bildirimTitle: { ...ty.bodySemibold, color: c.text, marginBottom: 2 },
-    bildirimBody: { ...ty.caption, color: c.text2, lineHeight: 18 },
-    bildirimTime: { ...ty.micro, color: c.text3, marginTop: 6, letterSpacing: 0 },
   });
 }

@@ -1,6 +1,6 @@
 // components/ui/surface.tsx
-import React, { useRef } from 'react';
-import { Animated, Pressable, View, type ViewProps, type ViewStyle } from 'react-native';
+import React from 'react';
+import { Pressable, View, type ViewProps, type ViewStyle } from 'react-native';
 import { useTheme } from '../../lib/theme';
 
 export function Surface({
@@ -41,22 +41,15 @@ export const PressableScale = React.memo(function PressableScale({
   style?: ViewStyle | ViewStyle[];
   disabled?: boolean;
 }) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const to = (v: number) =>
-    Animated.spring(scale, { toValue: v, useNativeDriver: true, speed: 40, bounciness: 0 }).start();
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <Pressable
-        disabled={disabled}
-        onPressIn={() => to(0.97)}
-        onPressOut={() => to(1)}
-        onPress={() => {
-          onPress?.();
-        }}
-        style={style}
-      >
-        {children}
-      </Pressable>
-    </Animated.View>
+    <Pressable
+      disabled={disabled}
+      onPress={() => {
+        onPress?.();
+      }}
+      style={style}
+    >
+      {children}
+    </Pressable>
   );
 });

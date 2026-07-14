@@ -1,8 +1,6 @@
 // components/ui/app-alert.tsx
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
-    Animated,
-    Easing,
     Modal,
     Pressable,
     StyleSheet,
@@ -28,40 +26,6 @@ type Props = {
 export function AppAlert({ visible, title, message, buttons = [], onDismiss }: Props) {
   const theme = useTheme();
   const c = theme.colors;
-  const scale = useRef(new Animated.Value(0.9)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 200,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.spring(scale, {
-          toValue: 1,
-          speed: 20,
-          bounciness: 6,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scale, {
-          toValue: 0.9,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [visible]);
 
   const defaultButtons: AlertButton[] = buttons.length > 0 ? buttons : [{ text: 'Tamam', style: 'default' }];
 
@@ -75,15 +39,13 @@ export function AppAlert({ visible, title, message, buttons = [], onDismiss }: P
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onDismiss}>
-      <Animated.View style={[styles.overlay, { backgroundColor: c.overlay, opacity }]}>
-        <Animated.View
+      <View style={[styles.overlay, { backgroundColor: c.overlay }]}>
+        <View
           style={[
             styles.card,
             {
               backgroundColor: c.surface,
               borderColor: c.border,
-              transform: [{ scale }],
-              opacity,
             },
             theme.shadowSm,
           ]}
@@ -108,8 +70,8 @@ export function AppAlert({ visible, title, message, buttons = [], onDismiss }: P
               <Pressable
                 key={i}
                 onPress={() => {
-                  onDismiss();
                   btn.onPress?.();
+                  onDismiss();
                 }}
                 style={({ pressed }) => [
                   styles.button,
@@ -127,8 +89,8 @@ export function AppAlert({ visible, title, message, buttons = [], onDismiss }: P
               </Pressable>
             ))}
           </View>
-        </Animated.View>
-      </Animated.View>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -172,10 +134,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   button: {
-    flex: 1,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 48,
   },
   buttonHalf: {
     flex: 1,

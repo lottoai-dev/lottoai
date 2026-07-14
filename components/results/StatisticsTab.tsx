@@ -294,22 +294,28 @@ export function StatisticsTab({ game }: { game: Game }) {
               </View>
             ))}
 
-          {activeTab === 'cold' &&
-            coldNumbers.map((item, i) => (
-              <View key={item.number} style={s.barRow}>
-                <View style={[s.rank, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
-                  <Text style={s.rankText}>{i + 1}</Text>
+          {activeTab === 'cold' && (
+            <>
+              {coldNumbers.map((item, i) => (
+                <View key={item.number} style={s.barRow}>
+                  <View style={[s.rank, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+                    <Text style={s.rankText}>{i + 1}</Text>
+                  </View>
+                  <NumberBall value={item.number} color={mainColor} size={38} />
+                  <View style={[s.track, { backgroundColor: c.hairline }]}>
+                    <View style={[s.fill, { width: `${(item.missingSince / maxMissing) * 100}%`, backgroundColor: mainColor }]} />
+                  </View>
+                  <View style={s.barVal}>
+                    <Text style={s.barCount}>{item.missingSince}</Text>
+                    <Text style={s.barPct}>çekiliş</Text>
+                  </View>
                 </View>
-                <NumberBall value={item.number} color={mainColor} size={38} />
-                <View style={[s.track, { backgroundColor: c.hairline }]}>
-                  <View style={[s.fill, { width: `${(item.missingSince / maxMissing) * 100}%`, backgroundColor: mainColor }]} />
-                </View>
-                <View style={s.barVal}>
-                  <Text style={s.barCount}>{item.missingSince}</Text>
-                  <Text style={s.barPct}>çekiliş</Text>
-                </View>
+              ))}
+              <View style={s.pad}>
+                <StatNote text="Bir sayının uzun süredir çıkmamış olması, bir sonraki çekilişte çıkma ihtimalini ARTIRMAZ — her çekiliş bağımsızdır, geçmiş sonuçları 'hatırlamaz'." theme={theme} />
               </View>
-            ))}
+            </>
+          )}
 
           {activeTab === 'distribution' && (
             <View style={s.pad}>
@@ -388,7 +394,7 @@ export function StatisticsTab({ game }: { game: Game }) {
                   </View>
                 ))}
               </Surface>
-              <StatNote text="Kuponunun toplamı ortalamaya yakınsa daha dengeli sayılır." theme={theme} />
+              <StatNote text="Toplamlar geçmiş çekilişlere aittir; hiçbir toplam diğerinden daha olası ya da 'doğru' değildir, her çekiliş bağımsızdır." theme={theme} />
             </View>
           )}
 

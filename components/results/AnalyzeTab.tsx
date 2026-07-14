@@ -4,7 +4,7 @@ import { Keyboard, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppTheme, GameAccent } from '../../constants/theme';
 import type { Game } from '../../lib/games';
-import { FlameIcon, SearchIcon, SnowflakeIcon } from '../../lib/icons';
+import { SearchIcon } from '../../lib/icons';
 import { safeQuery, supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
 import { AppButton } from '../ui/app-button';
@@ -18,7 +18,7 @@ function parseNumbers(str: string): number[] {
   return str.split(' - ').map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
 }
 
-type Stat = { number: number; count: number; lastSeen: string; hot: boolean; missingSince: number; topPairs: number[] };
+type Stat = { number: number; count: number; lastSeen: string; missingSince: number; topPairs: number[] };
 
 export function AnalyzeTab({ game }: { game: Game }) {
   const theme = useTheme();
@@ -69,7 +69,6 @@ export function AnalyzeTab({ game }: { game: Game }) {
       .filter((n) => !isNaN(n) && n >= 1 && n <= game.max);
     if (numbers.length === 0) return;
 
-    const avgExpected = draws.length > 0 ? draws.length / game.max : 0;
     const stats: Stat[] = numbers.map((num) => {
       let count = 0;
       let lastSeen = 'Hiç çıkmadı';
@@ -88,7 +87,7 @@ export function AnalyzeTab({ game }: { game: Game }) {
         }
       }
       const topPairs = Object.entries(pairFreq).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n]) => parseInt(n, 10));
-      return { number: num, count, lastSeen, hot: count > avgExpected, missingSince, topPairs };
+      return { number: num, count, lastSeen, missingSince, topPairs };
     });
     setResult({ stats });
   };
@@ -124,17 +123,10 @@ export function AnalyzeTab({ game }: { game: Game }) {
           </View>
           {result.stats.map((stat) => (
             <Surface key={stat.number} style={s.statCard}>
-              <NumberBall value={stat.number} color={stat.hot ? mainColor : c.text3} size={46} />
+              <NumberBall value={stat.number} color={mainColor} size={46} />
               <View style={s.statInfo}>
                 <Row label="Toplam çıkış" valueColor={mainColor} value={`${stat.count} kez`} theme={theme} />
                 <Row label="Son çıkış" valueColor={c.text} value={stat.lastSeen} theme={theme} />
-                <View style={s.statRow}>
-                  <Text style={s.statLabel}>Durum</Text>
-                  <View style={s.statusVal}>
-                    {stat.hot ? <FlameIcon color={c.warning} size={14} /> : <SnowflakeIcon color={c.text3} size={14} />}
-                    <Text style={[s.statValue, { color: stat.hot ? c.warning : c.text3 }]}>{stat.hot ? 'Sıcak' : 'Soğuk'}</Text>
-                  </View>
-                </View>
                 {stat.missingSince > 0 ? (
                   <Row label="Gecikme" valueColor={c.warning} value={`${stat.missingSince} çekiliş`} theme={theme} />
                 ) : null}
@@ -185,10 +177,7 @@ function makeStyles(theme: AppTheme) {
     infoLineText: { ...ty.caption, color: c.text3 },
     statCard: { marginHorizontal: 20, marginBottom: 10, padding: spacing.lg, flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
     statInfo: { flex: 1 },
-    statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     statLabel: { ...ty.caption, color: c.text2 },
-    statValue: { ...ty.caption, fontFamily: theme.font.bold },
-    statusVal: { flexDirection: 'row', alignItems: 'center', gap: 5 },
     pairsBlock: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.hairline },
     pairsRow: { flexDirection: 'row', gap: 6, marginTop: 7 },
     pairBall: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
