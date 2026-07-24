@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '../../components/ui/surface';
 import { AppTheme } from '../../constants/theme';
+import { softHaptic } from '../../lib/haptics';
 import { BackIcon, ChevronDownIcon } from '../../lib/icons';
 import { useTheme } from '../../lib/theme';
 
@@ -22,6 +23,7 @@ const FAQ = [
   { q: 'Hatırlatıcılar nasıl çalışır?', a: 'Profil > Hatırlatıcılar ekranından istediğiniz oyunlar için çekiliş öncesi ve sonrası bildirimleri açabilirsiniz.' },
   { q: 'Uygulama internet gerektiriyor mu?', a: 'Sonuçlar, istatistikler ve AI Asistan için internet gerekir. Kupon üretme ve kaydetme çevrimdışı da çalışır.' },
   { q: 'Verilerim güvende mi?', a: 'Evet. Hesap ve kupon verileriniz güvenli sunucularda saklanır. AI Asistan ile yaptığınız sohbetler, yanıtların kalitesini artırmak amacıyla hesabınızla ilişkilendirilerek kaydedilir; bu kayıtlara yalnızca LottoAI ekibi erişebilir, üçüncü şahıslarla paylaşılmaz veya satılmaz. Detaylar için Gizlilik Politikamıza göz atabilirsiniz.' },
+  { q: 'Hesabımı nasıl silerim?', a: 'Profil ekranındaki "Hesabımı sil" seçeneği ile hesabınızı, AI sohbet kayıtlarınızı ve bu cihazdaki verilerinizi kalıcı olarak silebilirsiniz. Bu işlem geri alınamaz.' },
   { q: 'Bu uygulama kumar teşvik ediyor mu?', a: 'Hayır. LottoAI yalnızca bilgilendirme amaçlı bir araçtır. Şans oyunları bağımlılık yapabilir. Lütfen sorumlu oynayın. Yardım için: Yeşilay 115.' },
 ];
 
@@ -43,8 +45,8 @@ export default function LegalScreen() {
       <View style={{ paddingTop: insets.top + 6 }}>
         <View style={s.nav}>
           <Pressable
-            onPress={() => router.back()}
-            style={[s.navBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+            onPress={() => { softHaptic(); router.back(); }}
+            style={[s.navBtn, { backgroundColor: c.surface }]}
             hitSlop={6}
           >
             <BackIcon color={c.text2} size={22} />
@@ -66,7 +68,7 @@ export default function LegalScreen() {
               <PressableScale
                 key={index}
                 onPress={() => toggle(index)}
-                style={[s.faqItem, { backgroundColor: c.surface, borderColor: c.border }]}
+                style={[s.faqItem, { backgroundColor: c.surface }]}
               >
                 <View style={s.faqHead}>
                   <Text style={s.faqQ}>{item.q}</Text>
@@ -93,9 +95,9 @@ function makeStyles(theme: AppTheme) {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingHorizontal: 16, paddingBottom: spacing.md,
     },
-    navBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+    navBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' },
     navTitle: { ...ty.h3, color: c.text },
-    faqItem: { borderRadius: radius.lg, borderWidth: 1, padding: 16 },
+    faqItem: { borderRadius: radius.xl, backgroundColor: c.surface, padding: 16 },
     faqHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     faqQ: { ...ty.bodySemibold, color: c.text, flex: 1 },
     faqA: { ...ty.body, color: c.text2, lineHeight: 22, marginTop: 12 },

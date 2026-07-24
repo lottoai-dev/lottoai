@@ -1,16 +1,17 @@
 // components/ui/app-button.tsx
-// Primary/secondary/ghost button.
+// Primary/secondary/ghost button — Calm Emerald.
 
 import React from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type ViewStyle,
+    ActivityIndicator,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
+    type ViewStyle,
 } from 'react-native';
 import { FontFamily } from '../../constants/theme';
+import { softHaptic } from '../../lib/haptics';
 import { useTheme } from '../../lib/theme';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
@@ -27,6 +28,7 @@ export function AppButton({
   style,
   fullWidth = true,
   accent,
+  haptic = true,
 }: {
   label: string;
   onPress?: () => void;
@@ -39,38 +41,42 @@ export function AppButton({
   style?: ViewStyle;
   fullWidth?: boolean;
   accent?: string;
+  haptic?: boolean;
 }) {
   const theme = useTheme();
   const c = theme.colors;
 
   const brand = accent ?? c.brand;
   const height = size === 'lg' ? 52 : size === 'md' ? 46 : 40;
-  const fontSize = size === 'lg' ? 15.5 : size === 'md' ? 14.5 : 13.5;
+  const fontSize = size === 'lg' ? 15 : size === 'md' ? 14 : 13;
   const iconSize = size === 'lg' ? 20 : 18;
 
   let bg = brand;
   let fg = c.brandText;
-  let border: ViewStyle = {};
-  if (variant === 'secondary') { bg = c.surfaceAlt; fg = c.text; border = { borderWidth: 1, borderColor: c.border }; }
-  if (variant === 'ghost') { bg = 'transparent'; fg = brand; }
+  if (variant === 'secondary') {
+    bg = c.surfaceAlt;
+    fg = accent ? accent : c.text;
+  }
+  if (variant === 'ghost') {
+    bg = 'transparent';
+    fg = brand;
+  }
 
   return (
     <View style={[fullWidth && { width: '100%' }, style]}>
       <Pressable
         disabled={disabled || loading}
         onPress={() => {
+          if (haptic) softHaptic();
           onPress?.();
         }}
         style={[
           styles.btn,
-          { height, borderRadius: theme.radius.lg, backgroundColor: bg, opacity: disabled ? 0.5 : 1 },
-          border,
-          variant === 'primary' && {
-            shadowColor: brand,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.32,
-            shadowRadius: 12,
-            elevation: 4,
+          {
+            height,
+            borderRadius: theme.radius.pill,
+            backgroundColor: bg,
+            opacity: disabled ? 0.45 : 1,
           },
         ]}
       >
@@ -91,7 +97,7 @@ export function AppButton({
 }
 
 const styles = StyleSheet.create({
-  btn: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
+  btn: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  label: { fontFamily: FontFamily.bold, letterSpacing: -0.1 },
+  label: { fontFamily: FontFamily.semibold, letterSpacing: -0.1 },
 });

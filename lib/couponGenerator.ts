@@ -54,6 +54,10 @@ export type NumberConstraints = {
   avoidObviousPatterns?: boolean;
   /** Kupon sadece asal sayılardan oluşur (2, 3, 5, 7, 11...). */
   onlyPrimes?: boolean;
+  /** Kupon sadece çift sayılardan oluşur. */
+  onlyEven?: boolean;
+  /** Kupon sadece tek sayılardan oluşur. */
+  onlyOdd?: boolean;
 };
 
 /** Bir sayının asal olup olmadığını kontrol eder. */
@@ -156,6 +160,12 @@ function satisfiesConstraints(numbers: number[], max: number, constraints: Numbe
     return false;
   }
   if (constraints.onlyPrimes && !numbers.every(isPrime)) {
+    return false;
+  }
+  if (constraints.onlyEven && !numbers.every((n) => n % 2 === 0)) {
+    return false;
+  }
+  if (constraints.onlyOdd && !numbers.every((n) => n % 2 !== 0)) {
     return false;
   }
   return true;
@@ -270,6 +280,14 @@ function generateCandidate(count: number, max: number, constraints: NumberConstr
   if (constraints.onlyPrimes) {
     pool = pool.filter(isPrime);
   }
+  // Aynı verimlilik mantığı çift/tek için de geçerli — havuzu baştan
+  // daraltmazsak, örn. On Numara'da (1-80) 500 denemenin yarısı boşa gider.
+  if (constraints.onlyEven) {
+    pool = pool.filter((n) => n % 2 === 0);
+  }
+  if (constraints.onlyOdd) {
+    pool = pool.filter((n) => n % 2 !== 0);
+  }
   if (pool.length < count - picked.size) return null; // yeterli sayı kalmadı
 
   if (constraints.sumRange) {
@@ -382,6 +400,25 @@ export function checkPrimeFeasibility(count: number, max: number): PrimeFeasibil
 }
 
 /**
+ * Aynı fizibilite kontrolünün "sadece çift" / "sadece tek" karşılığı.
+ * Pratikte desteklenen oyunların hiçbirinde bu imkansız olmaz (1-90 gibi
+ * aralıklarda her zaman yeterince çift/tek sayı var), ama tutarlılık ve
+ * ileride küçük aralıklı bir oyun eklenirse güvenlik için hazır tutuyoruz.
+ */
+export type ParityFeasibility = {
+  feasible: boolean;
+  availableCount: number;
+};
+
+export function checkParityFeasibility(count: number, max: number, parity: 'even' | 'odd'): ParityFeasibility {
+  let availableCount = 0;
+  for (let n = 1; n <= max; n++) {
+    if (parity === 'even' ? n % 2 === 0 : n % 2 !== 0) availableCount++;
+  }
+  return { feasible: availableCount >= count, availableCount };
+}
+
+/**
  * Bir kuponun hangi kısıtlamaları KARŞILAMADIĞINI tespit eder. `relaxed: true`
  * döndüğünde, kullanıcıya "bazı özel şartlar karşılanamadı" gibi genel bir
  * mesaj yerine, TAM OLARAK hangi isteğin karşılanamadığını söylemek için
@@ -395,7 +432,9 @@ export type ConstraintKey =
   | 'avoidObviousPatterns'
   | 'mustInclude'
   | 'mustExclude'
-  | 'onlyPrimes';
+  | 'onlyPrimes'
+  | 'onlyEven'
+  | 'onlyOdd';
 
 export function getViolatedConstraints(
   numbers: number[],
@@ -430,6 +469,12 @@ export function getViolatedConstraints(
   }
   if (constraints.onlyPrimes && !numbers.every(isPrime)) {
     violated.push('onlyPrimes');
+  }
+  if (constraints.onlyEven && !numbers.every((n) => n % 2 === 0)) {
+    violated.push('onlyEven');
+  }
+  if (constraints.onlyOdd && !numbers.every((n) => n % 2 !== 0)) {
+    violated.push('onlyOdd');
   }
 
   return violated;

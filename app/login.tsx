@@ -1,6 +1,7 @@
 // app/login.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { GoogleSignin, isErrorWithCode, statusCodes } from '@react-native-google-signin/google-signin';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -17,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandMark } from '../lib/emblems';
+import { softHaptic } from '../lib/haptics';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../lib/theme';
 
@@ -37,6 +39,8 @@ export default function LoginScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -45,6 +49,16 @@ export default function LoginScreen() {
       webClientId: '775120851198-fkplgqbpkljuf173g63d5ivpr6mt2c5o.apps.googleusercontent.com',
       scopes: ['email', 'profile'],
     });
+  }, []);
+
+  useEffect(() => {
+    // Apple girişi sadece iOS'ta ve native modül build'e dahilse kullanılabilir.
+    // Bu kontrol sayesinde Android'de veya eski build'lerde buton hiç görünmez.
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync()
+        .then(setAppleAvailable)
+        .catch(() => setAppleAvailable(false));
+    }
   }, []);
 
   const resetState = () => {
@@ -93,6 +107,45 @@ export default function LoginScreen() {
       }
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setAppleLoading(true);
+    setError(null);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        setError('Apple girişi başarısız. Tekrar dene.');
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+
+      if (error) {
+        setError('Apple ile giriş yapılamadı. Tekrar dene.');
+        return;
+      }
+
+      router.canGoBack() ? router.back() : router.replace('/(tabs)/home');
+
+    } catch (err: any) {
+      if (err?.code === 'ERR_REQUEST_CANCELED') {
+        // kullanıcı iptal etti — sessizce geç
+      } else {
+        setError('Apple ile giriş yapılamadı. Tekrar dene.');
+      }
+    } finally {
+      setAppleLoading(false);
     }
   };
 
@@ -175,8 +228,8 @@ export default function LoginScreen() {
   };
 
   const subtitles: Record<Mode, string> = {
-    login: 'Kuponlarına her yerden eriş',
-    register: 'Ücretsiz hesap oluştur, kuponlarını kaydet',
+    login: 'Kuponlarını kaydet ve AI Asistan\'ı kullan',
+    register: 'Ücretsiz hesap oluştur; kupon kaydet, AI kullan',
     forgot: 'E-postanı gir, sıfırlama bağlantısı gönderelim',
   };
 
@@ -195,10 +248,8 @@ export default function LoginScreen() {
       zIndex: 10,
       width: 40,
       height: 40,
-      borderRadius: 12,
+      borderRadius: 20,
       backgroundColor: c.surface,
-      borderWidth: 1,
-      borderColor: c.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -214,7 +265,7 @@ export default function LoginScreen() {
     },
     
     title: {
-      fontFamily: theme.font.extrabold,
+      fontFamily: theme.font.bold,
       fontSize: 26,
       color: c.text,
       marginBottom: 6,
@@ -239,14 +290,12 @@ export default function LoginScreen() {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: c.surface,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: c.border,
-      paddingHorizontal: 16,
+      borderRadius: 999,
+      paddingHorizontal: 18,
       height: 52,
     },
     inputWrapperFocused: {
-      borderColor: c.brand,
+      backgroundColor: c.elevated,
     },
     input: {
       flex: 1,
@@ -257,7 +306,7 @@ export default function LoginScreen() {
     eyeButton: { padding: 4 },
     errorBox: {
       backgroundColor: c.dangerSoft,
-      borderRadius: 12,
+      borderRadius: 16,
       padding: 14,
       marginTop: 12,
       flexDirection: 'row',
@@ -273,11 +322,9 @@ export default function LoginScreen() {
     },
     successBox: {
       backgroundColor: c.brandSoft,
-      borderRadius: 12,
+      borderRadius: 16,
       padding: 14,
       marginTop: 12,
-      borderWidth: 1,
-      borderColor: c.brandBorder,
     },
     successText: {
       fontFamily: theme.font.medium,
@@ -287,7 +334,7 @@ export default function LoginScreen() {
     },
     submitButton: {
       backgroundColor: c.brand,
-      borderRadius: 14,
+      borderRadius: 999,
       height: 54,
       justifyContent: 'center',
       alignItems: 'center',
@@ -295,7 +342,7 @@ export default function LoginScreen() {
     },
     submitButtonDisabled: { opacity: 0.6 },
     submitButtonText: {
-      fontFamily: theme.font.bold,
+      fontFamily: theme.font.semibold,
       color: c.brandText,
       fontSize: 16,
     },
@@ -317,10 +364,8 @@ export default function LoginScreen() {
       justifyContent: 'center',
       gap: 10,
       backgroundColor: c.surface,
-      borderRadius: 14,
+      borderRadius: 999,
       height: 54,
-      borderWidth: 1,
-      borderColor: c.border,
       marginTop: 12,
     },
     googleButtonDisabled: { opacity: 0.6 },
@@ -342,6 +387,11 @@ export default function LoginScreen() {
       color: c.text,
       fontSize: 15,
     },
+    appleButton: {
+      height: 54,
+      marginTop: 12,
+    },
+    appleButtonDisabled: { opacity: 0.6 },
     footer: {
       marginTop: 28,
       gap: 14,
@@ -395,7 +445,11 @@ export default function LoginScreen() {
     >
       <Pressable
         style={s.backButton}
-        onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')}
+        onPress={() => {
+          softHaptic();
+          if (router.canGoBack()) router.back();
+          else router.replace('/(tabs)/home');
+        }}
       >
         <Ionicons name="arrow-back" size={20} color={c.text2} />
       </Pressable>
@@ -441,7 +495,7 @@ export default function LoginScreen() {
                   secureTextEntry={!passwordVisible}
                   autoCapitalize="none"
                 />
-                <Pressable style={s.eyeButton} onPress={() => setPasswordVisible(!passwordVisible)}>
+                <Pressable style={s.eyeButton} onPress={() => { softHaptic(); setPasswordVisible(!passwordVisible); }}>
                   <Ionicons
                     name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
                     size={20}
@@ -468,11 +522,11 @@ export default function LoginScreen() {
           {mode !== 'forgot' && (
             <Text style={s.consentText}>
               {mode === 'register' ? 'Kayıt olarak' : 'Giriş yaparak veya hesap oluşturarak'}{' '}
-              <Text style={s.consentLink} onPress={() => Linking.openURL(TERMS_URL)}>
+              <Text style={s.consentLink} onPress={() => { softHaptic(); Linking.openURL(TERMS_URL); }}>
                 Kullanım Koşulları
               </Text>
               {"'"}nı ve{' '}
-              <Text style={s.consentLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
+              <Text style={s.consentLink} onPress={() => { softHaptic(); Linking.openURL(PRIVACY_URL); }}>
                 Gizlilik Politikası
               </Text>
               {"'"}nı kabul etmiş, 18 yaşından büyük olduğunu beyan etmiş olursun.
@@ -481,7 +535,7 @@ export default function LoginScreen() {
 
           <Pressable
             style={[s.submitButton, loading && s.submitButtonDisabled]}
-            onPress={handleSubmit}
+            onPress={() => { softHaptic(); handleSubmit(); }}
             disabled={loading}
           >
             {loading
@@ -500,7 +554,7 @@ export default function LoginScreen() {
 
               <Pressable
                 style={[s.googleButton, googleLoading && s.googleButtonDisabled]}
-                onPress={handleGoogleSignIn}
+                onPress={() => { softHaptic(); handleGoogleSignIn(); }}
                 disabled={googleLoading}
               >
                 {googleLoading
@@ -513,6 +567,22 @@ export default function LoginScreen() {
                   )
                 }
               </Pressable>
+
+              {appleAvailable && (
+                <View style={appleLoading ? s.appleButtonDisabled : undefined}>
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                    cornerRadius={27}
+                    style={s.appleButton}
+                    onPress={() => {
+                      if (appleLoading) return;
+                      softHaptic();
+                      handleAppleSignIn();
+                    }}
+                  />
+                </View>
+              )}
             </>
           )}
         </View>
@@ -523,11 +593,11 @@ export default function LoginScreen() {
             <>
               <View style={s.switchRow}>
                 <Text style={s.switchText}>Hesabın yok mu?</Text>
-                <Pressable onPress={() => { setMode('register'); resetState(); }}>
+                <Pressable onPress={() => { softHaptic(); setMode('register'); resetState(); }}>
                   <Text style={s.switchLink}>Kayıt Ol</Text>
                 </Pressable>
               </View>
-              <Pressable onPress={() => { setMode('forgot'); resetState(); }}>
+              <Pressable onPress={() => { softHaptic(); setMode('forgot'); resetState(); }}>
                 <Text style={s.forgotText}>Şifremi unuttum</Text>
               </Pressable>
             </>
@@ -536,20 +606,24 @@ export default function LoginScreen() {
           {mode === 'register' && (
             <View style={s.switchRow}>
               <Text style={s.switchText}>Zaten hesabın var mı?</Text>
-              <Pressable onPress={() => { setMode('login'); resetState(); }}>
+              <Pressable onPress={() => { softHaptic(); setMode('login'); resetState(); }}>
                 <Text style={s.switchLink}>Giriş Yap</Text>
               </Pressable>
             </View>
           )}
 
           {mode === 'forgot' && (
-            <Pressable onPress={() => { setMode('login'); resetState(); }}>
+            <Pressable onPress={() => { softHaptic(); setMode('login'); resetState(); }}>
               <Text style={s.switchLink}>Giriş ekranına dön</Text>
             </Pressable>
           )}
 
           {mode !== 'forgot' && (
-            <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')}>
+            <Pressable onPress={() => {
+              softHaptic();
+              if (router.canGoBack()) router.back();
+              else router.replace('/(tabs)/home');
+            }}>
               <Text style={s.guestText}>Şimdilik devam et, giriş yapma</Text>
             </Pressable>
           )}

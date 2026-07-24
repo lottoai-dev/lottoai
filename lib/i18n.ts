@@ -77,6 +77,10 @@ export const t = (key: string, params?: Record<string, string | number>): string
     onboarding_results_desc: 'Çekiliş sonuçlarını anında gör, kuponlarını otomatik kontrol et.',
     onboarding_stats_title: 'Detaylı istatistikler',
     onboarding_stats_desc: 'Sıcak ve soğuk sayıları incele, çekiliş istatistiklerini keşfet.',
+    onboarding_notif_title: 'Çekiliş sonuçlarından haberdar ol',
+    onboarding_notif_desc: 'Sonuçlar açıklandığında bildirim al. İstediğin zaman Profil > Hatırlatıcılar\'dan kapatabilirsin.',
+    onboarding_notif_yes: 'Evet, bildirim al',
+    onboarding_notif_no: 'Şimdilik hayır',
     onboarding_warning_title: 'Sorumlu oyun',
     onboarding_warning_desc: 'Bu uygulama yalnızca 18 yaş ve üzeri bireyler içindir. Şans oyunları bağımlılık yapabilir.',
     onboarding_warning_text_1: 'Oyun oynamak eğlence amaçlı olmalıdır.',
@@ -109,7 +113,7 @@ export const t = (key: string, params?: Record<string, string | number>): string
     notifToggleBeforeLabel: 'Çekiliş hatırlatıcısı',
     notifToggleBeforeDesc: "Saat {hour}:{minute}'da bildirim",
     notifToggleAfterLabel: 'Sonuç bildirimi',
-    notifToggleAfterDesc: "Saat {hour}:{minute}'da \"Kuponunu kontrol et\"",
+    notifToggleAfterDesc: 'Sonuçlar girildiğinde bildirim al',
   };
 
   let text = texts[key] || key;

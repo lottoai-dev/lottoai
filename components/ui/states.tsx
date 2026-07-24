@@ -64,6 +64,6 @@ const styles = StyleSheet.create({
   muted: { fontFamily: 'PlusJakarta-Medium', fontSize: 14 },
   card: { marginHorizontal: 20, marginTop: 16, padding: 24, alignItems: 'center', gap: 12 },
   iconWrap: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
-  title: { fontFamily: 'PlusJakarta-ExtraBold', fontSize: 19, letterSpacing: -0.4 },
+  title: { fontFamily: 'PlusJakarta-Bold', fontSize: 18, letterSpacing: -0.3 },
   desc: { fontFamily: 'PlusJakarta-Regular', fontSize: 14.5, lineHeight: 21, textAlign: 'center', maxWidth: 270 },
 });

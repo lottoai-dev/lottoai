@@ -12,7 +12,12 @@ import { STORAGE_KEYS } from '../constants/storage-keys';
 import { AppTheme } from '../constants/theme';
 import { BrandMark } from '../lib/emblems';
 import { t } from '../lib/i18n';
-import { CheckIcon, DiceIcon, ResultsIcon, ShieldIcon, StatsIcon, type IconProps } from '../lib/icons';
+import { CheckIcon, BellIcon, DiceIcon, ResultsIcon, ShieldIcon, StatsIcon, type IconProps } from '../lib/icons';
+import {
+  applyNotificationSettings,
+  initializeNotificationSettingsIfNeeded,
+  requestNotificationPermission,
+} from '../lib/notificationSettings';
 import { useTheme } from '../lib/theme';
 
 const { width } = Dimensions.get('window');
@@ -33,13 +38,17 @@ type Slide = {
   descKey: string;
   skippable: boolean;
   isWarning?: boolean;
+  isNotification?: boolean;
 };
+
+const WARNING_INDEX = 5;
 
 const SLIDES: Slide[] = [
   { Icon: 'brand', titleKey: 'onboarding_welcome_title', descKey: 'onboarding_welcome_desc', skippable: true },
   { Icon: DiceIcon, titleKey: 'onboarding_generate_title', descKey: 'onboarding_generate_desc', skippable: true },
   { Icon: ResultsIcon, titleKey: 'onboarding_results_title', descKey: 'onboarding_results_desc', skippable: true },
   { Icon: StatsIcon, titleKey: 'onboarding_stats_title', descKey: 'onboarding_stats_desc', skippable: true },
+  { Icon: BellIcon, titleKey: 'onboarding_notif_title', descKey: 'onboarding_notif_desc', skippable: true, isNotification: true },
   { Icon: ShieldIcon, titleKey: 'onboarding_warning_title', descKey: 'onboarding_warning_desc', skippable: false, isWarning: true },
 ];
 
@@ -63,10 +72,12 @@ export default function OnboardingScreen() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [consentChecked, setConsentChecked] = useState(false);
+  const [notifOptIn, setNotifOptIn] = useState<boolean | null>(null);
   const listRef = useRef<FlatList>(null);
 
   const slide = SLIDES[currentIndex];
   const isLast = currentIndex === SLIDES.length - 1;
+  const isNotification = !!slide.isNotification;
   const canFinish = !isLast || consentChecked;
 
   const goToSlide = (index: number) => {
@@ -75,14 +86,35 @@ export default function OnboardingScreen() {
     setCurrentIndex(index);
   };
 
+  const handleNotificationChoice = (optIn: boolean) => {
+    setNotifOptIn(optIn);
+    goToSlide(WARNING_INDEX);
+  };
+
+  const finishOnboarding = async () => {
+    if (!consentChecked) return;
+    softHaptic();
+
+    const resultNotifications = notifOptIn ?? true;
+    const settings = await initializeNotificationSettingsIfNeeded(resultNotifications);
+
+    if (resultNotifications && settings) {
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        await applyNotificationSettings(settings);
+      }
+    }
+
+    await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, 'true');
+    router.replace('/(tabs)/home');
+  };
+
   const handleNext = async () => {
+    if (isNotification) return;
     if (!isLast) {
       goToSlide(currentIndex + 1);
     } else {
-      if (!consentChecked) return; // Buton zaten disabled ama ek güvenlik.
-      softHaptic();
-      await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, 'true');
-      router.replace('/(tabs)/home');
+      await finishOnboarding();
     }
   };
 
@@ -92,7 +124,7 @@ export default function OnboardingScreen() {
 
       <View style={s.topBar}>
         {slide.skippable ? (
-          <Pressable onPress={() => { softHaptic(); goToSlide(SLIDES.length - 1); }} hitSlop={8}>
+          <Pressable onPress={() => goToSlide(SLIDES.length - 1)} hitSlop={8}>
             <Text style={s.skip}>Geç</Text>
           </Pressable>
         ) : (
@@ -102,6 +134,7 @@ export default function OnboardingScreen() {
 
       <FlatList
         ref={listRef}
+        style={{ flex: 1 }}
         data={SLIDES}
         keyExtractor={(_, i) => String(i)}
         horizontal
@@ -128,7 +161,7 @@ export default function OnboardingScreen() {
             <Text style={s.title}>{t(item.titleKey)}</Text>
             <Text style={s.desc}>{t(item.descKey)}</Text>
             {item.isWarning ? (
-              <View style={[s.warningBox, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+              <View style={[s.warningBox, { backgroundColor: c.surfaceAlt }]}>
                 <Text style={s.warningText}>{t('onboarding_warning_text_1')}</Text>
                 <Text style={s.warningText}>{t('onboarding_warning_text_2')}</Text>
                 <Text
@@ -155,11 +188,11 @@ export default function OnboardingScreen() {
                   </View>
                   <Text style={s.consentText}>
                     18 yaşından büyüğüm ve{' '}
-                    <Text style={s.consentLink} onPress={() => { softHaptic(); Linking.openURL(TERMS_URL); }}>
+                    <Text style={s.consentLink} onPress={() => Linking.openURL(TERMS_URL)}>
                       Kullanım Koşulları
                     </Text>
                     {"'"}nı ile{' '}
-                    <Text style={s.consentLink} onPress={() => { softHaptic(); Linking.openURL(PRIVACY_URL); }}>
+                    <Text style={s.consentLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
                       Gizlilik Politikası
                     </Text>
                     {"'"}nı okudum, kabul ediyorum.
@@ -187,12 +220,32 @@ export default function OnboardingScreen() {
         ))}
       </View>
 
-      <AppButton
-        label={isLast ? t('onboardingStart') : t('onboardingNext')}
-        onPress={handleNext}
-        disabled={!canFinish}
-        style={{ marginHorizontal: 24 }}
-      />
+      {!isNotification ? (
+        <View style={s.footerActions}>
+          <AppButton
+            haptic={false}
+            label={isLast ? t('onboardingStart') : t('onboardingNext')}
+            onPress={handleNext}
+            disabled={!canFinish}
+          />
+        </View>
+      ) : null}
+
+      {isNotification ? (
+        <View style={s.notifActions}>
+          <AppButton
+            haptic={false}
+            variant="ghost"
+            label={t('onboarding_notif_no')}
+            onPress={() => handleNotificationChoice(false)}
+          />
+          <AppButton
+            haptic={false}
+            label={t('onboarding_notif_yes')}
+            onPress={() => handleNotificationChoice(true)}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -204,11 +257,18 @@ function makeStyles(theme: AppTheme) {
     container: { flex: 1, backgroundColor: c.bg },
     topBar: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 24, height: 32 },
     skip: { ...ty.label, color: c.text2 },
-    slide: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 18, flex: 1 },
+    slide: {
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      paddingHorizontal: 32,
+      paddingTop: 40,
+      gap: 18,
+      height: '100%',
+    },
     iconWrap: { width: 132, height: 132, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
     title: { ...ty.h1, color: c.text, textAlign: 'center' },
     desc: { ...ty.body, fontSize: 16, lineHeight: 24, color: c.text2, textAlign: 'center' },
-    warningBox: { borderWidth: 1, borderRadius: 16, padding: 16, marginTop: 8, gap: 8, width: '100%' },
+    warningBox: { borderRadius: 18, padding: 16, marginTop: 8, gap: 8, width: '100%' },
     warningText: { ...ty.bodyMedium, color: c.text2, textAlign: 'center', lineHeight: 20 },
     consentRow: {
       flexDirection: 'row',
@@ -216,20 +276,22 @@ function makeStyles(theme: AppTheme) {
       gap: 10,
       marginTop: 8,
       paddingTop: 12,
-      borderTopWidth: 1,
     },
     checkbox: {
       width: 22,
       height: 22,
-      borderRadius: 6,
+      borderRadius: 7,
       borderWidth: 1.5,
       alignItems: 'center',
       justifyContent: 'center',
       marginTop: 1,
     },
     consentText: { ...ty.caption, color: c.text2, flex: 1, lineHeight: 18, textAlign: 'left' },
-    consentLink: { color: c.brand, fontFamily: theme.font.bold, textDecorationLine: 'underline' },
+    consentLink: { color: c.brand, fontFamily: theme.font.semibold, textDecorationLine: 'underline' },
     dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 24 },
     dot: { height: 8, borderRadius: 4 },
+    // Keep primary CTA at the same Y across slides (notif has 2 buttons: 52 + 8 + 52).
+    footerActions: { marginHorizontal: 24, minHeight: 112, justifyContent: 'flex-end' },
+    notifActions: { gap: 8, marginHorizontal: 24, minHeight: 112, justifyContent: 'flex-end' },
   });
 }

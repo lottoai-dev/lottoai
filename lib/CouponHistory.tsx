@@ -1,8 +1,8 @@
 // lib/CouponHistory.tsx
-// "Geçmiş performans" — scans all past draws for a coupon and shows how often
-// it would have matched. Now uses safeQuery for timeout handling.
+// "Geçmiş performans" — scans past draws for a coupon and shows how often
+// it would have matched. Uses safeQuery, Set lookups, limit, and result cache.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,6 +10,7 @@ import { NumberBall } from '../components/ui/number-ball';
 import { LoadingState } from '../components/ui/states';
 import { AppTheme, GameAccent } from '../constants/theme';
 import { getGameByName } from './games';
+import { softHaptic } from './haptics';
 import { CloseIcon } from './icons';
 import { safeQuery, supabase } from './supabase';
 import { useTheme } from './theme';
@@ -32,15 +33,24 @@ type HistoryResult = {
   recentMatches: { date: string; matched: number; draw_no: string; superStarMatched?: boolean }[];
 };
 
+const historyCache = new Map<string, HistoryResult>();
+
+function cacheKey(game: string, numbers: number[], bonus: number[], superStar?: number) {
+  return `${game}|${numbers.join(',')}|${bonus.join(',')}|${superStar ?? ''}`;
+}
+
 function parseNumbers(str: string): number[] {
-  return str.split(' - ').map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
+  return str
+    .split(' - ')
+    .map((n) => parseInt(n.trim(), 10))
+    .filter((n) => !isNaN(n));
 }
 
 export default function CouponHistory({ game, numbers, bonus, superStar, visible, onClose }: Props) {
   const theme = useTheme();
   const c = theme.colors;
   const insets = useSafeAreaInsets();
-  const s = makeStyles(theme);
+  const s = useMemo(() => makeStyles(theme), [theme]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<HistoryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,81 +64,130 @@ export default function CouponHistory({ game, numbers, bonus, superStar, visible
 
   const matchColor = (m: number) => (m >= 5 ? c.gold : m >= 3 ? mainColor : m >= 1 ? c.text2 : c.text3);
 
-  const analyze = async () => {
-    setLoading(true);
-    setError(null);
-    setResult(null);
-
-    type DrawRow = {
-      numbers: string;
-      bonus: string;
-      superstar: number | null;
-      draw_date: string;
-      draw_no: string;
-    };
-    
-    const { data, error: err } = await safeQuery<DrawRow[]>(
-      async () =>
-        supabase
-          .from('draws')
-          .select('numbers, bonus, superstar, draw_date, draw_no')
-          .eq('game', game)
-          .order('draw_date_parsed', { ascending: false }),
-      'Geçmiş veriler yüklenirken bir sorun oluştu.'
-    );
-
-    if (err || !data) {
-      setError(err || 'Veri bulunamadı.');
-      setLoading(false);
+  useEffect(() => {
+    if (!visible) {
+      setResult(null);
+      setError(null);
       return;
     }
 
-    const distribution: Record<number, number> = {};
-    let bestMatch = 0;
-    let bestMatchDate = '';
-    let totalMatched = 0;
-    const recentMatches: HistoryResult['recentMatches'] = [];
+    let cancelled = false;
 
-    data.forEach((draw) => {
-      const drawnNumbers = parseNumbers(draw.numbers).filter((n) => n >= 1 && n <= maxNum);
-      const drawnBonus =
-        draw.bonus && draw.bonus !== '-'
-          ? draw.bonus.split(',').map((n: string) => parseInt(n.trim(), 10)).filter((n: number) => !isNaN(n) && n >= 1 && n <= bonusMaxNum)
-          : [];
-      const matchedMain = numbers.filter((n) => drawnNumbers.includes(n)).length;
-      const matchedBonus = bonus.filter((n) => drawnBonus.includes(n)).length;
-      const matchedSuperStar = superStar != null && draw.superstar != null && superStar === draw.superstar;
-      const total = matchedMain + matchedBonus + (matchedSuperStar ? 1 : 0);
-      distribution[total] = (distribution[total] || 0) + 1;
-      totalMatched += total;
-      if (total > bestMatch) {
-        bestMatch = total;
-        bestMatchDate = draw.draw_date;
+    const analyze = async () => {
+      const key = cacheKey(game, numbers, bonus, superStar);
+      const cached = historyCache.get(key);
+      if (cached) {
+        setResult(cached);
+        setError(null);
+        setLoading(false);
+        return;
       }
-      if (recentMatches.length < 5) {
-        recentMatches.push({ date: draw.draw_date, matched: total, draw_no: draw.draw_no, superStarMatched: matchedSuperStar || undefined });
-      }
-    });
 
-    setResult({
-      totalDraws: data.length,
-      bestMatch,
-      bestMatchDate,
-      averageMatch: data.length > 0 ? totalMatched / data.length : 0,
-      matchDistribution: distribution,
-      recentMatches,
-    });
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    if (visible) {
-      analyze();
-    } else {
-      setResult(null);
+      setLoading(true);
       setError(null);
-    }
-  }, [visible]);
+      setResult(null);
+
+      type DrawRow = {
+        numbers: string;
+        bonus: string;
+        superstar: number | null;
+        draw_date: string;
+        draw_no: string;
+      };
+
+      const { data, error: err } = await safeQuery<DrawRow[]>(
+        async () =>
+          supabase
+            .from('draws')
+            .select('numbers, bonus, superstar, draw_date, draw_no')
+            .eq('game', game)
+            .order('draw_date_parsed', { ascending: false }),
+        'Geçmiş veriler yüklenirken bir sorun oluştu.',
+      );
+
+      if (cancelled) return;
+
+      if (err || !data) {
+        setError(err || 'Veri bulunamadı.');
+        setLoading(false);
+        return;
+      }
+
+      const couponNumbers = numbers;
+      const couponBonus = bonus;
+      const distribution: Record<number, number> = {};
+      let bestMatch = 0;
+      let bestMatchDate = '';
+      let totalMatched = 0;
+      const recentMatches: HistoryResult['recentMatches'] = [];
+
+      for (const draw of data) {
+        const drawnNumbers = parseNumbers(draw.numbers).filter((n) => n >= 1 && n <= maxNum);
+        const drawnSet = new Set(drawnNumbers);
+
+        const drawnBonus =
+          draw.bonus && draw.bonus !== '-'
+            ? draw.bonus
+                .split(',')
+                .map((n: string) => parseInt(n.trim(), 10))
+                .filter((n: number) => !isNaN(n) && n >= 1 && n <= bonusMaxNum)
+            : [];
+        const drawnBonusSet = drawnBonus.length > 0 ? new Set(drawnBonus) : null;
+
+        let matchedMain = 0;
+        for (const n of couponNumbers) {
+          if (drawnSet.has(n)) matchedMain++;
+        }
+
+        let matchedBonusCount = 0;
+        if (drawnBonusSet) {
+          for (const n of couponBonus) {
+            if (drawnBonusSet.has(n)) matchedBonusCount++;
+          }
+        }
+
+        const matchedSuperStar = superStar != null && draw.superstar != null && superStar === draw.superstar;
+        const total = matchedMain + matchedBonusCount + (matchedSuperStar ? 1 : 0);
+        distribution[total] = (distribution[total] || 0) + 1;
+        totalMatched += total;
+        if (total > bestMatch) {
+          bestMatch = total;
+          bestMatchDate = draw.draw_date;
+        }
+        if (recentMatches.length < 5) {
+          recentMatches.push({
+            date: draw.draw_date,
+            matched: total,
+            draw_no: draw.draw_no,
+            superStarMatched: matchedSuperStar || undefined,
+          });
+        }
+      }
+
+      const next: HistoryResult = {
+        totalDraws: data.length,
+        bestMatch,
+        bestMatchDate,
+        averageMatch: data.length > 0 ? totalMatched / data.length : 0,
+        matchDistribution: distribution,
+        recentMatches,
+      };
+
+      historyCache.set(key, next);
+      if (historyCache.size > 40) {
+        const oldest = historyCache.keys().next().value;
+        if (oldest != null) historyCache.delete(oldest);
+      }
+
+      setResult(next);
+      setLoading(false);
+    };
+
+    analyze();
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, game, numbers, bonus, superStar, maxNum, bonusMaxNum]);
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
@@ -140,7 +199,14 @@ export default function CouponHistory({ game, numbers, bonus, superStar, visible
               <Text style={s.title}>Geçmiş performans</Text>
               <Text style={s.subtitle}>{game}</Text>
             </View>
-            <Pressable onPress={onClose} style={[s.close, { backgroundColor: c.surfaceAlt }]} hitSlop={8}>
+            <Pressable
+              onPress={() => {
+                softHaptic();
+                onClose();
+              }}
+              style={[s.close, { backgroundColor: c.surfaceAlt }]}
+              hitSlop={8}
+            >
               <CloseIcon color={c.text2} size={20} />
             </Pressable>
           </View>
@@ -155,7 +221,13 @@ export default function CouponHistory({ game, numbers, bonus, superStar, visible
               <View style={s.statsGrid}>
                 <Stat value={String(result.bestMatch)} label="En iyi" sub={result.bestMatchDate} color={c.gold} theme={theme} />
                 <Stat value={result.averageMatch.toFixed(1)} label="Ortalama" sub="tutuş" color={mainColor} theme={theme} />
-                <Stat value={String(result.matchDistribution[0] || 0)} label="0 tutuş" sub="çekiliş" color={c.text2} theme={theme} />
+                <Stat
+                  value={String(result.matchDistribution[0] || 0)}
+                  label="0 tutuş"
+                  sub="çekiliş"
+                  color={c.text2}
+                  theme={theme}
+                />
               </View>
 
               <Text style={s.section}>Tutuş dağılımı</Text>
@@ -182,7 +254,13 @@ export default function CouponHistory({ game, numbers, bonus, superStar, visible
               <Text style={s.section}>Son çekilişler</Text>
               <View style={s.recentCard}>
                 {result.recentMatches.map((m, i) => (
-                  <View key={i} style={[s.recentRow, i < result.recentMatches.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.hairline }]}>
+                  <View
+                    key={i}
+                    style={[
+                      s.recentRow,
+                      i < result.recentMatches.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.hairline },
+                    ]}
+                  >
                     <Text style={s.recentDate}>{m.date}</Text>
                     <Text style={s.recentNo}>No: {m.draw_no}</Text>
                     <View style={[s.recentBadge, { backgroundColor: matchColor(m.matched) + '15' }]}>
@@ -199,13 +277,37 @@ export default function CouponHistory({ game, numbers, bonus, superStar, visible
   );
 }
 
-function Stat({ value, label, sub, color, theme }: { value: string; label: string; sub: string; color: string; theme: AppTheme }) {
+function Stat({
+  value,
+  label,
+  sub,
+  color,
+  theme,
+}: {
+  value: string;
+  label: string;
+  sub: string;
+  color: string;
+  theme: AppTheme;
+}) {
   const c = theme.colors;
   return (
-    <View style={{ flex: 1, backgroundColor: c.surfaceAlt, borderRadius: theme.radius.md, padding: 12, alignItems: 'center' }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: c.surfaceAlt,
+        borderRadius: theme.radius.md,
+        padding: 12,
+        alignItems: 'center',
+      }}
+    >
       <Text style={{ fontFamily: theme.font.extrabold, fontSize: 24, color }}>{value}</Text>
-      <Text style={{ ...theme.typography.caption, fontFamily: theme.font.bold, color: c.text, marginTop: 4 }}>{label}</Text>
-      <Text style={{ ...theme.typography.micro, color: c.text3, marginTop: 2, letterSpacing: 0 }} numberOfLines={1}>{sub}</Text>
+      <Text style={{ ...theme.typography.caption, fontFamily: theme.font.bold, color: c.text, marginTop: 4 }}>
+        {label}
+      </Text>
+      <Text style={{ ...theme.typography.micro, color: c.text3, marginTop: 2, letterSpacing: 0 }} numberOfLines={1}>
+        {sub}
+      </Text>
     </View>
   );
 }
@@ -216,7 +318,14 @@ function makeStyles(theme: AppTheme) {
   return StyleSheet.create({
     overlay: { flex: 1, justifyContent: 'flex-end' },
     sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing.xl },
-    grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: c.border, marginBottom: spacing.lg },
+    grabber: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: c.border,
+      marginBottom: spacing.lg,
+    },
     head: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
     title: { ...ty.h2, color: c.text },
     subtitle: { ...ty.caption, color: c.text2, marginTop: 3 },
@@ -230,7 +339,12 @@ function makeStyles(theme: AppTheme) {
     distFill: { height: '100%', borderRadius: 4 },
     distCount: { ...ty.caption, color: c.text, width: 32, textAlign: 'right', fontFamily: theme.font.bold },
     distPct: { ...ty.caption, color: c.text3, width: 44, textAlign: 'right' },
-    recentCard: { backgroundColor: c.surfaceAlt, borderRadius: radius.lg, paddingHorizontal: 14, marginBottom: spacing.lg },
+    recentCard: {
+      backgroundColor: c.surfaceAlt,
+      borderRadius: radius.lg,
+      paddingHorizontal: 14,
+      marginBottom: spacing.lg,
+    },
     recentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
     recentDate: { ...ty.caption, color: c.text, flex: 1 },
     recentNo: { ...ty.caption, color: c.text3 },

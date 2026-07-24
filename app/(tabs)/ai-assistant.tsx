@@ -1,17 +1,18 @@
 // app/(tabs)/ai-assistant.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,25 +21,27 @@ import { AppButton } from '../../components/ui/app-button';
 import { NumberBall } from '../../components/ui/number-ball';
 import { PressableScale } from '../../components/ui/surface';
 import { STORAGE_KEYS } from '../../constants/storage-keys';
-import { AppTheme, GameAccent } from '../../constants/theme';
+import { AppTheme } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { APP_SCREEN_MAP, buildAppContextSnapshot, formatAppContextForPrompt } from '../../lib/aiAppContext';
 import {
-  type ConstraintKey,
-  type FrequencyMap,
-  type NumberConstraints,
-  buildAvoidSet,
-  checkPrimeFeasibility,
-  checkSumRangeFeasibility,
-  generateCouponWithConstraints,
-  generateMultipleCoupons,
-  getViolatedConstraints,
-  pickSingleNumber,
+    type ConstraintKey,
+    type FrequencyMap,
+    type NumberConstraints,
+    buildAvoidSet,
+    checkParityFeasibility,
+    checkPrimeFeasibility,
+    checkSumRangeFeasibility,
+    generateCouponWithConstraints,
+    generateMultipleCoupons,
+    getViolatedConstraints,
+    pickSingleNumber,
 } from '../../lib/couponGenerator';
+import { markCouponsDirty } from '../../lib/couponsStore';
 import { type AIErrorType, type CouponIntent, chatWithAI, classifyCouponIntent, stripMarkdown } from '../../lib/deepseek';
 import { GameEmblem } from '../../lib/emblems';
-import { GAMES, type Game, type GameId, getGameById, getGameByName } from '../../lib/games';
+import { GAMES, type Game, type GameId, getGameAccentColor, getGameById, getGameByName } from '../../lib/games';
 import { AIAssistantIcon, BackIcon, BookmarkIcon, CloseIcon, SendIcon } from '../../lib/icons';
 import { formatPrize } from '../../lib/prizeEstimates';
 import { supabase } from '../../lib/supabase';
@@ -48,6 +51,16 @@ import { useTheme } from '../../lib/theme';
 let cachedStatsText: string | null = null;
 let cachedStatsTime = 0;
 const STATS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 dakika sonra istatistikler yenilenir
+
+/**
+ * AI asistanında bir seferde üretilebilecek en fazla kupon sayısı.
+ * DİKKAT: Bu sabit hem gerçek üretim sınırını, hem getBasePrompt'taki
+ * kuralı, hem de buildTruncationWarning'deki uyarı metnini besler —
+ * TEK KAYNAK burasıdır. Değiştirirsen üçü birden otomatik güncellenir;
+ * prompt'a elle sayı yazma (geçmişte prompt ile kodun ayrı düşmesi
+ * "desteklemiyorum" tarzı tutarsızlıklara yol açmıştı).
+ */
+const MAX_AI_COUPONS = 5;
 
 function softHaptic() {
   if (Platform.OS === 'android') {
@@ -226,6 +239,7 @@ const getBasePrompt = (statsText: string, userName: string | null, appContextTex
   const today = new Date();
   const gunAdi = today.toLocaleDateString('tr-TR', { weekday: 'long' });
   const tarih = today.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const saat = today.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
   const userStr = userName ? `Kullanıcının adı: ${userName}. Konuşmada uygun yerlerde ismiyle hitap et, ama her cümlede kullanma.` : 'Kullanıcı henüz ismini girmemiş.';
 
   return `Sen LottoAI uygulamasının yapay zeka asistanısın. Adın Lota.
@@ -254,10 +268,10 @@ Kişiliğin:
   hiçbiri diğerinden daha şanslı değil. İstersen geçmiş çekiliş istatistiklerini de gösterebilirim."
 
 ÇOK ÖNEMLİ - Kupon adedi limiti:
-- Bir seferde en fazla 5 kupon üretebilirsin. Bu kesin bir uygulama kuralıdır.
-- ASLA "en fazla 10", "10 kupon üretebiliyorum" gibi yanlış bir üst sınır söyleme.
-- Kullanıcı 5'ten fazla isterse nazikçe en fazla 5 üretebildiğini söyle; istersen 5 tane
-  hazırlayabileceğini belirt.
+- Bir seferde en fazla ${MAX_AI_COUPONS} kupon üretebilirsin. Bu kesin bir uygulama kuralıdır.
+- ASLA bundan farklı bir üst sınır söyleme — doğru üst sınır her zaman ${MAX_AI_COUPONS} kupondur.
+- Kullanıcı bundan fazlasını isterse nazikçe bir seferde en fazla ${MAX_AI_COUPONS} kupon
+  üretebildiğini söyle; istersen o kadarını hazırlayabileceğini belirt.
 
 ${userStr}
 
@@ -282,10 +296,23 @@ Konu yönetimi:
   bir sayının "iyi gittiğini" ASLA ima etme. Bu istatistiksel olarak yanlıştır (kumarbaz yanılgısı
   olarak bilinir) — her çekiliş önceki çekilişlerden tamamen bağımsızdır.
 - "Sırası gelmiş", "bu sefer çıkabilir", "onların sırası", "gecikti demek yakında çıkar",
-  "iyi gidiyor" gibi ifadeleri KESİNLİKLE KULLANMA — ne genel sohbette ne de kupon açıklamalarında.
+  "iyi gidiyor", "bir sonraki kuponda şansın daha yüksek olabilir", "bu sefer daha şanslı
+  olabilirsin" gibi ifadeleri KESİNLİKLE KULLANMA — ne genel sohbette ne de kupon açıklamalarında.
+  Bir kuponun "az tutması", bir SONRAKİ kuponun "daha çok tutacağı" anlamına gelmez — her kupon
+  birbirinden tamamen bağımsızdır, üzücü bir sonuç bile "yakında telafi olur" gibi sunulamaz.
 - Sıcak/soğuk sayı istatistiklerinden bahsedebilirsin ama SADECE geçmişe dönük, nötr bir bilgi
   olarak ("son 100 çekilişte en çok/az çıkan sayılar bunlar") — bunun geleceğe dair hiçbir öngörü
   taşımadığını açıkça belirt veya en azından ima etme.
+- Bir kuponun toplamı/çift-tek dağılımı ortalamaya veya "beklenen" bir değere yakınsa bile bunu
+  "dengeli kupon", "iyi bir kupon", "güzel bir dağılım olmuş", "gayet uygun" gibi KALİTE ima eden
+  bir ifadeyle ÖVME. Sayıları nötr şekilde bildir ("3 çift, 3 tek var, toplamı 279"), ama bunun
+  "iyi/dengeli/uygun" olduğunu ima etme — her kombinasyon (dengeli görünen de, görünmeyen de)
+  matematiksel olarak eşit şansa sahiptir, biri diğerinden "daha iyi" değildir.
+- Kullanıcı "kazanma taktiği", "şansımı nasıl artırırım" gibi bir şey sorarsa: ÖNCE net ve dürüst
+  bir şekilde böyle bir taktiğin var olmadığını söyle, SONRA istersen filtreleri (çift/tek, toplam
+  aralığı vb.) çeşitlilik/eğlence aracı olarak tanıt. Sırayı tersine çevirip önce filtreleri
+  "tavsiye" gibi sunup sona dürüstlük notu eklemek YETERLİ DEĞİL — bu, uyarıyı okumadan geçen bir
+  kullanıcıda "bu bir taktikmiş" izlenimi bırakabilir.
 
 ÇOK ÖNEMLİ - Toplam Aralığı Karışıklığı Uyarısı:
 - İstatistiklerde iki farklı "toplam" bilgisi olabilir: biri kuponun KESİN alabileceği toplam
@@ -304,18 +331,72 @@ Konu yönetimi:
   itibarıyla 79 milyon TL"). Elle girildiğinden, resmi kaynaktan kontrol edilmesi gerektiğinden
   veya verinin güncel olmayabileceğinden ASLA bahsetme.
 
+ÇOK ÖNEMLİ - Veri ve Hesap Sorularında Dürüstlük:
+- Kullanıcı "sohbetlerimizi kaydediyor musun", "verilerim ne oluyor" gibi bir şey sorarsa: sohbet
+  geçmişinin, hesabıyla ilişkilendirilerek KALICI olarak saklandığını, amacının "konuşmaya devam
+  edebilmek" DEĞİL, senin (Lota'nın) verdiğin yanıtları incelemek ve geliştirmek olduğunu söyle.
+  ASLA "geçici olarak saklanıyor" ya da "kaldığımız yerden devam edebilmek için" gibi YANLIŞ bir
+  açıklama uydurma — bu bilgiler doğru değildir. Detay isterse Profil ekranındaki yasal bilgilere
+  yönlendir.
+- Kullanıcı "hesabımı nasıl silerim" diye sorarsa: Profil ekranındaki "Hesabımı sil" seçeneğini
+  kullanmasını söyle. Bu seçenek hesabını, AI sohbet kayıtlarını ve cihazdaki verilerini kalıcı
+  olarak siler. ASLA e-posta ile silme talebi gerektiğini veya "Tüm Verileri Sil" diye bir seçenek
+  olduğunu söyleme — bunlar artık geçerli değil.
+- Kullanıcı "önceki oturumları/konuşmaları hatırlıyor musun" diye sorarsa: BU İKİ ŞEYİ KARIŞTIRMA —
+  (1) sohbetler KAYDEDİLİYOR (hesabına bağlı, ekibin incelemesi için, kalıcı) — bu doğru ve sabit;
+  (2) ama SEN (Lota), yeni bir oturumda önceki oturumların içeriğine CANLI ERİŞEMEZSİN — her oturum
+  kendi bağlamıyla başlar. İkisini birbirine karıştırıp "kayıt tutulmuyor" gibi YANLIŞ bir şey
+  söyleme (kayıt tutuluyor, sadece sen o kayda o an bakamıyorsun). Örnek doğru cevap: "Sohbetlerin
+  kayıtlı duruyor ama ben yeni bir oturumda önceki oturumların içeriğini göremiyorum — bu oturumda
+  neler konuştuysak onu hatırlarım."
+
 ÇOK ÖNEMLİ - Sayı Üretimi Kuralı:
 - Bu sohbette (normal konuşma modunda) KESİNLİKLE hiçbir sayı dizisi, kupon önerisi veya
   "1-2-3-4-5..." gibi örnek sayılar YAZMA. Kupon sayıları SADECE ayrı bir sistem tarafından,
   gerçek bir algoritma ile üretilir — sen asla kendi kafandan sayı uydurmazsın, toplamlarını
   hesaplamazsın, örnek de vermezsin.
+- Aynı şekilde, gerçek üretim sistemi henüz devreye girmediyse "İşte kuponun hazır!", "hazırladım!"
+  gibi bir TAMAMLANMA iddiası da YAZMA — bu, sayı yazmadan da yanlış bir izlenim verir (kullanıcı
+  "nerede kupon?" diye sormak zorunda kalır). Kupon üretimi tamamlanmadıysa hiçbir şekilde
+  "hazırladım/işte" deme; sadece kullanıcının isteğini anladığını belirt, gerçek sistem devreye
+  girip sonucu getirene kadar tamamlanma iddiasında bulunma.
 - Kullanıcı "neden karşılayamadın", "farklı bir kupon dener misin", "başka sayı önerir misin"
   gibi bir şey sorarsa, ASLA kendin sayı üretme. Bunun yerine kısaca açıkla (örn. çok dar bir
   toplam aralığı istendiyse bunun neden zor olduğunu anlat) ve "yeniden denememi ister misin?"
   diye sor. Kullanıcı evet derse, gerçek üretim sistemi devreye girer.
 - Bu kural her koşulda geçerlidir, kullanıcı ısrar etse bile sayı UYDURMAZSIN.
+- DESTEKLENEN FİLTRELER SINIRLIDIR — şu an sadece şunlar var: toplam aralığı, mutlaka içersin/
+  içermesin, bir aralığı tamamen hariç tut, sadece asal sayılar, sadece çift sayılar, sadece tek
+  sayılar, çoklu kupon çakışmasızlığı, önceki kuponlardan farklı olsun. Kullanıcı bunların DIŞINDA,
+  BİLEŞİK bir istek yaparsa (ör. "yarısı asal yarısı çift olsun", "üçte biri 50'den büyük olsun"
+  gibi birden fazla kategoriyi aynı anda karıştıran istekler), bu sistemde KARŞILANAMAZ. Böyle bir
+  istekte:
+  1. ASLA sanki karşılanmış gibi davranma veya "istediğin gibi hazırladım" deme.
+  2. Kupon yine de üretilecek (adil rastgele) ama SEN bunu netleştir: "Şu an '[X] ve [Y]'yi aynı
+     anda karıştıran bir filtre desteklemiyorum, bu yüzden bu isteğini tam karşılayamadım — yine
+     de adil rastgele bir kupon hazırladım" gibi dürüst bir açıklama yap.
+  3. Kullanıcı sonradan "bu sayılar gerçekten [X] mi?" diye sorarsa, kendi geçmişindeki GERÇEK
+     sayılara bakıp dürüstçe kontrol et ve cevapla (uydurma, yukarıdaki kural geçerli) — çoğu
+     zaman hayır olacaktır, bunu söylemekten çekinme.
+- BU KURALIN KAPSAMI DIŞINDA KALAN BİR ŞEY: Eğer bu sohbette DAHA ÖNCE bir kupon ürettiysen, o
+  kuponun GERÇEK sayıları senin mesaj geçmişinde (köşeli parantez içinde, ör. "[On Numara: 3-7-11...]"
+  formatında) AYNEN duruyor — bunlar sana gerçekten gösterilen, uydurulmamış, doğrulanmış sayılardır.
+  Kullanıcı o kuponun toplamını, kaç çift/tek sayı içerdiğini gibi BASİT bir hesabı sorarsa, bu
+  sayıları KENDİ GEÇMİŞİNDEN AYNEN KOPYALA ve üzerinde hesap yap — bu "yeni sayı üretmek" değil,
+  zaten gösterilmiş sayıları okuyup toplamak.
+  - "Kuponun sayılarını göremiyorum/hesaplayamam" gibi YANLIŞ bir şey söyleme.
+  - EN ÖNEMLİSİ: Kendi geçmişindeki gerçek sayılar yerine KENDİNDEN FARKLI/UYDURMA bir sayı dizisi
+    YAZMA — bu, kullanıcıya yanlış bilgi vermek demektir ve KESİNLİKLE YASAKTIR. Emin değilsen ya da
+    hangi kupondan bahsedildiği belirsizse, uydurmak yerine "hangi kuponu kastediyorsun, en son
+    ürettiğim mi?" diye sor.
+  - Sohbette birden fazla kupon üretildiyse ve kullanıcı "bu kupon" derse, EN SON ürettiğin kuponu
+    kastettiğini varsay (aksi belirtilmedikçe).
+  Sadece kuponu bu sohbette hiç üretmediysen (örn. kullanıcı "Kuponlarım ekranındaki eski bir
+  kuponumun toplamı ne" derse, ki bu sohbette hiç görünmüyor) o zaman "Kuponlarım ekranına bak"
+  demen doğru olur.
 
-Bugün ${gunAdi}, ${tarih}.
+Bugün ${gunAdi}, ${tarih}. Şu an saat ${saat} (bu, mesajın gönderildiği ana ait GERÇEK saattir —
+kullanıcı saat sorarsa bu değeri kullan, kendinden bir saat UYDURMA).
 
 Güncel Oyun Bilgileri:
 - Çılgın Sayısal Loto: 1-90 arasından 6 ana numara seçilir. Ayrıca 1-90 arasından 1 adet SüperStar numarası seçilir (ana numaralardan bağımsız, tekrar edebilir). SADECE Pazartesi, Çarşamba ve Cumartesi günleri çekilir.
@@ -455,12 +536,6 @@ function errorMessageFor(errorType?: AIErrorType): string {
 }
 
 /**
- * classifyCouponIntent'ten dönen alanları, couponGenerator'ın anladığı
- * NumberConstraints biçimine çevirir. Oyunun gerçek sınırlarına (max, count)
- * göre geçersiz değerleri sessizce eler — kullanıcı hatalı bir istek yazsa
- * bile uygulama çökmez, sadece o kısıtlama yok sayılır.
- */
-/**
  * Kullanıcının gerçekten yazdığı metinleri (bu mesaj + son sohbetteki
  * kullanıcı mesajları) tek bir küçük harfli havuzda toplar. Bu havuz,
  * classifyCouponIntent'in halüsinasyon yapıp yapmadığını (yani kullanıcı
@@ -474,6 +549,23 @@ function collectUserIntentText(content: string, recentContext: { role: string; c
   const parts = [content, ...recentContext.filter((m) => m.role === 'user').map((m) => m.content)];
   return parts.join(' ').toLocaleLowerCase('tr-TR');
 }
+
+/**
+ * "Sadece çift" / "sadece tek" isteği için açık kalıp listeleri. Tek başına
+ * 'çift'/'tek' aramak fazla gevşekti: "tekrar", "teklif" gibi kelimeler ve
+ * "çift/tek dengeli olsun" ifadesi yanlış tetiklemeye yol açabiliyordu
+ * (halüsinasyon güvenlik ağının kendisi yanlış geçirir hale geliyordu).
+ * Bu kalıplar, kullanıcının GERÇEKTEN "hepsi çift/tek olsun" tarzı bir
+ * istek yazdığından makul ölçüde emin olmamızı sağlar.
+ */
+const ONLY_EVEN_PHRASES = [
+  'sadece çift', 'yalnız çift', 'yalnızca çift', 'hepsi çift', 'tamamı çift',
+  'çift sayılardan', 'çift olsun',
+];
+const ONLY_ODD_PHRASES = [
+  'sadece tek', 'yalnız tek', 'yalnızca tek', 'hepsi tek', 'tamamı tek',
+  'tek sayılardan', 'tek olsun', 'tek sayı olsun',
+];
 
 /**
  * classifyCouponIntent'ten dönen alanları, couponGenerator'ın anladığı
@@ -535,6 +627,12 @@ function buildConstraintsFromIntent(intent: CouponIntent | null, game: Game, use
   }
   if (intent.onlyPrimes && userText.includes('asal')) {
     constraints.onlyPrimes = true;
+  }
+  if (intent.onlyEven && ONLY_EVEN_PHRASES.some((p) => userText.includes(p))) {
+    constraints.onlyEven = true;
+  }
+  if (intent.onlyOdd && ONLY_ODD_PHRASES.some((p) => userText.includes(p))) {
+    constraints.onlyOdd = true;
   }
 
   return constraints;
@@ -611,6 +709,25 @@ function buildImpossiblePrimeNote(game: Game, constraints: NumberConstraints): s
 }
 
 /**
+ * Aynı imkansızlık kontrolünün "sadece çift" / "sadece tek" karşılığı.
+ * Desteklenen oyunların hiçbirinde pratikte tetiklenmez (her zaman yeterince
+ * çift/tek sayı var), ama tutarlılık ve gelecekte küçük aralıklı bir oyun
+ * eklenirse güvenlik için hazır tutuyoruz.
+ */
+function buildImpossibleParityNote(game: Game, constraints: NumberConstraints): string | null {
+  const parity = constraints.onlyEven ? 'even' : constraints.onlyOdd ? 'odd' : null;
+  if (!parity) return null;
+  const { feasible, availableCount } = checkParityFeasibility(game.count, game.max, parity);
+  if (feasible) return null;
+  const label = parity === 'even' ? 'çift' : 'tek';
+  return (
+    `${game.name}'da 1-${game.max} arasında sadece ${availableCount} ${label} sayı var, ama ${game.count} ` +
+    `sayı seçilmesi gerekiyor — bu yüzden sadece ${label} sayılardan oluşan bir kupon üretmek mümkün değil. ` +
+    `Bu isteğini dikkate almadan, diğer şartlarına uyan bir kupon hazırladım.`
+  );
+}
+
+/**
  * Kullanıcı mustInclude/mustExclude için 30'dan fazla tekil sayı yazdıysa
  * (nadir ama olabilir), bunu sessizce kırpmak yerine açıkça bildiririz —
  * aksi halde kullanıcı isteğinin bir kısmının neden uygulanmadığını hiç
@@ -621,7 +738,7 @@ function buildTruncationWarning(intent: CouponIntent | null): string | null {
   const parts: string[] = [];
   if (intent.countRequestedRaw) {
     parts.push(
-      `${intent.countRequestedRaw} kupon istedin, ben bir seferde en fazla 5 kupon üretebiliyorum, 5 tanesini hazırladım`
+      `${intent.countRequestedRaw} kupon istedin, ben bir seferde en fazla ${MAX_AI_COUPONS} kupon üretebiliyorum, ${MAX_AI_COUPONS} tanesini hazırladım`
     );
   }
   if (intent.mustIncludeTruncatedFrom) {
@@ -649,6 +766,8 @@ function describeConstraints(constraints: NumberConstraints, noOverlap: boolean,
   if (constraints.spreadAcrossZones) notes.push('sayı aralığına yayılmış');
   if (constraints.maxConsecutive != null) notes.push(`en fazla ${constraints.maxConsecutive} ardışık sayı içeriyor`);
   if (constraints.onlyPrimes) notes.push('sadece asal sayılardan oluşuyor');
+  if (constraints.onlyEven) notes.push('sadece çift sayılardan oluşuyor');
+  if (constraints.onlyOdd) notes.push('sadece tek sayılardan oluşuyor');
   if (noOverlap) notes.push('birbirleriyle hiç ortak sayı taşımıyor');
   if (avoidPrevious) notes.push('daha önce kaydettiğin kuponlardan farklı');
   return notes;
@@ -663,6 +782,8 @@ const CONSTRAINT_LABELS: Record<ConstraintKey, string> = {
   mustInclude: 'mutlaka istediğin sayı(lar)ı',
   mustExclude: 'hariç tutmak istediğin sayı(lar)ı',
   onlyPrimes: 'sadece asal sayı isteğini',
+  onlyEven: 'sadece çift sayı isteğini',
+  onlyOdd: 'sadece tek sayı isteğini',
 };
 
 /**
@@ -686,22 +807,108 @@ function buildRelaxedNote(numbers: number[], max: number, constraints: NumberCon
   return `Not: ${joined} tam karşılayamadım, en yakın uygun kombinasyonu hazırladım.`;
 }
 
-/** AI asistanında bir seferde üretilebilecek en fazla kupon sayısı. */
-const MAX_AI_COUPONS = 5;
+/** Chip metinlerinde kısa oyun adı (intent eşleşmesiyle uyumlu). */
+const SUGGESTION_SHORT_NAME: Record<GameId, string> = {
+  cilgin: 'Sayısal Loto',
+  superloto: 'Süper Loto',
+  sanstopu: 'Şans Topu',
+  onnumara: 'On Numara',
+};
 
-const SUGGESTIONS = [
-  'Şanslı bir Çılgın Sayısal kuponu üret',
-  'Süper Loto nasıl oynanır?',
-  'Bu hafta hangi çekilişler var?',
+const INFO_SUGGESTIONS = [
   'Sıcak sayılar ne demek?',
+  'Süper Loto nasıl oynanır?',
+  'Şans Topu nasıl oynanır?',
+  'On Numara nasıl oynanır?',
+  'Sayısal Loto nasıl oynanır?',
 ];
 
+const SUGGESTION_FALLBACKS = [
+  'Bu hafta hangi çekilişler var?',
+  'Sıcak sayılar ne demek?',
+  'Süper Loto kuponu üret',
+  'Sayısal Loto nasıl oynanır?',
+];
+
+function daySeed(date: Date): number {
+  return date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+}
+
+function pickStable<T>(items: readonly T[], seed: number, salt: number): T {
+  return items[((seed + salt) % items.length + items.length) % items.length];
+}
+
+function getGamesDrawingOn(date: Date): Game[] {
+  const weekday = date.getDay();
+  return GAMES.filter((g) => g.country === 'TR' && g.drawDays.includes(weekday));
+}
+
+/**
+ * Boş sohbet önerilerini güne ve kayıtlı kupon durumuna göre üretir.
+ * Aynı takvim gününde aynı seed kullanılır — ekran her açıldığında değişmez.
+ */
+function buildDailySuggestions(hasSavedCoupons: boolean, date = new Date()): string[] {
+  const seed = daySeed(date);
+  const todays = getGamesDrawingOn(date);
+  const trGames = GAMES.filter((g) => g.country === 'TR');
+  const out: string[] = [];
+
+  // Slot 1 — bugünün aksiyonu (çekiliş yoksa yine kupon üret)
+  if (todays.length >= 1) {
+    const game = todays.length === 1 ? todays[0] : pickStable(todays, seed, 0);
+    out.push(`${SUGGESTION_SHORT_NAME[game.id]} kuponu üret`);
+  } else {
+    const game = pickStable(trGames, seed, 0);
+    out.push(`${SUGGESTION_SHORT_NAME[game.id]} kuponu üret`);
+  }
+
+  // Slot 2 — keşif / bilgi (aynı gün sabit rotasyon)
+  const infoPool = INFO_SUGGESTIONS.filter((s) => !out.includes(s));
+  out.push(pickStable(infoPool.length > 0 ? infoPool : INFO_SUGGESTIONS, seed, 1));
+
+  // Slot 3 — takvim bağlamı
+  if (todays.length > 1) {
+    out.push('Bugün hangi çekilişler var?');
+  } else {
+    out.push('Bu hafta hangi çekilişler var?');
+  }
+
+  // Slot 4 — kişisel veya alternatif üretim
+  if (hasSavedCoupons) {
+    out.push('Kayıtlı kuponlarımı kontrol et');
+  } else {
+    const used = new Set(out);
+    const candidates = trGames
+      .map((g) => `${SUGGESTION_SHORT_NAME[g.id]} kuponu üret`)
+      .filter((s) => !used.has(s));
+    if (candidates.length > 0) {
+      out.push(pickStable(candidates, seed, 2));
+    }
+  }
+
+  const unique: string[] = [];
+  for (const s of out) {
+    if (!unique.includes(s)) unique.push(s);
+  }
+  for (const f of SUGGESTION_FALLBACKS) {
+    if (unique.length >= 4) break;
+    if (!unique.includes(f)) unique.push(f);
+  }
+  return unique.slice(0, 4);
+}
+
 // Oyun adı eşleşmesi için, en spesifik (uzun) ifadeler önce kontrol edilir.
+// Kısa/bitişik yazımlar da tanınır ("çılgın", "süperloto", "10 numara" gibi) —
+// kullanıcı "hangi oyun?" sorusuna doğal kısaltmalarla cevap verdiğinde
+// eşleşememe (ve sessizce normal sohbete düşme) sorununu önler.
+// BİLİNÇLİ OLARAK EKLENMEYENLER: tek başına "süper" ("süper, on numara olsun"
+// gibi bir onay cümlesini yanlış oyuna yönlendirirdi) ve tek başına "şans"
+// ("şansım", "şanslı" gibi kelimelerin içinde geçiyor).
 const GAME_NAME_PATTERNS: { id: GameId; patterns: string[] }[] = [
-  { id: 'cilgin', patterns: ['çılgın sayısal', 'çılgın loto', 'sayısal loto'] },
-  { id: 'superloto', patterns: ['süper loto'] },
-  { id: 'sanstopu', patterns: ['şans topu'] },
-  { id: 'onnumara', patterns: ['on numara'] },
+  { id: 'cilgin', patterns: ['çılgın sayısal', 'çılgın loto', 'sayısal loto', 'çılgın', 'sayısal'] },
+  { id: 'superloto', patterns: ['süper loto', 'süperloto'] },
+  { id: 'sanstopu', patterns: ['şans topu', 'şanstopu'] },
+  { id: 'onnumara', patterns: ['on numara', 'onnumara', '10 numara'] },
 ];
 
 /**
@@ -741,6 +948,7 @@ export default function AIAssistantScreen() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
+  const [hasSavedCoupons, setHasSavedCoupons] = useState(false);
   const [awaitingGameChoice, setAwaitingGameChoice] = useState(false);
   // "Hangi oyun için kupon istiyorsun?" diye sorduğumuzda, kullanıcının ilk
   // isteğindeki toplam aralığı/mustInclude gibi özel istekleri kaybetmemek
@@ -766,6 +974,29 @@ export default function AIAssistantScreen() {
     });
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem(STORAGE_KEYS.SAVED_COUPONS)
+        .then((raw) => {
+          if (!raw) {
+            setHasSavedCoupons(false);
+            return;
+          }
+          try {
+            const list = JSON.parse(raw);
+            setHasSavedCoupons(Array.isArray(list) && list.length > 0);
+          } catch {
+            setHasSavedCoupons(false);
+          }
+        })
+        .catch(() => setHasSavedCoupons(false));
+    }, [])
+  );
+
+  const suggestions = useMemo(
+    () => buildDailySuggestions(hasSavedCoupons),
+    [hasSavedCoupons]
+  );
   /**
    * Ekrana yeni bir mesaj eklerken kullanılan TEK yol — hem görünen sohbete
    * (state) ekler hem de arka planda `ai_conversations`'a kaydeder. Tüm
@@ -791,7 +1022,6 @@ export default function AIAssistantScreen() {
         text: 'Temizle',
         style: 'destructive',
         onPress: () => {
-          softHaptic();
           setMessages([]);
           setSessionId(generateSessionId());
           setAwaitingGameChoice(false);
@@ -802,10 +1032,6 @@ export default function AIAssistantScreen() {
     ]);
   };
 
-  /**
-   * Belirli bir oyun için kupon üretir: sayılar kod tarafında (algoritmik)
-   * seçilir, AI sadece bu seçim için kısa bir açıklama yazar.
-   */
   /**
    * Belirli bir oyun için 1 veya daha fazla kupon üretir: sayılar kod
    * tarafında (algoritmik) seçilir, AI sadece bu seçim(ler) için kısa bir
@@ -845,11 +1071,21 @@ export default function AIAssistantScreen() {
       // matematiksel olarak imkansızsa (yeterli asal sayı yoksa) önceden
       // tespit edilip kaldırılır.
       const impossiblePrimeNote = buildImpossiblePrimeNote(game, afterSumConstraints);
-      const effectiveConstraints: NumberConstraints = impossiblePrimeNote
+      const afterPrimeConstraints: NumberConstraints = impossiblePrimeNote
         ? { ...afterSumConstraints, onlyPrimes: undefined }
         : afterSumConstraints;
       if (impossiblePrimeNote) {
         appendMessage({ role: 'assistant', content: impossiblePrimeNote });
+      }
+
+      // Aynı kontrol "sadece çift/tek sayı" için de yapılır — pratikte
+      // desteklenen oyunlarda hiç tetiklenmez, ama tutarlılık için var.
+      const impossibleParityNote = buildImpossibleParityNote(game, afterPrimeConstraints);
+      const effectiveConstraints: NumberConstraints = impossibleParityNote
+        ? { ...afterPrimeConstraints, onlyEven: undefined, onlyOdd: undefined }
+        : afterPrimeConstraints;
+      if (impossibleParityNote) {
+        appendMessage({ role: 'assistant', content: impossibleParityNote });
       }
 
       // "Önceki kuponlarımdan farklı olsun" istendiyse, bu oyun için
@@ -975,7 +1211,14 @@ export default function AIAssistantScreen() {
 
     const apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
       { role: 'system', content: getBasePrompt(statsText, resolvedUserName, appContextText) },
-      ...recentMessages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      // messageToLogText kullanıyoruz (sadece m.content değil) — kupon
+      // mesajlarında gerçek sayılar content'te değil, ayrı bir coupon
+      // alanında duruyor. Sadece m.content gönderirsek AI'ın kendi ürettiği
+      // kuponun sayılarını GERÇEKTEN GÖRMESİ mümkün olmaz — sonradan "bu
+      // kuponun istatistikleri nedir" diye sorulduğunda ya "göremiyorum"
+      // der ya da (daha kötüsü) uydurma sayılarla "hesap" yapar. Yaşanmış
+      // bir hataydı — bkz. ai_conversations kayıtları.
+      ...recentMessages.map((m) => ({ role: m.role as 'user' | 'assistant', content: messageToLogText(m) })),
       { role: 'user', content },
     ];
 
@@ -1011,17 +1254,59 @@ export default function AIAssistantScreen() {
     setPendingIntent(intent);
     setPendingIntentText(userText);
 
-    // Bu mesaj hazır bir metin (gerçek AI çağrısı değil), ama diğer
-    // cevaplarla tutarlı hissettirmesi için kısa bir "düşünme" süresi
-    // ekliyoruz — aksi halde anında çıkıp yapay durur.
-    const thinkingDelay = 2000 + Math.random() * 1500;
-    await new Promise((resolve) => setTimeout(resolve, thinkingDelay));
+    // Eskiden burada sabit (hardcoded) bir metin gönderiliyordu — kullanıcı
+    // her kupon isteğinde AYNI cümleyi görüyordu, bu da "gerçekten bir yapay
+    // zekayla mı konuşuyorum?" sorusuna yol açtı (haklı bir gözlemdi). Artık
+    // gerçek bir AI çağrısı yapıyoruz — sendChatMessage ile aynı desende
+    // (aynı istatistik/bağlam toplama), sadece AI'a bu turda TEK bir görevi
+    // (hangi oyunu sor) net şekilde bildiriyoruz.
+    let statsText = '';
+    let appContextText = '';
+    let resolvedUserName = userName;
+    try {
+      const [stats, snapshot] = await Promise.all([
+        getCachedStatsText(),
+        buildAppContextSnapshot(),
+      ]);
+      statsText = stats;
+      appContextText = formatAppContextForPrompt(snapshot);
+      resolvedUserName = snapshot.userName ?? userName;
+      if (snapshot.userName && snapshot.userName !== userName) {
+        setUserName(snapshot.userName);
+      }
+    } catch {
+      statsText = 'İstatistikler şu anda yüklenemedi.';
+      appContextText = 'Kullanıcının güncel durumu şu an okunamadı.';
+    }
+
+    const gameAskInstruction = `
+
+ŞU AN YAPMAN GEREKEN TEK ŞEY: Kullanıcı bir kupon istedi ama hangi oyun için istediğini
+belirtmedi. Ona kendi doğal üslubunla, kısa bir cümleyle hangi oyunu istediğini sor. Seçenekler:
+Çılgın Sayısal Loto, Süper Loto, Şans Topu, On Numara — bu dört seçeneği bir şekilde belirt.
+SADECE bu soruyu sor; kupon üretme, sayı yazma, başka bir konuya girme.`;
+
+    const apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+      { role: 'system', content: getBasePrompt(statsText, resolvedUserName, appContextText) + gameAskInstruction },
+      ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: messageToLogText(m) })),
+      { role: 'user', content },
+    ];
+
+    const result = await chatWithAI(apiMessages);
     if (!isMounted.current) return;
 
-    appendMessage({
-      role: 'assistant',
-      content: 'Hangi oyun için kupon istiyorsun? Çılgın Sayısal Loto, Süper Loto, Şans Topu veya On Numara diyebilirsin.',
-    });
+    if (result.reply) {
+      appendMessage({ role: 'assistant', content: stripMarkdown(result.reply.trim()) });
+    } else {
+      // AI çağrısı başarısız olursa, kullanıcıyı hiç cevapsız bırakmamak
+      // için son bir güvenlik ağı olarak sabit metne düşüyoruz — bu, normal
+      // akışta artık kullanılmıyor, sadece gerçek bir hata durumunda devreye
+      // giriyor.
+      appendMessage({
+        role: 'assistant',
+        content: 'Hangi oyun için kupon istiyorsun? Çılgın Sayısal Loto, Süper Loto, Şans Topu veya On Numara diyebilirsin.',
+      });
+    }
     setLoading(false);
     scrollRef.current?.scrollToEnd({ animated: false });
   };
@@ -1074,7 +1359,7 @@ export default function AIAssistantScreen() {
 
     // Kupon isteği mi, hangi oyun için, hangi özel şartlarla — hepsi
     // AI tabanlı tek bir sınıflandırma çağrısıyla anlaşılır.
-    const recentContext = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+    const recentContext = messages.slice(-6).map((m) => ({ role: m.role, content: messageToLogText(m) }));
     const intent = await classifyCouponIntent(content, recentContext);
     if (!isMounted.current) return;
 
@@ -1107,7 +1392,7 @@ export default function AIAssistantScreen() {
       const existing = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_COUPONS);
       const coupons = existing ? JSON.parse(existing) : [];
       const gameConfig = GAMES.find((g) => g.name === coupon.game);
-      const gameColor = GameAccent[gameConfig?.id ?? 'cilgin'] ?? c.brand;
+      const gameColor = getGameAccentColor(gameConfig?.id ?? 'cilgin');
       coupons.unshift({
         id: Date.now(),
         game: coupon.game,
@@ -1122,6 +1407,8 @@ export default function AIAssistantScreen() {
         aiExplanation: coupon.explanation,
       });
       await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(coupons));
+      markCouponsDirty();
+      setHasSavedCoupons(true);
       showAlert('Kaydedildi', "AI kuponu Kuponlarım'a eklendi.", [
         { text: 'Tamam' },
         { text: 'Kuponlarıma git', onPress: () => router.push('/(tabs)/saved') },
@@ -1138,7 +1425,7 @@ export default function AIAssistantScreen() {
         <View style={s.nav}>
           <Pressable
             onPress={() => { softHaptic(); router.back(); }}
-            style={[s.navBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+            style={[s.navBtn, { backgroundColor: c.surfaceAlt }]}
             hitSlop={6}
           >
             <BackIcon color={c.text2} size={22} />
@@ -1156,7 +1443,7 @@ export default function AIAssistantScreen() {
           {messages.length > 0 ? (
             <Pressable
               onPress={() => { softHaptic(); handleClearMessages(); }}
-              style={[s.navBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+              style={[s.navBtn, { backgroundColor: c.surfaceAlt }]}
               hitSlop={6}
             >
               <CloseIcon color={c.text2} size={20} />
@@ -1183,11 +1470,12 @@ export default function AIAssistantScreen() {
             </Text>
             {user ? (
               <View style={s.suggestions}>
-                {SUGGESTIONS.map((sug, i) => (
+                {suggestions.map((sug, i) => (
                   <PressableScale
-                    key={i}
-                    onPress={() => { softHaptic(); send(sug); }}
-                    style={[s.suggestion, { backgroundColor: c.surface, borderColor: c.border }]}
+                    haptic={false}
+                    key={sug}
+                    onPress={() => send(sug)}
+                    style={[s.suggestion, { backgroundColor: c.surface }]}
                   >
                     <Text style={s.suggestionText}>{sug}</Text>
                   </PressableScale>
@@ -1217,7 +1505,7 @@ export default function AIAssistantScreen() {
                     s.bubble,
                     msg.role === 'user'
                       ? [s.userBubble, { backgroundColor: c.brand }]
-                      : [s.aiBubble, { backgroundColor: c.surface, borderColor: c.border }],
+                      : [s.aiBubble, { backgroundColor: c.surface }],
                   ]}
                 >
                   <Text style={[s.bubbleText, { color: msg.role === 'user' ? c.brandText : c.text }]}>
@@ -1230,7 +1518,7 @@ export default function AIAssistantScreen() {
               </View>
             ))}
             {loading ? (
-              <View style={[s.bubble, s.aiBubble, { backgroundColor: c.surface, borderColor: c.border, paddingVertical: 14 }]}>
+              <View style={[s.bubble, s.aiBubble, { backgroundColor: c.surface, paddingVertical: 14 }]}>
                 <TypingDots color={c.text3} />
               </View>
             ) : null}
@@ -1239,7 +1527,7 @@ export default function AIAssistantScreen() {
 
         <View style={[s.inputRow, { borderTopColor: c.hairline, paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }]}>
           <TextInput
-            style={[s.input, { backgroundColor: c.surface, borderColor: c.border, color: c.text }]}
+            style={[s.input, { backgroundColor: c.surface, color: c.text }]}
             value={input}
             onChangeText={setInput}
             placeholder={user ? "Lota'ya bir şey yaz…" : "Kullanmak için giriş yap…"}
@@ -1260,6 +1548,15 @@ export default function AIAssistantScreen() {
   );
 }
 
+function shadeHex(hex: string, amount: number): string {
+  const raw = hex.replace('#', '');
+  const n = parseInt(raw.length === 3 ? raw.split('').map((ch) => ch + ch).join('') : raw, 16);
+  const r = Math.min(255, Math.max(0, ((n >> 16) & 0xff) + amount));
+  const g = Math.min(255, Math.max(0, ((n >> 8) & 0xff) + amount));
+  const b = Math.min(255, Math.max(0, (n & 0xff) + amount));
+  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+}
+
 function AICouponCard({ coupon, theme, onSave }: {
   coupon: NonNullable<ChatMessage['coupon']>;
   theme: AppTheme;
@@ -1268,45 +1565,62 @@ function AICouponCard({ coupon, theme, onSave }: {
   const c = theme.colors;
   const s = useMemo(() => makeStyles(theme), [theme]);
   const id = getGameByName(coupon.game)?.id ?? 'cilgin';
-  const color = GameAccent[id] ?? c.brand;
+  const color = getGameAccentColor(id);
+  const bonusLabel = coupon.game === 'Çılgın Sayısal Loto' ? 'Joker' : 'Şans Topu';
 
   return (
-    <View style={[s.couponCard, { backgroundColor: c.surface, borderColor: c.border }]}>
-      <View style={s.couponHead}>
-        <GameEmblem game={id} size={34} />
-        <View>
-          <Text style={s.couponGame}>{coupon.game}</Text>
-          <Text style={s.couponTag}>Lota'nın önerisi</Text>
+    <View style={s.couponCardWrap}>
+      <LinearGradient
+        colors={[color, shadeHex(color, -48), shadeHex(color, -78)]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={s.couponCard}
+      >
+        <View style={s.couponGlow} />
+        <View style={s.couponHead}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.couponEyebrow}>LOTA'NIN ÖNERİSİ</Text>
+            <Text style={s.couponGame}>{coupon.game}</Text>
+          </View>
+          <View style={s.couponEmblem}>
+            <GameEmblem game={id} size={34} color={color} />
+          </View>
         </View>
-      </View>
 
-      <View style={s.couponBalls}>
-        {coupon.numbers.map((n, i) => (
-          <NumberBall key={i} value={n} color={color} size={38} />
-        ))}
-      </View>
-
-      {coupon.bonus !== null && (
-        <View style={s.couponExtra}>
-          <Text style={[s.couponExtraLabel, { color: c.text3 }]}>Şans Topu</Text>
-          <NumberBall value={coupon.bonus} variant="bonus" size={38} />
+        <View style={s.couponBalls}>
+          {coupon.numbers.map((n, i) => (
+            <View key={i} style={s.couponWhiteBall}>
+              <Text style={[s.couponWhiteBallText, { color: shadeHex(color, -30) }]} allowFontScaling={false}>
+                {n}
+              </Text>
+            </View>
+          ))}
         </View>
-      )}
 
-      {coupon.superStar !== null && (
-        <View style={s.couponExtra}>
-          <Text style={[s.couponExtraLabel, { color: c.text3 }]}>SüperStar</Text>
-          <NumberBall value={coupon.superStar} variant="star" size={38} />
-        </View>
-      )}
+        {(coupon.bonus !== null || coupon.superStar !== null) ? (
+          <View style={s.couponBonusRow}>
+            {coupon.bonus !== null ? (
+              <View style={s.couponBonusItem}>
+                <Text style={s.couponBonusLabel}>{bonusLabel}</Text>
+                <NumberBall value={coupon.bonus} variant="bonus" size={36} />
+              </View>
+            ) : null}
+            {coupon.superStar !== null ? (
+              <View style={s.couponBonusItem}>
+                <Text style={s.couponBonusLabel}>SüperStar</Text>
+                <NumberBall value={coupon.superStar} variant="star" size={36} />
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
-      {coupon.explanation ? <Text style={s.couponExp}>{coupon.explanation}</Text> : null}
-      <AppButton
-        label="Kuponu kaydet"
-        onPress={onSave}
-        iconLeft={(cl, sz) => <BookmarkIcon color={cl} size={sz} />}
-        style={{ marginTop: 13 }}
-      />
+        {coupon.explanation ? <Text style={s.couponExp}>{coupon.explanation}</Text> : null}
+
+        <PressableScale haptic={false} onPress={onSave} style={s.couponCta}>
+          <BookmarkIcon color={color} size={18} />
+          <Text style={[s.couponCtaText, { color }]}>Kuponu kaydet</Text>
+        </PressableScale>
+      </LinearGradient>
     </View>
   );
 }
@@ -1316,8 +1630,8 @@ function makeStyles(theme: AppTheme) {
   const { spacing, radius, typography: ty } = theme;
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
-    nav: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: c.hairline },
-    navBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+    nav: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 14 },
+    navBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' },
     navAvatar: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
     navTitle: { ...ty.h3, color: c.text },
     navStatus: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 },
@@ -1329,25 +1643,86 @@ function makeStyles(theme: AppTheme) {
     emptyTitle: { ...ty.h2, color: c.text },
     emptyDesc: { ...ty.body, color: c.text2, textAlign: 'center', maxWidth: 290, marginTop: 8 },
     suggestions: { width: '100%', gap: 9, marginTop: 22 },
-    suggestion: { paddingHorizontal: 16, paddingVertical: 13, borderRadius: radius.md, borderWidth: 1 },
+    suggestion: { paddingHorizontal: 16, paddingVertical: 13, borderRadius: radius.lg, backgroundColor: c.surface },
     suggestionText: { ...ty.bodySemibold, color: c.text },
 
     bubble: { maxWidth: '86%', paddingHorizontal: 15, paddingVertical: 12 },
     userBubble: { alignSelf: 'flex-end', borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomLeftRadius: 18, borderBottomRightRadius: 5 },
-    aiBubble: { alignSelf: 'flex-start', borderWidth: 1, borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomRightRadius: 18, borderBottomLeftRadius: 5 },
+    aiBubble: { alignSelf: 'flex-start', borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomRightRadius: 18, borderBottomLeftRadius: 5 },
     bubbleText: { ...ty.body, lineHeight: 21 },
 
-    couponCard: { alignSelf: 'flex-start', maxWidth: '92%', borderRadius: radius.xl, borderWidth: 1, padding: 16, ...theme.shadowSm },
-    couponHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 13 },
-    couponGame: { ...ty.title, color: c.text },
-    couponTag: { ...ty.caption, color: c.text3 },
+    couponCardWrap: { alignSelf: 'flex-start', maxWidth: '92%' },
+    couponCard: { borderRadius: radius.xxl, padding: 18, overflow: 'hidden' },
+    couponGlow: {
+      position: 'absolute',
+      top: -40,
+      right: -30,
+      width: 140,
+      height: 140,
+      borderRadius: 70,
+      backgroundColor: 'rgba(255,255,255,0.14)',
+    },
+    couponHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 },
+    couponEyebrow: {
+      fontFamily: theme.font.semibold,
+      fontSize: 10.5,
+      letterSpacing: 1.1,
+      color: 'rgba(255,255,255,0.7)',
+      marginBottom: 4,
+    },
+    couponGame: {
+      fontFamily: theme.font.bold,
+      fontSize: 18,
+      lineHeight: 22,
+      color: '#fff',
+      letterSpacing: -0.3,
+    },
+    couponEmblem: {
+      width: 48,
+      height: 48,
+      borderRadius: 16,
+      backgroundColor: 'rgba(255,255,255,0.18)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     couponBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-    couponExtra: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
-    couponExtraLabel: { ...ty.caption, fontFamily: theme.font.semibold },
-    couponExp: { ...ty.caption, color: c.text2, lineHeight: 18, marginTop: 13, paddingTop: 13, borderTopWidth: 1, borderTopColor: c.hairline },
-
-    inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1 },
-    input: { flex: 1, minHeight: 48, maxHeight: 110, borderRadius: 24, borderWidth: 1, paddingHorizontal: 18, paddingTop: 13, paddingBottom: 13, ...ty.body },
+    couponWhiteBall: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: 'rgba(255,255,255,0.92)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    couponWhiteBallText: {
+      fontFamily: theme.font.bold,
+      fontSize: 14,
+      fontVariant: ['tabular-nums'],
+      includeFontPadding: false,
+    },
+    couponBonusRow: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: spacing.md },
+    couponBonusItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    couponBonusLabel: { ...ty.caption, color: 'rgba(255,255,255,0.78)', fontFamily: theme.font.semibold },
+    couponExp: {
+      ...ty.caption,
+      color: 'rgba(255,255,255,0.82)',
+      lineHeight: 18,
+      marginTop: 13,
+      paddingTop: 13,
+    },
+    couponCta: {
+      marginTop: 16,
+      height: 46,
+      borderRadius: radius.pill,
+      backgroundColor: '#fff',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    couponCtaText: { fontFamily: theme.font.semibold, fontSize: 15 },
+    inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
+    input: { flex: 1, minHeight: 48, maxHeight: 110, borderRadius: 24, paddingHorizontal: 18, paddingTop: 13, paddingBottom: 13, ...ty.body },
     sendBtn: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   });
 }

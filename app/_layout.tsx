@@ -11,10 +11,10 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { AlertProvider } from '../contexts/AlertContext';
 import { AuthProvider } from '../contexts/AuthContext';
-import { BildirimProvider, useBildirim } from '../contexts/BildirimContext';
+import { BildirimProvider, useBildirim, type AddBildirimInput } from '../contexts/BildirimContext';
 import { OfflineBanner } from '../lib/OfflineBanner';
 import { useAppFonts } from '../lib/fonts';
-import { EXPO_PROJECT_ID, registerPushToken } from '../lib/push-token';
+import { cancelTimedResultNotifications, EXPO_PROJECT_ID, registerPushToken } from '../lib/push-token';
 import { supabase } from '../lib/supabase';
 import { ThemeProvider, useTheme } from '../lib/theme';
 
@@ -30,7 +30,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 // duration: 0 Android'deki varsayılan fade'i kapatır; fade: false iOS içindir.
 SplashScreen.setOptions({ duration: 0, fade: false });
 
-const SPLASH_BG = '#0E1212';
+const SPLASH_BG = '#0A0C10';
 // Logo en az bu kadar görünsün (fontlar daha erken hazır olsa bile).
 const SPLASH_MIN_MS = 1000;
 // Fontlar hiç yüklenmezse splash sonsuza dek takılı kalmasın.
@@ -57,8 +57,17 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/** Expo Notification.date bazen saniye, bazen ms olabilir. */
+function notificationDateToIso(date: number | undefined): string | undefined {
+  if (typeof date !== 'number' || !Number.isFinite(date)) return undefined;
+  const ms = date < 1e12 ? date * 1000 : date;
+  const parsed = new Date(ms);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString();
+}
+
 async function fetchUnreadNotifications(
-  addBildirim: (b: { title: string; body: string; screen?: string }) => void
+  addBildirim: (b: AddBildirimInput) => void
 ) {
   try {
     const tokenData = await Notifications.getExpoPushTokenAsync({
@@ -91,6 +100,7 @@ async function fetchUnreadNotifications(
           title: notif.title || 'Bildirim',
           body: notif.body || '',
           screen: notif.screen,
+          createdAt: notif.created_at || undefined,
         });
       }
 
@@ -136,6 +146,8 @@ function RootContent() {
 
   useEffect(() => {
     registerPushToken();
+    // Eski sürümlerde sabit saatte planlanan "sonuç açıklandı" bildirimlerini temizle.
+    cancelTimedResultNotifications();
 
     const handleDeepLink = async (url: string) => {
       if (!url) return;
@@ -181,6 +193,7 @@ function RootContent() {
         title: title || 'Bildirim',
         body: body || '',
         screen: data?.screen as string | undefined,
+        createdAt: notificationDateToIso(notification.date),
       });
     });
 
@@ -191,6 +204,7 @@ function RootContent() {
         title: title || 'Bildirim',
         body: body || '',
         screen: data?.screen as string | undefined,
+        createdAt: notificationDateToIso(response.notification.date),
       });
       const { screen } = data ?? {};
       if (screen === 'saved') router.push('/(tabs)/saved');

@@ -2,8 +2,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Keyboard, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { AppTheme, GameAccent } from '../../constants/theme';
-import type { Game } from '../../lib/games';
+import { AppTheme } from '../../constants/theme';
+import { getGameAccentColor, type Game } from '../../lib/games';
 import { SearchIcon } from '../../lib/icons';
 import { safeQuery, supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
@@ -20,11 +20,11 @@ function parseNumbers(str: string): number[] {
 
 type Stat = { number: number; count: number; lastSeen: string; missingSince: number; topPairs: number[] };
 
-export function AnalyzeTab({ game }: { game: Game }) {
+export function AnalyzeTab({ game, refreshKey = 0 }: { game: Game; refreshKey?: number }) {
   const theme = useTheme();
   const c = theme.colors;
   const s = useMemo(() => makeStyles(theme), [theme]);
-  const mainColor = GameAccent[game.id] ?? c.brand;
+  const mainColor = getGameAccentColor(game.id);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +60,23 @@ export function AnalyzeTab({ game }: { game: Game }) {
   useEffect(() => {
     fetchDraws();
   }, [game.id]);
+
+  useEffect(() => {
+    if (refreshKey === 0) return;
+    (async () => {
+      const { data, error: err } = await safeQuery(
+        () =>
+          supabase
+            .from('draws')
+            .select('numbers, draw_date')
+            .eq('game', game.name)
+            .order('draw_date_parsed', { ascending: false }),
+        'Veriler yüklenirken bir sorun oluştu.'
+      );
+      if (err) setError(err);
+      else if (data) setDraws(data);
+    })();
+  }, [refreshKey, game.name]);
 
   const analyze = () => {
     Keyboard.dismiss();
@@ -98,9 +115,11 @@ export function AnalyzeTab({ game }: { game: Game }) {
   return (
     <View>
       <Surface style={s.inputCard}>
-        <Text style={s.inputLabel}>Analiz etmek istediğin sayıları gir (1–{game.max}, virgülle ayır)</Text>
+        <View style={[s.drawAccent, { backgroundColor: mainColor }]} />
+        <Text style={s.inputTitle}>Sayı analizi</Text>
+        <Text style={s.inputLabel}>1–{game.max} arası sayıları virgülle ayırarak gir</Text>
         <TextInput
-          style={[s.input, { backgroundColor: c.surfaceAlt, borderColor: c.border, color: c.text }]}
+          style={[s.input, { backgroundColor: c.surfaceAlt, color: c.text }]}
           value={input}
           onChangeText={setInput}
           placeholder="Örn: 3, 15, 27, 42"
@@ -123,21 +142,20 @@ export function AnalyzeTab({ game }: { game: Game }) {
           </View>
           {result.stats.map((stat) => (
             <Surface key={stat.number} style={s.statCard}>
-              <NumberBall value={stat.number} color={mainColor} size={46} />
+              <View style={[s.drawAccent, { backgroundColor: mainColor }]} />
+              <NumberBall value={stat.number} color={mainColor} variant="matched" size={46} />
               <View style={s.statInfo}>
-                <Row label="Toplam çıkış" valueColor={mainColor} value={`${stat.count} kez`} theme={theme} />
-                <Row label="Son çıkış" valueColor={c.text} value={stat.lastSeen} theme={theme} />
+                <Row label="Toplam çıkış" accent={mainColor} value={`${stat.count} kez`} theme={theme} />
+                <Row label="Son çıkış" value={stat.lastSeen} theme={theme} />
                 {stat.missingSince > 0 ? (
-                  <Row label="Gecikme" valueColor={c.warning} value={`${stat.missingSince} çekiliş`} theme={theme} />
+                  <Row label="Gecikme" value={`${stat.missingSince} çekiliş`} theme={theme} />
                 ) : null}
                 {stat.topPairs.length > 0 ? (
                   <View style={s.pairsBlock}>
                     <Text style={s.statLabel}>En çok birlikte çıktığı</Text>
                     <View style={s.pairsRow}>
                       {stat.topPairs.map((p, i) => (
-                        <View key={i} style={[s.pairBall, { backgroundColor: mainColor + '14', borderColor: mainColor + '33' }]}>
-                          <Text style={[s.pairText, { color: mainColor }]}>{p}</Text>
-                        </View>
+                        <NumberBall key={i} value={p} color={mainColor} variant="matched" size={30} />
                       ))}
                     </View>
                   </View>
@@ -157,11 +175,30 @@ export function AnalyzeTab({ game }: { game: Game }) {
   );
 }
 
-function Row({ label, value, valueColor, theme }: { label: string; value: string; valueColor: string; theme: AppTheme }) {
+function Row({
+  label,
+  value,
+  accent,
+  theme,
+}: {
+  label: string;
+  value: string;
+  accent?: string;
+  theme: AppTheme;
+}) {
+  const c = theme.colors;
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 7 }}>
-      <Text style={{ ...theme.typography.caption, color: theme.colors.text2 }}>{label}</Text>
-      <Text style={{ ...theme.typography.caption, fontFamily: theme.font.bold, color: valueColor }}>{value}</Text>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
+      <Text style={{ ...theme.typography.caption, color: c.text3 }}>{label}</Text>
+      <Text
+        style={{
+          ...theme.typography.bodySemibold,
+          color: accent ?? c.text,
+          fontVariant: ['tabular-nums'],
+        }}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
@@ -170,17 +207,38 @@ function makeStyles(theme: AppTheme) {
   const c = theme.colors;
   const { spacing, radius, typography: ty } = theme;
   return StyleSheet.create({
-    inputCard: { marginHorizontal: 20, padding: spacing.lg, marginBottom: spacing.lg },
-    inputLabel: { ...ty.bodyMedium, color: c.text2, marginBottom: 12 },
-    input: { height: 50, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 16, fontFamily: theme.font.bold, fontSize: 15 },
+    inputCard: {
+      marginHorizontal: 20,
+      padding: spacing.lg,
+      paddingLeft: spacing.lg + 4,
+      marginBottom: spacing.lg,
+      overflow: 'hidden',
+    },
+    drawAccent: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 4,
+    },
+    inputTitle: { ...ty.h3, color: c.text, marginBottom: 3 },
+    inputLabel: { ...ty.caption, color: c.text2, marginBottom: 12 },
+    input: { height: 52, borderRadius: radius.pill, paddingHorizontal: 18, fontFamily: theme.font.semibold, fontSize: 15 },
     infoLine: { marginHorizontal: 20, marginBottom: 12 },
     infoLineText: { ...ty.caption, color: c.text3 },
-    statCard: { marginHorizontal: 20, marginBottom: 10, padding: spacing.lg, flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
+    statCard: {
+      marginHorizontal: 20,
+      marginBottom: 10,
+      padding: spacing.lg,
+      paddingLeft: spacing.lg + 4,
+      flexDirection: 'row',
+      gap: 14,
+      alignItems: 'flex-start',
+      overflow: 'hidden',
+    },
     statInfo: { flex: 1 },
-    statLabel: { ...ty.caption, color: c.text2 },
+    statLabel: { ...ty.caption, color: c.text3 },
     pairsBlock: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.hairline },
     pairsRow: { flexDirection: 'row', gap: 6, marginTop: 7 },
-    pairBall: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-    pairText: { fontFamily: theme.font.bold, fontSize: 12 },
   });
 }

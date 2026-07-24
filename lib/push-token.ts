@@ -58,3 +58,16 @@ export async function syncNotifyResults(notifyResults: boolean): Promise<void> {
 
   if (error) logError('syncNotifyResults', error);
 }
+
+/** Eski sabit-saatli "sonuç açıklandı" yerel bildirimlerini iptal eder. */
+export async function cancelTimedResultNotifications(): Promise<void> {
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const timedAfter = scheduled.filter((n) => n.content.data?.type === 'after');
+    await Promise.all(
+      timedAfter.map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier))
+    );
+  } catch (err) {
+    logError('cancelTimedResultNotifications', err);
+  }
+}

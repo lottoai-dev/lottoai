@@ -1,16 +1,17 @@
 // app/(tabs)/bildirimler.tsx
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    AppState,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,6 +19,8 @@ import { AppTheme } from '../../constants/theme';
 import { useBildirim, type Bildirim } from '../../contexts/BildirimContext';
 import { BackIcon, BellIcon } from '../../lib/icons';
 import { useTheme } from '../../lib/theme';
+
+const TIME_TICK_MS = 60_000;
 
 function softHaptic() {
   if (Platform.OS === 'android') {
@@ -27,10 +30,9 @@ function softHaptic() {
   }
 }
 
-function formatBildirimTime(isoString: string) {
+function formatBildirimTime(isoString: string, nowMs: number) {
   const date = new Date(isoString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = nowMs - date.getTime();
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 1) return 'az önce';
   if (diffMin < 60) return `${diffMin} dk önce`;
@@ -46,6 +48,24 @@ export default function BildirimlerScreen() {
   const c = theme.colors;
   const s = useMemo(() => makeStyles(theme), [theme]);
   const { bildirimler, markAsRead, markAllAsRead } = useBildirim();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  // Ekran odaktayken göreli süreleri dakikada bir yenile
+  useFocusEffect(
+    useCallback(() => {
+      setNowMs(Date.now());
+      const id = setInterval(() => setNowMs(Date.now()), TIME_TICK_MS);
+      return () => clearInterval(id);
+    }, []),
+  );
+
+  // Arka plandan dönüşte interval throttle olsa bile hemen güncelle
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') setNowMs(Date.now());
+    });
+    return () => sub.remove();
+  }, []);
 
   const handlePress = (bildirim: Bildirim) => {
     softHaptic();
@@ -64,7 +84,7 @@ export default function BildirimlerScreen() {
               softHaptic();
               router.back();
             }}
-            style={[s.navBtn, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+            style={[s.navBtn, { backgroundColor: c.surface }]}
             hitSlop={6}
           >
             <BackIcon color={c.text2} size={22} />
@@ -105,29 +125,53 @@ export default function BildirimlerScreen() {
           }}
         >
           {bildirimler.map((b) => (
-            <TouchableOpacity
+            <BildirimRow
               key={b.id}
-              style={[s.item, { backgroundColor: b.isRead ? c.surface : c.brandSoft, borderColor: c.border }]}
-              onPress={() => handlePress(b)}
-              activeOpacity={0.7}
-            >
-              <View style={[s.dot, { backgroundColor: b.isRead ? 'transparent' : c.brand }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.itemTitle} numberOfLines={1}>
-                  {b.title}
-                </Text>
-                <Text style={s.itemBody} numberOfLines={3}>
-                  {b.body}
-                </Text>
-                <Text style={s.itemTime}>{formatBildirimTime(b.createdAt)}</Text>
-              </View>
-            </TouchableOpacity>
+              bildirim={b}
+              nowMs={nowMs}
+              styles={s}
+              colors={c}
+              onPress={handlePress}
+            />
           ))}
         </ScrollView>
       )}
     </View>
   );
 }
+
+const BildirimRow = React.memo(function BildirimRow({
+  bildirim,
+  nowMs,
+  styles: s,
+  colors: c,
+  onPress,
+}: {
+  bildirim: Bildirim;
+  nowMs: number;
+  styles: ReturnType<typeof makeStyles>;
+  colors: AppTheme['colors'];
+  onPress: (b: Bildirim) => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[s.item, { backgroundColor: bildirim.isRead ? c.surface : c.brandSoft }]}
+      onPress={() => onPress(bildirim)}
+      activeOpacity={1}
+    >
+      <View style={[s.dot, { backgroundColor: bildirim.isRead ? 'transparent' : c.brand }]} />
+      <View style={{ flex: 1 }}>
+        <Text style={s.itemTitle} numberOfLines={1}>
+          {bildirim.title}
+        </Text>
+        <Text style={s.itemBody} numberOfLines={3}>
+          {bildirim.body}
+        </Text>
+        <Text style={s.itemTime}>{formatBildirimTime(bildirim.createdAt, nowMs)}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
 
 function makeStyles(theme: AppTheme) {
   const c = theme.colors;
@@ -145,8 +189,8 @@ function makeStyles(theme: AppTheme) {
     navBtn: {
       width: 38,
       height: 38,
-      borderRadius: 12,
-      borderWidth: 1,
+      borderRadius: 19,
+      backgroundColor: c.surface,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -176,8 +220,7 @@ function makeStyles(theme: AppTheme) {
       alignItems: 'flex-start',
       gap: 12,
       padding: 14,
-      borderRadius: radius.lg,
-      borderWidth: 1,
+      borderRadius: radius.xl,
       marginBottom: 8,
     },
     dot: { width: 10, height: 10, borderRadius: 5, marginTop: 6 },

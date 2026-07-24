@@ -21,11 +21,12 @@ import { NumberBall } from '../../components/ui/number-ball';
 import { PressableScale, Surface } from '../../components/ui/surface';
 import { Toggle } from '../../components/ui/toggle';
 import { STORAGE_KEYS } from '../../constants/storage-keys';
-import { AppTheme, GameAccent } from '../../constants/theme';
+import { AppTheme } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { markCouponsDirty } from '../../lib/couponsStore';
 import { GameEmblem } from '../../lib/emblems';
-import { GAMES } from '../../lib/games';
+import { GAMES, getGameAccentColor } from '../../lib/games';
 import GameSelector from '../../lib/GameSelector';
 import {
     BookmarkIcon,
@@ -48,12 +49,20 @@ function softHaptic() {
 }
 
 /* ───────────────────────── number logic ───────────────────────── */
-function generateNumbers(count: number, max: number): number[] {
-  const pool = Array.from({ length: max }, (_, i) => i + 1);
-  for (let i = pool.length - 1; i > 0; i--) {
+function shuffleInPlace<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
   }
+  return arr;
+}
+
+function generateNumbers(count: number, max: number): number[] {
+  const pool = new Array<number>(max);
+  for (let i = 0; i < max; i++) pool[i] = i + 1;
+  shuffleInPlace(pool);
   return pool.slice(0, count).sort((a, b) => a - b);
 }
 
@@ -102,37 +111,44 @@ function generateWithConstraints(
     balanced: boolean;
     includeNumbers: number[];
     excludeNumbers: number[];
-  }
+  },
 ): number[] | null {
+  if (constraints.includeNumbers.length > count) return null;
+
   const MAX_ATTEMPTS = 500;
+  const excludeSet = new Set(constraints.excludeNumbers);
+  const includeSet = new Set(constraints.includeNumbers);
+  const basePool: number[] = [];
+  for (let n = 1; n <= max; n++) {
+    if (!excludeSet.has(n)) basePool.push(n);
+  }
+
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    if (constraints.includeNumbers.length > count) return null;
-    const pool = Array.from({ length: max }, (_, i) => i + 1).filter((n) => !constraints.excludeNumbers.includes(n));
     let nums: number[] = [];
 
     if (constraints.balanced) {
       const sliceSize = max / count;
       const remaining = count - constraints.includeNumbers.length;
       const usedRanges = new Set<number>();
-      constraints.includeNumbers.forEach((num) => {
+      for (const num of constraints.includeNumbers) {
         usedRanges.add(Math.min(Math.floor((num - 1) / sliceSize), count - 1));
-      });
+      }
       const availableRanges: number[][] = [];
       for (let i = 0; i < count; i++) {
         if (usedRanges.has(i)) continue;
         const from = Math.floor(i * sliceSize) + 1;
         const to = Math.floor((i + 1) * sliceSize);
-        availableRanges.push(
-          Array.from({ length: to - from + 1 }, (_, j) => from + j).filter(
-            (n) => !constraints.excludeNumbers.includes(n)
-          )
-        );
+        const range: number[] = [];
+        for (let n = from; n <= to; n++) {
+          if (!excludeSet.has(n)) range.push(n);
+        }
+        availableRanges.push(range);
       }
       if (availableRanges.length < remaining) continue;
-      const shuffledRanges = availableRanges.sort(() => Math.random() - 0.5);
+      shuffleInPlace(availableRanges);
       const picks: number[] = [];
       for (let i = 0; i < remaining; i++) {
-        const range = shuffledRanges[i];
+        const range = availableRanges[i];
         if (!range || range.length === 0) continue;
         picks.push(range[Math.floor(Math.random() * range.length)]);
       }
@@ -142,15 +158,25 @@ function generateWithConstraints(
       const includeEvens = constraints.includeNumbers.filter((n) => n % 2 === 0).length;
       const neededEvens = Math.max(0, constraints.evenCount - includeEvens);
       const neededOdds = Math.max(0, remaining - neededEvens);
-      const evens = pool.filter((n) => n % 2 === 0 && !constraints.includeNumbers.includes(n));
-      const odds = pool.filter((n) => n % 2 !== 0 && !constraints.includeNumbers.includes(n));
+      const evens: number[] = [];
+      const odds: number[] = [];
+      for (const n of basePool) {
+        if (includeSet.has(n)) continue;
+        if (n % 2 === 0) evens.push(n);
+        else odds.push(n);
+      }
       if (evens.length < neededEvens || odds.length < neededOdds) continue;
-      const selEvens = [...evens].sort(() => Math.random() - 0.5).slice(0, neededEvens);
-      const selOdds = [...odds].sort(() => Math.random() - 0.5).slice(0, neededOdds);
+      shuffleInPlace(evens);
+      shuffleInPlace(odds);
+      const selEvens = evens.slice(0, neededEvens);
+      const selOdds = odds.slice(0, neededOdds);
       nums = [...constraints.includeNumbers, ...selEvens, ...selOdds].sort((a, b) => a - b);
     } else {
       const remaining = count - constraints.includeNumbers.length;
-      const poolFiltered = pool.filter((n) => !constraints.includeNumbers.includes(n));
+      const poolFiltered: number[] = [];
+      for (const n of basePool) {
+        if (!includeSet.has(n)) poolFiltered.push(n);
+      }
       if (poolFiltered.length < remaining) continue;
 
       // Toplam aralığı isteniyorsa, sayı seçimi TAMAMEN RASTGELE kalmaya devam
@@ -166,7 +192,7 @@ function generateWithConstraints(
         const targetAvg = ((lo + hi) / 2 - includedSum) / remaining;
         const spread = Math.max(max / 3, 10);
 
-        const workingPool = [...poolFiltered];
+        const workingPool = poolFiltered.slice();
         picks = [];
         for (let i = 0; i < remaining; i++) {
           const weights = workingPool.map((n) => Math.max(1, spread - Math.abs(n - targetAvg)));
@@ -175,13 +201,16 @@ function generateWithConstraints(
           let chosenIdx = workingPool.length - 1;
           for (let j = 0; j < workingPool.length; j++) {
             r -= weights[j];
-            if (r <= 0) { chosenIdx = j; break; }
+            if (r <= 0) {
+              chosenIdx = j;
+              break;
+            }
           }
           picks.push(workingPool[chosenIdx]);
           workingPool.splice(chosenIdx, 1);
         }
       } else {
-        picks = [...poolFiltered].sort(() => Math.random() - 0.5).slice(0, remaining);
+        picks = shuffleInPlace(poolFiltered.slice()).slice(0, remaining);
       }
 
       nums = [...constraints.includeNumbers, ...picks].sort((a, b) => a - b);
@@ -236,7 +265,7 @@ export default function GenerateScreen() {
   const [historyModal, setHistoryModal] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
 
-  const mainColor = GameAccent[selectedGame.id] ?? c.brand;
+  const mainColor = getGameAccentColor(selectedGame.id);
 
   const includeNumbers = parseNumberList(includeText, selectedGame.max);
   const excludeNumbers = parseNumberList(excludeText, selectedGame.max);
@@ -291,6 +320,7 @@ export default function GenerateScreen() {
   );
 
   const handleGenerate = () => {
+    softHaptic();
     const sumMinNum = sumMin.trim() !== '' ? parseInt(sumMin, 10) : null;
     const sumMaxNum = sumMax.trim() !== '' ? parseInt(sumMax, 10) : null;
 
@@ -329,8 +359,6 @@ export default function GenerateScreen() {
       ss = generateNumbers(1, selectedGame.superStar.max)[0];
     }
 
-    softHaptic();
-
     setGeneratedNumbers(nums);
     setBonusNumbers(bonus);
     setSuperStarNumber(ss ?? null);
@@ -347,7 +375,6 @@ export default function GenerateScreen() {
   };
 
   const handleGameSelect = (game: (typeof GAMES)[0]) => {
-    softHaptic();
     setSelectedGame(game);
     setGeneratedNumbers([]);
     setBonusNumbers([]);
@@ -395,7 +422,6 @@ export default function GenerateScreen() {
               await AsyncStorage.setItem(STORAGE_KEYS.GENERATION_HISTORY, JSON.stringify(updated));
             }
             setHistoryModal(false);
-            softHaptic();
             showAlert('Temizlendi', `${selectedGame.name} geçmişi temizlendi.`);
           },
         },
@@ -410,7 +436,7 @@ export default function GenerateScreen() {
     id: Date.now() + idOffset,
     game: entry.game,
     icon: GAMES.find((g) => g.name === entry.game)?.icon || '',
-    color: GameAccent[GAMES.find((g) => g.name === entry.game)?.id ?? 'cilgin'] ?? c.brand,
+    color: getGameAccentColor(GAMES.find((g) => g.name === entry.game)?.id ?? 'cilgin'),
     numbers: entry.numbers,
     bonus: entry.bonus,
     superStar: entry.superStar ?? null,
@@ -439,8 +465,8 @@ export default function GenerateScreen() {
     });
 
     const handleSaveAllHistory = async () => {
+      softHaptic();
       if (!user) {
-        softHaptic();
         setHistoryModal(false);
         router.push('/login' as any);
         return;
@@ -457,6 +483,7 @@ export default function GenerateScreen() {
       }
       if (savedCount > 0) {
         await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(coupons));
+        markCouponsDirty();
       }
       const updatedHistory = history.filter((h) => h.gameId !== selectedGame.id);
       setHistory(updatedHistory);
@@ -466,7 +493,6 @@ export default function GenerateScreen() {
         await AsyncStorage.setItem(STORAGE_KEYS.GENERATION_HISTORY, JSON.stringify(updatedHistory));
       }
       setHistoryModal(false);
-      softHaptic();
       if (savedCount > 0) {
         showAlert('Kaydedildi', `${savedCount} kupon Kuponlarım'a eklendi.`, [
           { text: 'Tamam' },
@@ -486,12 +512,12 @@ export default function GenerateScreen() {
   };
 
   const handleSave = async () => {
+    softHaptic();
     if (generatedNumbers.length === 0) {
       showAlert('Uyarı', 'Önce bir kupon üretin.');
       return;
     }
     if (!user) {
-      softHaptic();
       router.push('/login' as any);
       return;
     }
@@ -507,7 +533,7 @@ export default function GenerateScreen() {
       const persist = async () => {
         coupons.unshift(buildCoupon(entry));
         await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(coupons));
-        softHaptic();
+        markCouponsDirty();
         showAlert('Kaydedildi', "Kuponunuz Kuponlarım'a eklendi.", [
           { text: 'Tamam' },
           { text: 'Kuponlarıma git', onPress: () => router.push('/(tabs)/saved') },
@@ -543,7 +569,7 @@ export default function GenerateScreen() {
     return parts;
   };
 
-  const inputStyle = [s.input, { backgroundColor: c.surfaceAlt, borderColor: c.border, color: c.text }];
+  const inputStyle = [s.input, { backgroundColor: c.surfaceAlt, color: c.text }];
 
   return (
     <View style={s.container}>
@@ -555,12 +581,17 @@ export default function GenerateScreen() {
       >
         <View style={s.header}>
           <View style={s.headerText}>
+            <View style={s.eyebrowRow}>
+              <View style={[s.eyebrowDot, { backgroundColor: mainColor }]} />
+              <Text style={[s.eyebrow, { color: mainColor }]}>KUPON STÜDYOSU</Text>
+            </View>
             <Text style={s.title}>Kupon Üret</Text>
             <Text style={s.subtitle}>Sayılarını sistem senin için seçsin</Text>
           </View>
           <PressableScale
+            haptic={false}
             onPress={() => { softHaptic(); setHistoryModal(true); }}
-            style={[s.historyHeaderBtn, { backgroundColor: c.surface, borderColor: c.border }]}
+            style={[s.historyHeaderBtn, { backgroundColor: c.surface }]}
           >
             <ClockIcon color={c.brand} size={18} />
             <Text style={[s.historyHeaderBtnText, { color: c.brand }]}>Geçmiş</Text>
@@ -578,21 +609,24 @@ export default function GenerateScreen() {
         <Surface style={s.resultCard} elevated>
           {generatedNumbers.length === 0 ? (
             <View style={s.empty}>
-              <View style={[s.emptyIcon, { backgroundColor: mainColor + '15' }]}>
+              <View style={[s.emptyIcon, { backgroundColor: `${mainColor}14` }]}>
                 <DiceIcon color={mainColor} size={30} />
               </View>
               <Text style={s.emptyText}>Kupon üretmek için aşağıdaki butona dokun</Text>
             </View>
           ) : (
             <>
+              <View style={[s.resultAccent, { backgroundColor: mainColor }]} />
+              <Text style={s.resultEyebrow}>SENİN KUPONUN</Text>
               <View style={s.balls} key={`n-${genId}`}>
                 {generatedNumbers.map((num, i) => (
                   <NumberBall
                     key={`${genId}-${i}`}
                     value={num}
-                    color={includeNumbers.includes(num) ? c.gold : mainColor}
+                    color={mainColor}
                     size={46}
-                    variant={includeNumbers.includes(num) ? 'bonus' : 'game'}
+                    variant="matched"
+                    revealIndex={i}
                   />
                 ))}
               </View>
@@ -602,7 +636,13 @@ export default function GenerateScreen() {
                   <Text style={s.bonusLabel}>ŞANS TOPU</Text>
                   <View style={s.balls}>
                     {bonusNumbers.map((num, i) => (
-                      <NumberBall key={`b-${genId}-${i}`} value={num} variant="bonus" size={46} />
+                      <NumberBall
+                        key={`b-${genId}-${i}`}
+                        value={num}
+                        variant="bonus"
+                        size={46}
+                        revealIndex={generatedNumbers.length + i}
+                      />
                     ))}
                   </View>
                 </View>
@@ -612,7 +652,13 @@ export default function GenerateScreen() {
                 <View style={s.bonusBlock}>
                   <Text style={s.bonusLabel}>SÜPERSTAR</Text>
                   <View style={s.balls}>
-                    <NumberBall key={`ss-${genId}`} value={superStarNumber} variant="star" size={46} />
+                    <NumberBall
+                      key={`ss-${genId}`}
+                      value={superStarNumber}
+                      variant="star"
+                      size={46}
+                      revealIndex={generatedNumbers.length + bonusNumbers.length}
+                    />
                   </View>
                 </View>
               ) : null}
@@ -639,6 +685,7 @@ export default function GenerateScreen() {
 
         <View style={s.btnRow}>
           <AppButton
+            haptic={false}
             label={generatedNumbers.length > 0 ? 'Yeniden üret' : 'Kupon üret'}
             accent={mainColor}
             onPress={handleGenerate}
@@ -647,12 +694,12 @@ export default function GenerateScreen() {
             style={{ flex: 1 }}
           />
           <PressableScale
+            haptic={false}
             onPress={() => { softHaptic(); setShowFilter((v) => !v); }}
             style={[
               s.filterBtn,
               {
                 backgroundColor: filterActive ? mainColor + '1A' : c.surface,
-                borderColor: filterActive ? mainColor : c.border,
               },
             ]}
           >
@@ -663,6 +710,7 @@ export default function GenerateScreen() {
 
         {generatedNumbers.length > 0 ? (
           <AppButton
+            haptic={false}
             label="Kuponu kaydet"
             onPress={handleSave}
             iconLeft={(color, size) => <BookmarkIcon color={color} size={size} />}
@@ -673,17 +721,20 @@ export default function GenerateScreen() {
 
         {showFilter ? (
           <Surface style={s.filterPanel}>
+            <View style={[s.panelAccent, { backgroundColor: mainColor }]} />
             <Text style={s.filterPanelTitle}>AKILLI FİLTRELER</Text>
 
             <Pressable
               onPress={() => { softHaptic(); setBalanced((b) => !b); if (!balanced) setEvenCount(null); }}
-              style={[s.toggleRow, { borderColor: balanced ? c.brand : c.border, backgroundColor: balanced ? c.brandSoft : 'transparent' }]}
+              style={[s.toggleRow, { backgroundColor: balanced ? c.brandSoft : c.surfaceAlt }]}
             >
               <View style={{ flex: 1 }}>
                 <Text style={[s.toggleTitle, balanced && { color: c.brand }]}>Dengeli dağılım</Text>
                 <Text style={s.toggleDesc}>Düşük, orta ve yüksek sayılardan eşit oranda seçer</Text>
               </View>
-              <Toggle value={balanced} onChange={(v) => { softHaptic(); setBalanced(v); if (v) setEvenCount(null); }} />
+              <View pointerEvents="none">
+                <Toggle value={balanced} onChange={(v) => { setBalanced(v); if (v) setEvenCount(null); }} />
+              </View>
             </Pressable>
 
             <View style={s.divider} />
@@ -697,14 +748,18 @@ export default function GenerateScreen() {
               ) : null}
             </View>
             <Text style={s.subDesc}>{selectedGame.count} sayıdan kaçı çift olsun?</Text>
-            <View style={s.segmentWrap}>
+            <View style={[s.segmentWrap, selectedGame.id === 'onnumara' && s.onNumaraSegmentWrap]}>
               {filterOptions.map((n) => {
                 const sel = evenCount === n;
                 return (
                   <Pressable
                     key={n}
                     onPress={() => { softHaptic(); setEvenCount(n); setBalanced(false); }}
-                    style={[s.segment, { borderColor: sel ? mainColor : c.border, backgroundColor: sel ? mainColor : 'transparent' }]}
+                    style={[
+                      s.segment,
+                      selectedGame.id === 'onnumara' && s.onNumaraSegment,
+                      { backgroundColor: sel ? mainColor : c.surfaceAlt },
+                    ]}
                   >
                     <Text style={[s.segmentTop, { color: sel ? '#fff' : c.text }]}>{n}</Text>
                     <Text style={[s.segmentBot, { color: sel ? 'rgba(255,255,255,0.75)' : c.text3 }]}>çift</Text>
@@ -717,13 +772,15 @@ export default function GenerateScreen() {
 
             <Pressable
               onPress={() => { softHaptic(); setNoConsecutive((v) => !v); }}
-              style={[s.toggleRow, { borderColor: noConsecutive ? c.brand : c.border, backgroundColor: noConsecutive ? c.brandSoft : 'transparent' }]}
+              style={[s.toggleRow, { backgroundColor: noConsecutive ? c.brandSoft : c.surfaceAlt }]}
             >
               <View style={{ flex: 1 }}>
                 <Text style={[s.toggleTitle, noConsecutive && { color: c.brand }]}>Ardışık sayıları engelle</Text>
                 <Text style={s.toggleDesc}>Yan yana 2{"'"}den fazla ardışık sayı olmasın</Text>
               </View>
-              <Toggle value={noConsecutive} onChange={(v) => { softHaptic(); setNoConsecutive(v); }} />
+              <View pointerEvents="none">
+                <Toggle value={noConsecutive} onChange={(v) => { setNoConsecutive(v); }} />
+              </View>
             </Pressable>
 
             <View style={s.divider} />
@@ -771,7 +828,7 @@ export default function GenerateScreen() {
           </Surface>
         ) : null}
 
-        <View style={[s.note, { backgroundColor: c.surfaceAlt, borderColor: c.hairline }]}>
+        <View style={[s.note, { backgroundColor: c.surfaceAlt }]}>
           <InfoIcon color={c.text3} size={15} />
           <Text style={s.noteText}>Sayılar tamamen rastgele üretilir. Eğlence amaçlıdır, kazanç garantisi yoktur.</Text>
         </View>
@@ -812,25 +869,29 @@ export default function GenerateScreen() {
               <>
                 <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
                   {currentGameHistory.map((entry, index) => {
-                    const entryColor = GameAccent[entry.gameId] ?? c.brand;
+                    const entryColor = getGameAccentColor(entry.gameId);
                     const timeAgo = Math.floor((Date.now() - entry.timestamp) / 60000);
                     const timeStr = timeAgo < 1 ? 'az önce' : timeAgo < 60 ? `${timeAgo} dk önce` : '1+ saat önce';
                     return (
                       <PressableScale
+                        haptic={false}
                         key={`${entry.timestamp}-${index}`}
                         onPress={() => handleRestore(entry)}
-                        style={[s.historyEntry, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}
+                        style={[s.historyEntry, { backgroundColor: c.surfaceAlt }]}
                       >
+                        <View style={[s.panelAccent, { backgroundColor: entryColor }]} />
                         <View style={s.historyEntryHead}>
                           <View style={s.historyEntryGameRow}>
-                            <GameEmblem game={entry.gameId} size={22} />
-                            <Text style={s.historyEntryGame}>{entry.game}</Text>
+                            <View style={[s.historyEntryEmblem, { backgroundColor: `${entryColor}14` }]}>
+                              <GameEmblem game={entry.gameId} size={22} color={entryColor} />
+                            </View>
+                            <Text style={[s.historyEntryGame, { color: entryColor }]}>{entry.game}</Text>
                           </View>
                           <Text style={s.historyEntryTime}>{timeStr}</Text>
                         </View>
                         <View style={s.historyEntryBalls}>
                           {entry.numbers.map((num, i) => (
-                            <NumberBall key={i} value={num} color={entryColor} size={28} />
+                            <NumberBall key={i} value={num} color={entryColor} variant="matched" size={28} />
                           ))}
                           {entry.bonus.map((num, i) => (
                             <NumberBall key={`b${i}`} value={num} variant="bonus" size={28} />
@@ -844,14 +905,17 @@ export default function GenerateScreen() {
 
                 <View style={s.modalActions}>
                   <AppButton
+                    haptic={false}
                     label={savingAll ? 'Kaydediliyor…' : 'Tümünü kaydet'}
                     onPress={handleSaveAllHistory}
                     disabled={savingAll}
                     iconLeft={(color, size) => <CheckIcon color={color} size={size} />}
                   />
                   <AppButton
+                    haptic={false}
                     label="Geçmişi temizle"
-                    variant="ghost"
+                    variant="secondary"
+                    size="md"
                     accent={c.danger}
                     onPress={handleClearHistory}
                     iconLeft={(color, size) => <TrashIcon color={color} size={size} />}
@@ -874,6 +938,9 @@ function makeStyles(theme: AppTheme) {
     container: { flex: 1, backgroundColor: c.bg },
     header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
     headerText: { flex: 1 },
+    eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 5 },
+    eyebrowDot: { width: 7, height: 7, borderRadius: 4 },
+    eyebrow: { ...ty.micro, fontFamily: theme.font.extrabold, letterSpacing: 1 },
     title: { ...ty.h1, color: c.text },
     subtitle: { ...ty.bodyMedium, color: c.text2, marginTop: 3 },
     historyHeaderBtn: {
@@ -883,7 +950,6 @@ function makeStyles(theme: AppTheme) {
       paddingVertical: 10,
       paddingHorizontal: 12,
       borderRadius: radius.lg,
-      borderWidth: 1,
     },
     historyHeaderBtnText: { ...ty.label },
     historyBadge: {
@@ -894,32 +960,55 @@ function makeStyles(theme: AppTheme) {
       justifyContent: 'center',
       paddingHorizontal: 5,
     },
-    historyBadgeText: { fontFamily: theme.font.bold, fontSize: 11, color: '#fff' },
+    historyBadgeText: { fontFamily: theme.font.semibold, fontSize: 11, color: '#fff' },
     sectionLabel: { ...ty.micro, color: c.text2, paddingHorizontal: spacing.xl, marginBottom: 10 },
 
-    resultCard: { marginHorizontal: spacing.xl, marginTop: spacing.lg, borderRadius: radius.xxl, paddingVertical: 24, paddingHorizontal: spacing.xl },
+    resultCard: {
+      marginHorizontal: spacing.xl,
+      marginTop: spacing.lg,
+      borderRadius: radius.xxl,
+      paddingVertical: 24,
+      paddingHorizontal: spacing.xl,
+      paddingLeft: spacing.xl + 4,
+      overflow: 'hidden',
+    },
+    resultAccent: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 4,
+    },
+    resultEyebrow: { ...ty.micro, fontSize: 9, letterSpacing: 0.8, color: c.text3, textAlign: 'center', marginBottom: 14 },
     empty: { alignItems: 'center', gap: spacing.md, paddingVertical: 8 },
     emptyIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
     emptyText: { ...ty.bodyMedium, color: c.text3, textAlign: 'center', maxWidth: 220 },
     balls: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
     bonusBlock: { alignItems: 'center', marginTop: spacing.lg },
     bonusLabel: { ...ty.micro, color: c.text3, marginBottom: 10 },
-    resultFooter: { alignItems: 'center', marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: c.hairline },
+    resultFooter: { alignItems: 'center', marginTop: spacing.lg, paddingTop: spacing.lg },
     resultFooterLabel: { ...ty.micro, color: c.text3 },
-    resultFooterValue: { fontFamily: theme.font.extrabold, fontSize: 15, color: c.text, marginTop: 3, fontVariant: ['tabular-nums'] },
+    resultFooterValue: { fontFamily: theme.font.bold, fontSize: 15, color: c.text, marginTop: 3, fontVariant: ['tabular-nums'] },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginTop: spacing.md },
     chip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill },
     chipText: { ...ty.caption, fontFamily: theme.font.semibold },
 
     btnRow: { flexDirection: 'row', gap: 10, marginHorizontal: spacing.xl, marginTop: spacing.lg },
-    filterBtn: { width: 52, height: 52, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+    filterBtn: { width: 52, height: 52, borderRadius: radius.lg, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' },
     filterDot: { position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: 4 },
 
     saveBtn: { marginHorizontal: spacing.xl, marginTop: 10, alignSelf: 'stretch' },
 
-    filterPanel: { marginHorizontal: spacing.xl, marginTop: spacing.md, padding: spacing.lg },
+    filterPanel: { marginHorizontal: spacing.xl, marginTop: spacing.md, padding: spacing.lg, paddingLeft: spacing.lg + 4, overflow: 'hidden' },
+    panelAccent: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 4,
+    },
     filterPanelTitle: { ...ty.micro, color: c.text2, marginBottom: spacing.md },
-    toggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: 14, borderRadius: radius.md, borderWidth: 1 },
+    toggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: 14, borderRadius: radius.lg, backgroundColor: c.surfaceAlt },
     toggleTitle: { ...ty.title, color: c.text },
     toggleDesc: { ...ty.caption, color: c.text3, marginTop: 3 },
     divider: { height: 1, backgroundColor: c.hairline, marginVertical: spacing.lg },
@@ -928,20 +1017,22 @@ function makeStyles(theme: AppTheme) {
     clearBtn: { ...ty.label, fontSize: 12 },
     subDesc: { ...ty.caption, color: c.text3, marginBottom: 10 },
     segmentWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-    segment: { flexGrow: 1, minWidth: 42, alignItems: 'center', paddingVertical: 9, borderRadius: radius.sm, borderWidth: 1 },
-    segmentTop: { fontFamily: theme.font.bold, fontSize: 13 },
+    segment: { flexGrow: 1, minWidth: 42, alignItems: 'center', paddingVertical: 9, borderRadius: radius.md, backgroundColor: c.surfaceAlt },
+    onNumaraSegmentWrap: { justifyContent: 'center' },
+    onNumaraSegment: { flexGrow: 0, flexBasis: '15%', minWidth: 0 },
+    segmentTop: { fontFamily: theme.font.semibold, fontSize: 13 },
     segmentBot: { fontFamily: theme.font.medium, fontSize: 9, marginTop: 1 },
     sumRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    sumDash: { fontFamily: theme.font.bold, fontSize: 16 },
-    input: { flex: 1, height: 48, borderRadius: radius.md, borderWidth: 1, textAlign: 'center', fontFamily: theme.font.bold, fontSize: 14 },
+    sumDash: { fontFamily: theme.font.semibold, fontSize: 16 },
+    input: { flex: 1, height: 48, borderRadius: radius.lg, textAlign: 'center', fontFamily: theme.font.semibold, fontSize: 14 },
     fullInput: { flex: 0, width: '100%', textAlign: 'left', paddingHorizontal: 14 },
 
-    note: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: 13, borderRadius: radius.md, borderWidth: 1 },
+    note: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: 13, borderRadius: radius.lg },
     noteText: { ...ty.caption, color: c.text2, flex: 1, lineHeight: 17 },
 
     modalOverlay: { flex: 1, justifyContent: 'flex-end' },
     modalSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing.xl },
-    modalGrabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: c.border, marginBottom: spacing.lg },
+    modalGrabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: c.elevated, marginBottom: spacing.lg },
     modalHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
     modalTitle: { ...ty.h2, color: c.text },
     modalSubtitle: { ...ty.caption, color: c.text2, marginTop: 3 },
@@ -950,10 +1041,17 @@ function makeStyles(theme: AppTheme) {
     historyEmptyIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
     historyEmptyTitle: { ...ty.title, color: c.text },
     historyEmptyText: { ...ty.bodyMedium, color: c.text3, textAlign: 'center', maxWidth: 240 },
-    historyEntry: { padding: 12, borderRadius: radius.lg, borderWidth: 1, marginBottom: 10 },
+    historyEntry: { padding: 12, paddingLeft: 16, borderRadius: radius.lg, marginBottom: 10, overflow: 'hidden' },
     historyEntryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
     historyEntryGameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    historyEntryGame: { ...ty.title, color: c.text },
+    historyEntryEmblem: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    historyEntryGame: { ...ty.title },
     historyEntryTime: { ...ty.caption, color: c.text3 },
     historyEntryBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, alignItems: 'center' },
     modalActions: { marginTop: spacing.md, gap: spacing.sm },

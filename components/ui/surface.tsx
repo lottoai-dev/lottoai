@@ -1,12 +1,13 @@
 // components/ui/surface.tsx
 import React from 'react';
-import { Pressable, View, type ViewProps, type ViewStyle } from 'react-native';
+import { Pressable, View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
+import { softHaptic } from '../../lib/haptics';
 import { useTheme } from '../../lib/theme';
 
 export function Surface({
   children,
   style,
-  elevated = true,
+  elevated = false,
   ...rest
 }: ViewProps & { elevated?: boolean }) {
   const theme = useTheme();
@@ -16,10 +17,8 @@ export function Surface({
       {...rest}
       style={[
         {
-          backgroundColor: c.surface,
+          backgroundColor: elevated ? c.elevated : c.surface,
           borderRadius: theme.radius.xl,
-          borderWidth: 1,
-          borderColor: c.border,
         },
         elevated ? theme.shadowSm : null,
         style,
@@ -35,16 +34,19 @@ export const PressableScale = React.memo(function PressableScale({
   onPress,
   style,
   disabled,
+  haptic = true,
 }: {
   children: React.ReactNode;
   onPress?: () => void;
-  style?: ViewStyle | ViewStyle[];
+  style?: StyleProp<ViewStyle>;
   disabled?: boolean;
+  haptic?: boolean;
 }) {
   return (
     <Pressable
       disabled={disabled}
       onPress={() => {
+        if (haptic) softHaptic();
         onPress?.();
       }}
       style={style}

@@ -14,8 +14,18 @@ const CLOVER = path.join(ASSETS, 'LottoAI-clover-white-1024.png');
 
 const BRAND_GREEN = { r: 28, g: 158, b: 115, alpha: 1 };
 const APP_BG_LIGHT = { r: 244, g: 245, b: 247, alpha: 1 };
-const APP_BG_DARK = { r: 14, g: 18, b: 18, alpha: 1 };
+// App theme dark bg (#0A0C10) — splash arka planıyla aynı olmalı.
+const APP_BG_DARK = { r: 10, g: 12, b: 16, alpha: 1 };
 const CLOVER_EMERALD = path.join(ASSETS, 'LottoAI-clover-emerald-1024.png');
+const ANDROID_RES = path.join(__dirname, '../android/app/src/main/res');
+// expo-splash-screen prebuild çıktısındaki splashscreen_logo boyutları (dp≈200).
+const ANDROID_SPLASH_SIZES = {
+  'drawable-mdpi': 288,
+  'drawable-hdpi': 432,
+  'drawable-xhdpi': 576,
+  'drawable-xxhdpi': 864,
+  'drawable-xxxhdpi': 1152,
+};
 
 // Sizes are expressed as the fraction of the icon side that the *visible*
 // clover artwork (ink) spans — the master PNG's transparent padding is
@@ -91,16 +101,33 @@ async function main() {
   const appStore = await iconWithBg(1024, BRAND_GREEN);
   await writeBuffer(appStore, 'LottoAI-AppStore-1024.png');
 
+  // Light splash preview: soft bg + emerald clover (web/docs). App splash uses dark transparent.
   await writeBuffer(
     await iconWithBg(1024, APP_BG_LIGHT, CLOVER_EMERALD, SPLASH_INK),
     'splash-icon-light.png'
   );
-  await writeBuffer(await iconWithBg(1024, APP_BG_DARK, CLOVER, SPLASH_INK), 'splash-icon-dark.png');
-  // App splash (expo-splash-screen) — koyu zemin + beyaz yonca; solid dosya da aynı içeriği taşısın.
-  await writeBuffer(await iconWithBg(1024, APP_BG_DARK, CLOVER, SPLASH_INK), 'splash-solid-0E1212.png');
+  // BrandMark ile aynı: transparan zemin + beyaz yonca (yeşil kutu yok).
+  await writeBuffer(await transparentForeground(1024, SPLASH_INK), 'splash-icon-dark.png');
+  await writeBuffer(await iconWithBg(1024, APP_BG_DARK, CLOVER, SPLASH_INK), 'splash-solid-0A0C10.png');
 
   await writeBuffer(await transparentForeground(1024), 'android-icon-foreground.png');
   await writeBuffer(await transparentForeground(1024), 'android-icon-monochrome.png');
+
+  // Native Android splash drawables (cold start) — aynı transparan yonca.
+  for (const [folder, size] of Object.entries(ANDROID_SPLASH_SIZES)) {
+    const outDir = path.join(ANDROID_RES, folder);
+    const out = path.join(outDir, 'splashscreen_logo.png');
+    try {
+      await sharp(await transparentForeground(size, SPLASH_INK)).toFile(out);
+      console.log('  wrote android', folder + '/splashscreen_logo.png');
+    } catch (err) {
+      if (err && err.code === 'ENOENT') {
+        console.log('  skip android splash (no', folder + ')');
+      } else {
+        throw err;
+      }
+    }
+  }
 
   const maskable = await iconWithBg(1024, BRAND_GREEN, CLOVER, MASKABLE_INK);
   await resizeFrom(maskable, 512, 'LottoAI-maskable-512.png');

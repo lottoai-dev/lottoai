@@ -6,14 +6,14 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  View,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,14 +23,22 @@ import { Segmented } from '../../components/ui/segmented';
 import { EmptyState, LoadingState } from '../../components/ui/states';
 import { PressableScale, Surface } from '../../components/ui/surface';
 import { STORAGE_KEYS } from '../../constants/storage-keys';
-import { AppTheme, GameAccent } from '../../constants/theme';
+import { AppTheme } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
 import { useAuth } from '../../contexts/AuthContext';
 import CouponHistory from '../../lib/CouponHistory';
+import {
+    formatMatchCategory,
+    getCouponRank,
+    getMatchDisplay,
+    matchCouponToDraw,
+    toMatchDisplayInput,
+    type DrawSnapshot,
+} from '../../lib/couponMatch';
+import { consumeCouponsDirty } from '../../lib/couponsStore';
 import { GameEmblem } from '../../lib/emblems';
-import { getGameByName } from '../../lib/games';
+import { getGameAccentColor, getGameByName } from '../../lib/games';
 import { CloseIcon, ShareIcon, StatsIcon, TicketIcon, TrashIcon, TrophyIcon } from '../../lib/icons';
-import { formatPrize, getPrizeTable, type PrizeEstimate } from '../../lib/prizeEstimates';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
 
@@ -55,6 +63,8 @@ type Coupon = {
   matchedCount?: number;
   matchedNumbers?: number[];
   matchedBonus?: number[];
+  matchedJoker?: boolean;
+  jokerHitNumber?: number | null;
   matchedSuperStar?: boolean;
 };
 
@@ -63,21 +73,34 @@ type CheckResult = {
   draw: DrawResult;
   matchedNumbers: number[];
   matchedBonus: number[];
+  matchedJoker: boolean;
+  jokerHitNumber: number | null;
   matchedSuperStar: boolean;
   mainMatchCount: number;
-  prize: PrizeEstimate | null;
   score: number;
 };
 type FilterStatus = 'all' | 'pending' | 'checked';
 
-function parseNumbers(str: string): number[] {
-  return str.split(' - ').map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
-}
+type TicketStyles = ReturnType<typeof makeStyles>;
 
 function matchesFilter(coupon: Coupon, filter: FilterStatus): boolean {
   if (filter === 'all') return true;
   const isPending = coupon.matchedCount === undefined || coupon.matchedCount === null;
   return filter === 'pending' ? isPending : !isPending;
+}
+
+function getScoreLabel(
+  coupon: Pick<
+    Coupon,
+    'game' | 'matchedCount' | 'matchedNumbers' | 'matchedJoker' | 'matchedSuperStar' | 'matchedBonus' | 'superStar'
+  >,
+) {
+  const display = getMatchDisplay(toMatchDisplayInput(coupon));
+  return { label: display.label, sub: display.sub };
+}
+
+function isPendingCoupon(cp: Coupon) {
+  return cp.matchedCount === undefined || cp.matchedCount === null;
 }
 
 export default function SavedScreen() {
@@ -99,105 +122,170 @@ export default function SavedScreen() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [isLoading, setIsLoading] = useState(true);
 
-  // Giriş yapılmamışsa login ekranına yönlendir
+  const couponsRef = useRef(coupons);
+  couponsRef.current = coupons;
+  const hasLoadedRef = useRef(false);
+  const autoCheckInFlightRef = useRef(false);
+  const autoCheckRef = useRef<(showNotification?: boolean) => Promise<void>>(async () => {});
+
   useFocusEffect(
     useCallback(() => {
       if (!user) {
         router.replace('/login' as any);
       }
-    }, [user])
+    }, [router, user]),
   );
 
-  const loadCoupons = async () => {
+  const loadCoupons = useCallback(async () => {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_COUPONS);
-      setCoupons(data ? JSON.parse(data) : []);
+      const parsed: Coupon[] = data ? JSON.parse(data) : [];
+      setCoupons(parsed);
+      couponsRef.current = parsed;
+      hasLoadedRef.current = true;
+      return parsed;
     } catch {
       setCoupons([]);
+      couponsRef.current = [];
+      hasLoadedRef.current = true;
+      return [] as Coupon[];
     }
-  };
+  }, []);
 
-  const autoCheckRef = useRef<(showNotification?: boolean) => Promise<void>>(async () => {});
   const autoCheckAllPending = useCallback(async (showNotification = false) => {
-    const saved = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_COUPONS);
-    if (!saved) return;
-    const allCoupons: Coupon[] = JSON.parse(saved);
-    const pending = allCoupons.filter((cp) => cp.matchedCount === undefined || cp.matchedCount === null);
-    if (pending.length === 0) return;
-
-    setCoupons(allCoupons);
-
-    let updated = [...allCoupons];
-    let hasChanges = false;
-
-    let oldestDateStr = '';
-    for (const coupon of pending) {
-      if (!coupon.date) continue;
-      if (!oldestDateStr || coupon.date < oldestDateStr) {
-        oldestDateStr = coupon.date;
-      }
-    }
-
-    let newlyCheckedCount = 0;
-    let bestNewScore = 0;
+    if (autoCheckInFlightRef.current) return;
+    autoCheckInFlightRef.current = true;
 
     try {
-      if (oldestDateStr) {
-        const [d, m, y] = oldestDateStr.split('.').map(Number);
-        const oldestIso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      let allCoupons = couponsRef.current;
+      if (!hasLoadedRef.current) {
+        const saved = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_COUPONS);
+        if (!saved) return;
+        allCoupons = JSON.parse(saved);
+        couponsRef.current = allCoupons;
+      }
 
-        const gameNames = [...new Set(pending.map((cp) => cp.game))];
-        const { data: allDraws } = await supabase
-          .from('draws')
-          .select('*')
-          .in('game', gameNames)
-          .gte('draw_date_parsed', oldestIso)
-          .order('draw_date_parsed', { ascending: true });
+      const pending = allCoupons.filter(isPendingCoupon);
+      if (pending.length === 0) return;
 
-        if (allDraws) {
-          for (const coupon of pending) {
-            const relevantDraws = allDraws.filter((d: any) => d.game === coupon.game);
-            if (relevantDraws.length === 0) continue;
+      setCoupons(allCoupons);
 
-            const couponIso = coupon.timestamp
-              ? coupon.timestamp.split('T')[0]
-              : oldestIso;
-
-            const firstDrawAfter = relevantDraws.find((d: any) => {
-              const drawIso = d.draw_date_parsed ? d.draw_date_parsed.substring(0, 10) : '';
-              return drawIso >= couponIso;
-            });
-
-            if (!firstDrawAfter) continue;
-
-            const drawnNumbers = parseNumbers(firstDrawAfter.numbers);
-            const drawnBonus =
-              firstDrawAfter.bonus && firstDrawAfter.bonus !== '-'
-                ? firstDrawAfter.bonus.split(',').map((n: string) => parseInt(n.trim(), 10)).filter((n: number) => !isNaN(n))
-                : [];
-            const matchedNumbers = coupon.numbers.filter((n) => drawnNumbers.includes(n));
-            const matchedBonus = coupon.bonus.filter((n) => drawnBonus.includes(n));
-            const matchedSuperStar = coupon.superStar != null && firstDrawAfter.superstar != null && coupon.superStar === firstDrawAfter.superstar;
-            const score = matchedNumbers.length + matchedBonus.length + (matchedSuperStar ? 1 : 0);
-
-            updated = updated.map((cp) =>
-              cp.id === coupon.id ? { ...cp, matchedCount: score, matchedNumbers, matchedBonus, matchedSuperStar } : cp
-            );
-            hasChanges = true;
-            newlyCheckedCount++;
-            if (score > bestNewScore) bestNewScore = score;
-          }
+      let oldestDateStr = '';
+      for (const coupon of pending) {
+        if (!coupon.date) continue;
+        if (!oldestDateStr || coupon.date < oldestDateStr) {
+          oldestDateStr = coupon.date;
         }
       }
-    } catch {}
 
-    if (hasChanges) {
+      let newlyCheckedCount = 0;
+      let bestNewRank = 0;
+      let bestNewLabel = '';
+      const patches = new Map<
+        number,
+        Pick<
+          Coupon,
+          | 'matchedCount'
+          | 'matchedNumbers'
+          | 'matchedBonus'
+          | 'matchedJoker'
+          | 'jokerHitNumber'
+          | 'matchedSuperStar'
+        >
+      >();
+
+      try {
+        if (oldestDateStr) {
+          const [d, m, y] = oldestDateStr.split('.').map(Number);
+          const oldestIso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+          const gameNames = [...new Set(pending.map((cp) => cp.game))];
+          const { data: allDraws } = await supabase
+            .from('draws')
+            .select('game, numbers, bonus, superstar, draw_date, draw_no, draw_date_parsed')
+            .in('game', gameNames)
+            .gte('draw_date_parsed', oldestIso)
+            .order('draw_date_parsed', { ascending: true });
+
+          if (allDraws && allDraws.length > 0) {
+            const drawsByGame = new Map<string, typeof allDraws>();
+            for (const draw of allDraws) {
+              const list = drawsByGame.get(draw.game);
+              if (list) list.push(draw);
+              else drawsByGame.set(draw.game, [draw]);
+            }
+
+            for (const coupon of pending) {
+              const relevantDraws = drawsByGame.get(coupon.game);
+              if (!relevantDraws || relevantDraws.length === 0) continue;
+
+              const couponIso = coupon.timestamp ? coupon.timestamp.split('T')[0] : oldestIso;
+
+              const firstDrawAfter = relevantDraws.find((draw) => {
+                const drawIso = draw.draw_date_parsed ? draw.draw_date_parsed.substring(0, 10) : '';
+                return drawIso >= couponIso;
+              });
+
+              if (!firstDrawAfter) continue;
+
+              const draw: DrawSnapshot = {
+                numbers: firstDrawAfter.numbers,
+                bonus: firstDrawAfter.bonus ?? '-',
+                superstar: firstDrawAfter.superstar,
+                draw_date: firstDrawAfter.draw_date,
+                draw_no: firstDrawAfter.draw_no,
+              };
+              const match = matchCouponToDraw(
+                {
+                  game: coupon.game,
+                  numbers: coupon.numbers,
+                  bonus: coupon.bonus,
+                  superStar: coupon.superStar,
+                },
+                draw,
+              );
+
+              patches.set(coupon.id, {
+                matchedCount: match.mainMatchCount,
+                matchedNumbers: match.matchedNumbers,
+                matchedBonus: match.matchedBonus,
+                matchedJoker: match.matchedJoker,
+                jokerHitNumber: match.jokerHitNumber,
+                matchedSuperStar: match.matchedSuperStar,
+              });
+              newlyCheckedCount++;
+              if (match.rank > bestNewRank) {
+                bestNewRank = match.rank;
+                bestNewLabel = getMatchDisplay({
+                  game: coupon.game,
+                  mainMatchCount: match.mainMatchCount,
+                  matchedJoker: match.matchedJoker,
+                  matchedSuperStar: match.matchedSuperStar,
+                  matchedBonusCount: match.matchedBonus.length,
+                  playedSuperStar: coupon.superStar != null,
+                }).label;
+              }
+            }
+          }
+        }
+      } catch {
+        /* ignore draw fetch / match errors */
+      }
+
+      if (patches.size === 0) return;
+
+      const updated = allCoupons.map((cp) => {
+        const patch = patches.get(cp.id);
+        return patch ? { ...cp, ...patch } : cp;
+      });
+
+      couponsRef.current = updated;
       setCoupons(updated);
       await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(updated));
 
       if (showNotification && newlyCheckedCount > 0) {
         const gameList = [...new Set(pending.map((cp) => cp.game))].join(', ');
-        const body = `${newlyCheckedCount} kuponun kontrol edildi${bestNewScore > 0 ? `, en iyi: ${bestNewScore} sayı` : ''}.`;
+        const body = `${newlyCheckedCount} kuponun kontrol edildi${bestNewRank > 0 ? `, en iyi: ${bestNewLabel}` : ''}.`;
         await Notifications.scheduleNotificationAsync({
           content: {
             title: 'Çekiliş Sonuçları Açıklandı!',
@@ -208,6 +296,8 @@ export default function SavedScreen() {
           trigger: null,
         });
       }
+    } finally {
+      autoCheckInFlightRef.current = false;
     }
   }, []);
 
@@ -216,7 +306,8 @@ export default function SavedScreen() {
   }, [autoCheckAllPending]);
 
   useEffect(() => {
-    const channel = supabase.channel('draws-changes')
+    const channel = supabase
+      .channel('draws-changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'draws' }, () => {
         autoCheckRef.current(true);
       })
@@ -229,29 +320,72 @@ export default function SavedScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!user) return;
-      setIsLoading(true);
-      loadCoupons().then(() => {
+
+      const needsReload = !hasLoadedRef.current || consumeCouponsDirty();
+
+      if (needsReload) {
+        const showSpinner = !hasLoadedRef.current;
+        if (showSpinner) setIsLoading(true);
+        loadCoupons().then((loaded) => {
+          setIsLoading(false);
+          if (loaded.some(isPendingCoupon)) {
+            autoCheckAllPending(false);
+          }
+        });
+        return;
+      }
+
+      if (couponsRef.current.some(isPendingCoupon)) {
         autoCheckAllPending(false);
-        setIsLoading(false);
-      });
-    }, [autoCheckAllPending, user])
+      }
+    }, [autoCheckAllPending, loadCoupons, user]),
   );
 
-  const handleFilterChange = useCallback((key: FilterStatus) => {
-    if (key === filterStatus) return;
-    softHaptic();
-    setFilterStatus(key);
-    scrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, [filterStatus]);
+  const handleFilterChange = useCallback((key: string) => {
+    const next = key as FilterStatus;
+    setFilterStatus((prev) => (prev === next ? prev : next));
+  }, []);
 
-  const filteredCoupons = useMemo(
-    () => coupons.filter((cp) => matchesFilter(cp, filterStatus)),
-    [coupons, filterStatus]
-  );
+  // Keep every ticket mounted; filter only toggles visibility (no remount = instant switch).
+  const visibleIdSet = useMemo(() => {
+    const ids = new Set<number>();
+    for (const cp of coupons) {
+      if (matchesFilter(cp, filterStatus)) ids.add(cp.id);
+    }
+    return ids;
+  }, [coupons, filterStatus]);
 
-  const totalCoupons = filteredCoupons.length;
-  const bestResult = coupons.reduce((max, cp) => Math.max(max, cp.matchedCount || 0), 0);
-  const pendingCount = coupons.filter((cp) => cp.matchedCount === undefined || cp.matchedCount === null).length;
+  const totalCoupons = visibleIdSet.size;
+
+  const ticketNumberById = useMemo(() => {
+    const map = new Map<number, number>();
+    let i = 0;
+    for (const cp of coupons) {
+      if (!visibleIdSet.has(cp.id)) continue;
+      map.set(cp.id, totalCoupons - i);
+      i++;
+    }
+    return map;
+  }, [coupons, totalCoupons, visibleIdSet]);
+  const bestResultCoupon = useMemo(() => {
+    let best: Coupon | null = null;
+    let bestRank = -1;
+    for (const cp of coupons) {
+      if (isPendingCoupon(cp)) continue;
+      const rank = getCouponRank(cp);
+      if (rank > bestRank) {
+        bestRank = rank;
+        best = cp;
+      }
+    }
+    return best;
+  }, [coupons]);
+
+  const bestResultLabel = bestResultCoupon
+    ? formatMatchCategory(toMatchDisplayInput(bestResultCoupon))
+    : '—';
+
+  const pendingCount = useMemo(() => coupons.filter(isPendingCoupon).length, [coupons]);
   const checkedCount = coupons.length - pendingCount;
 
   const filterOptions = useMemo(
@@ -260,92 +394,110 @@ export default function SavedScreen() {
       { key: 'pending', label: `Bekleyen (${pendingCount})` },
       { key: 'checked', label: `Kontrol (${checkedCount})` },
     ],
-    [coupons.length, pendingCount, checkedCount]
+    [coupons.length, pendingCount, checkedCount],
   );
 
-  const handleDelete = (id: number) => {
-    showAlert('Kuponu sil', 'Bu kupon kalıcı olarak silinecek.', [
-      { text: 'Vazgeç', style: 'cancel' },
-      {
-        text: 'Sil',
-        style: 'destructive',
-        onPress: async () => {
-          softHaptic();
-          const updated = coupons.filter((cp) => cp.id !== id);
-          setCoupons(updated);
-          await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(updated));
-        },
-      },
-    ]);
-  };
+  const persistCoupons = useCallback(async (updated: Coupon[]) => {
+    couponsRef.current = updated;
+    setCoupons(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(updated));
+  }, []);
 
-  const handleDeleteAll = () => {
+  const handleDelete = useCallback(
+    (id: number) => {
+      showAlert('Kuponu sil', 'Bu kupon kalıcı olarak silinecek.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Sil',
+          style: 'destructive',
+          onPress: async () => {
+            const updated = couponsRef.current.filter((cp) => cp.id !== id);
+            await persistCoupons(updated);
+          },
+        },
+      ]);
+    },
+    [persistCoupons, showAlert],
+  );
+
+  const handleDeleteAll = useCallback(() => {
+    softHaptic();
     showAlert('Tümünü sil', 'Tüm kayıtlı kuponlar silinecek.', [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Sil',
         style: 'destructive',
         onPress: async () => {
-          softHaptic();
+          couponsRef.current = [];
           setCoupons([]);
           await AsyncStorage.removeItem(STORAGE_KEYS.SAVED_COUPONS);
         },
       },
     ]);
-  };
+  }, [showAlert]);
 
-  const handleShare = async (coupon: Coupon) => {
+  const handleShare = useCallback(
+    async (id: number) => {
+      const coupon = couponsRef.current.find((cp) => cp.id === id);
+      if (!coupon) return;
+      softHaptic();
+      try {
+        const numbersText = coupon.numbers.join(' · ');
+        const bonusText =
+          coupon.bonus && coupon.bonus.length > 0 ? `\n🔵 Şans Topu: ${coupon.bonus.join(' · ')}` : '';
+        const superStarText = coupon.superStar ? `\n⭐ SüperStar: ${coupon.superStar}` : '';
+        const matchText =
+          coupon.matchedCount !== undefined && coupon.matchedCount !== null
+            ? `\n🎯 Sonuç: ${getMatchDisplay(toMatchDisplayInput(coupon)).label}`
+            : '';
+        const message =
+          `🍀 LottoAI Kuponu\n` +
+          `━━━━━━━━━━━━━━━\n` +
+          `🎮 ${coupon.game}\n` +
+          `📅 ${coupon.date}\n` +
+          `━━━━━━━━━━━━━━━\n` +
+          `🔢 ${numbersText}${bonusText}${superStarText}${matchText}\n` +
+          `━━━━━━━━━━━━━━━\n` +
+          `LottoAI ile üretildi`;
+        await Share.share({ message });
+      } catch {
+        showAlert('Hata', 'Paylaşım yapılamadı.');
+      }
+    },
+    [showAlert],
+  );
+
+  const openCheckResult = useCallback((id: number) => {
+    const coupon = couponsRef.current.find((cp) => cp.id === id);
+    if (!coupon || isPendingCoupon(coupon)) return;
     softHaptic();
-    try {
-      const numbersText = coupon.numbers.join(' · ');
-      const bonusText = coupon.bonus && coupon.bonus.length > 0 ? `\n🔵 Şans Topu: ${coupon.bonus.join(' · ')}` : '';
-      const superStarText = coupon.superStar ? `\n⭐ SüperStar: ${coupon.superStar}` : '';
-      const matchText = coupon.matchedCount !== undefined && coupon.matchedCount !== null
-        ? `\n🎯 Sonuç: ${coupon.matchedCount} sayı tutturdu`
-        : '';
-      const message =
-        `🍀 LottoAI Kuponu\n` +
-        `━━━━━━━━━━━━━━━\n` +
-        `🎮 ${coupon.game}\n` +
-        `📅 ${coupon.date}\n` +
-        `━━━━━━━━━━━━━━━\n` +
-        `🔢 ${numbersText}${bonusText}${superStarText}${matchText}\n` +
-        `━━━━━━━━━━━━━━━\n` +
-        `LottoAI ile üretildi`;
-      await Share.share({ message });
-    } catch {
-      showAlert('Hata', 'Paylaşım yapılamadı.');
-    }
-  };
+    const mainMatchCount = coupon.matchedNumbers?.length ?? coupon.matchedCount ?? 0;
 
-  const getScoreLabel = (score: number, gameName: string) => {
-    const prizeTable = getPrizeTable(gameName);
-    const hasPrize = prizeTable ? prizeTable[score] != null : false;
-
-    if (score === 0) return { label: 'Tutmadı', color: c.text3, sub: 'Bir sonrakine!' };
-    if (hasPrize && score >= 6) return { label: 'Büyük ikramiye!', color: c.gold, sub: 'Tebrikler!' };
-    if (hasPrize) return { label: `${score} sayı tutturdun`, color: c.brand, sub: 'Harika sonuç!' };
-    return { label: `${score} sayı tutturdun`, color: c.text2, sub: 'Bir sonrakine!' };
-  };
-
-  const openCheckResult = (coupon: Coupon) => {
-    if (coupon.matchedCount === undefined || coupon.matchedCount === null) return;
-    softHaptic();
-    const prizeTable = getPrizeTable(coupon.game);
-    const prize = prizeTable && coupon.matchedNumbers ? prizeTable[coupon.matchedNumbers.length] ?? null : null;
     setCheckingCoupon(coupon);
     setCheckResult({
       draw: { numbers: '', bonus: '', superstar: null, draw_date: coupon.date, draw_no: '' },
       matchedNumbers: coupon.matchedNumbers ?? [],
       matchedBonus: coupon.matchedBonus ?? [],
+      matchedJoker: !!coupon.matchedJoker,
+      jokerHitNumber: coupon.jokerHitNumber ?? null,
       matchedSuperStar: !!coupon.matchedSuperStar,
-      mainMatchCount: coupon.matchedNumbers?.length ?? 0,
-      prize,
-      score: coupon.matchedCount,
+      mainMatchCount,
+      score: getCouponRank(coupon),
     });
     setChecking(false);
     setCheckModal(true);
-  };
+  }, []);
+
+  const openHistory = useCallback((id: number) => {
+    const coupon = couponsRef.current.find((cp) => cp.id === id);
+    if (!coupon) return;
+    softHaptic();
+    setHistoryModalCoupon(coupon);
+  }, []);
+
+  const goGenerate = useCallback(() => {
+    router.push('/(tabs)/generate');
+  }, [router]);
 
   return (
     <View style={s.container}>
@@ -355,10 +507,7 @@ export default function SavedScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}
       >
-        <View style={s.header}>
-          <Text style={s.title}>Kuponlarım</Text>
-          <Text style={s.subtitle}>Kayıtlı kuponların ve sonuçları</Text>
-        </View>
+        <SavedHeader styles={s} brand={c.brand} />
 
         {isLoading ? (
           <LoadingState label="Kuponların yükleniyor…" />
@@ -369,26 +518,33 @@ export default function SavedScreen() {
               title="Henüz kuponun yok"
               desc="Kupon üret ekranında sayılarını seç ve kaydet. Sonuçlar açıklanınca otomatik kontrol edip burada gösterelim."
               action="İlk kuponunu üret"
-              onAction={() => { softHaptic(); router.push('/(tabs)/generate'); }}
+              onAction={goGenerate}
             />
           </View>
         ) : (
           <>
-            <Surface style={s.stats}>
-              <Stat value={String(coupons.length)} label="Toplam" color={c.brand} theme={theme} />
-              <View style={[s.statDivider, { backgroundColor: c.hairline }]} />
-              <Stat value={String(bestResult)} label="En iyi" color={c.gold} theme={theme} />
-            </Surface>
+            <View style={s.statsRow}>
+              <Surface style={s.statCard}>
+                <View style={[s.statIcon, { backgroundColor: c.brandSoft }]}>
+                  <TicketIcon color={c.brand} size={19} />
+                </View>
+                <Text style={s.statValue}>{coupons.length}</Text>
+                <Text style={s.statLabel}>Toplam kupon</Text>
+              </Surface>
+              <Surface style={s.statCard}>
+                <View style={[s.statIcon, { backgroundColor: c.surfaceAlt }]}>
+                  <TrophyIcon color={c.text2} size={19} />
+                </View>
+                <Text style={s.statValue}>{bestResultLabel}</Text>
+                <Text style={s.statLabel}>En iyi sonuç</Text>
+              </Surface>
+            </View>
 
-            <Segmented
-              options={filterOptions}
-              value={filterStatus}
-              onChange={(key) => handleFilterChange(key as FilterStatus)}
-            />
+            <Segmented options={filterOptions} value={filterStatus} onChange={handleFilterChange} />
 
             <View style={s.topRow}>
               <Text style={s.sectionTitle}>{totalCoupons} kupon</Text>
-              <Pressable onPress={() => { softHaptic(); handleDeleteAll(); }} hitSlop={8}>
+              <Pressable onPress={handleDeleteAll} hitSlop={8}>
                 <Text style={[s.deleteAll, { color: c.danger }]}>Tümünü sil</Text>
               </Pressable>
             </View>
@@ -396,24 +552,34 @@ export default function SavedScreen() {
             {totalCoupons === 0 ? (
               <EmptyState
                 icon={<TicketIcon color={c.brand} size={30} />}
-                title={filterStatus === 'pending' ? 'Bekleyen kupon yok' : filterStatus === 'checked' ? 'Kontrol edilmiş kupon yok' : 'Kupon bulunamadı'}
+                title={
+                  filterStatus === 'pending'
+                    ? 'Bekleyen kupon yok'
+                    : filterStatus === 'checked'
+                      ? 'Kontrol edilmiş kupon yok'
+                      : 'Kupon bulunamadı'
+                }
                 desc={filterStatus === 'pending' ? 'Tüm kuponların kontrol edildi.' : 'Bu filtreye uygun kupon yok.'}
               />
-            ) : (
-              filteredCoupons.map((coupon, index) => (
-                <CouponTicket
-                  key={coupon.id}
-                  coupon={coupon}
-                  number={totalCoupons - index}
-                  onShare={() => handleShare(coupon)}
-                  onDelete={() => handleDelete(coupon.id)}
-                  onOpenResult={() => openCheckResult(coupon)}
-                  onOpenHistory={() => { softHaptic(); setHistoryModalCoupon(coupon); }}
-                  getScoreLabel={getScoreLabel}
-                  theme={theme}
-                />
-              ))
-            )}
+            ) : null}
+
+            {coupons.map((coupon) => {
+              const visible = visibleIdSet.has(coupon.id);
+              return (
+                <View key={coupon.id} style={visible ? undefined : s.ticketHidden} removeClippedSubviews={false}>
+                  <CouponTicket
+                    coupon={coupon}
+                    number={ticketNumberById.get(coupon.id) ?? 0}
+                    styles={s}
+                    theme={theme}
+                    onShare={handleShare}
+                    onDelete={handleDelete}
+                    onOpenResult={openCheckResult}
+                    onOpenHistory={openHistory}
+                  />
+                </View>
+              );
+            })}
           </>
         )}
       </ScrollView>
@@ -425,62 +591,16 @@ export default function SavedScreen() {
             {checking ? (
               <LoadingState label="Kontrol ediliyor…" />
             ) : checkResult && checkingCoupon ? (
-              (() => {
-                const id = getGameByName(checkingCoupon.game)?.id ?? 'cilgin';
-                const mainColor = GameAccent[id] ?? c.brand;
-                const score = getScoreLabel(checkResult.score, checkingCoupon.game);
-                const currency = getGameByName(checkingCoupon.game)?.currency || 'TRY';
-                return (
-                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 540 }}>
-                    <View style={s.modalHead}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.modalTitle}>Kupon sonucu</Text>
-                        <Text style={s.modalSubtitle}>{checkingCoupon.game} · {checkResult.draw.draw_date}</Text>
-                      </View>
-                      <Pressable onPress={() => { softHaptic(); setCheckModal(false); }} style={[s.close, { backgroundColor: c.surfaceAlt }]} hitSlop={8}>
-                        <CloseIcon color={c.text2} size={20} />
-                      </Pressable>
-                    </View>
-
-                    <View style={[s.scoreBox, { backgroundColor: score.color + '14', borderColor: score.color + '33' }]}>
-                      <TrophyIcon color={score.color} size={22} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[s.scoreLabel, { color: score.color }]}>{score.label}</Text>
-                        <Text style={s.scoreSub}>{score.sub}</Text>
-                      </View>
-                    </View>
-
-                    {checkResult.prize ? (
-                      <View style={[s.prizeCard, { backgroundColor: c.goldSoft, borderColor: c.gold + '44' }]}>
-                        <View style={s.prizeRow}>
-                          <Text style={s.prizeLabel}>Tahmini ikramiye</Text>
-                          <Text style={s.prizeAmount}>{formatPrize(checkResult.prize.amount, currency)}</Text>
-                        </View>
-                        <Text style={s.prizeNote}>Tahminidir; resmî tutar çekiliş sonuçlarına göre değişir. Bayinize danışın.</Text>
-                      </View>
-                    ) : null}
-
-                    <Text style={s.modalLabel}>SENİN SAYILARIN</Text>
-                    <View style={s.modalBalls}>
-                      {checkingCoupon.numbers.map((num, i) => {
-                        const hit = checkResult.matchedNumbers.includes(num);
-                        return <NumberBall key={i} value={num} color={hit ? mainColor : undefined} variant={hit ? 'game' : 'muted'} size={38} />;
-                      })}
-                    </View>
-
-                    {checkingCoupon.superStar != null ? (
-                      <>
-                        <Text style={s.modalLabel}>SÜPERSTAR</Text>
-                        <View style={s.modalBalls}>
-                          <NumberBall value={checkingCoupon.superStar} variant={checkResult.matchedSuperStar ? 'star' : 'muted'} size={38} />
-                        </View>
-                      </>
-                    ) : null}
-
-                    <AppButton label="Kapat" variant="secondary" onPress={() => { softHaptic(); setCheckModal(false); }} style={{ marginTop: 12 }} />
-                  </ScrollView>
-                );
-              })()
+              <CheckResultBody
+                checkingCoupon={checkingCoupon}
+                checkResult={checkResult}
+                styles={s}
+                colors={c}
+                onClose={() => {
+                  softHaptic();
+                  setCheckModal(false);
+                }}
+              />
             ) : null}
           </View>
         </View>
@@ -493,128 +613,228 @@ export default function SavedScreen() {
           bonus={historyModalCoupon.bonus}
           superStar={historyModalCoupon.superStar ?? undefined}
           visible={!!historyModalCoupon}
-          onClose={() => { softHaptic(); setHistoryModalCoupon(null); }}
+          onClose={() => setHistoryModalCoupon(null)}
         />
       )}
     </View>
   );
 }
 
+const SavedHeader = React.memo(function SavedHeader({
+  styles: s,
+  brand,
+}: {
+  styles: TicketStyles;
+  brand: string;
+}) {
+  return (
+    <View style={s.header}>
+      <View style={s.eyebrowRow}>
+        <View style={[s.eyebrowDot, { backgroundColor: brand }]} />
+        <Text style={[s.eyebrow, { color: brand }]}>KUPON CÜZDANI</Text>
+      </View>
+      <Text style={s.title}>Kuponlarım</Text>
+      <Text style={s.subtitle}>Kayıtlı kuponların ve sonuçları</Text>
+    </View>
+  );
+});
+
+function CheckResultBody({
+  checkingCoupon,
+  checkResult,
+  styles: s,
+  colors: c,
+  onClose,
+}: {
+  checkingCoupon: Coupon;
+  checkResult: CheckResult;
+  styles: TicketStyles;
+  colors: AppTheme['colors'];
+  onClose: () => void;
+}) {
+  const id = getGameByName(checkingCoupon.game)?.id ?? 'cilgin';
+  const mainColor = getGameAccentColor(id);
+  const score = getScoreLabel(checkingCoupon);
+  const matchedMainSet = useMemo(() => new Set(checkResult.matchedNumbers), [checkResult.matchedNumbers]);
+
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 540 }}>
+      <View style={s.modalHead}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.modalTitle}>Kupon sonucu</Text>
+          <Text style={s.modalSubtitle}>
+            {checkingCoupon.game} · {checkResult.draw.draw_date}
+          </Text>
+        </View>
+        <Pressable onPress={onClose} style={[s.close, { backgroundColor: c.surfaceAlt }]} hitSlop={8}>
+          <CloseIcon color={c.text2} size={20} />
+        </Pressable>
+      </View>
+
+      <View style={[s.scoreBox, { backgroundColor: c.surfaceAlt }]}>
+        <TrophyIcon color={c.text2} size={22} />
+        <View style={{ flex: 1 }}>
+          <Text style={s.scoreLabel}>{score.label}</Text>
+          <Text style={s.scoreSub}>{score.sub}</Text>
+        </View>
+      </View>
+
+      <Text style={s.modalLabel}>SENİN SAYILARIN</Text>
+      <View style={s.modalBalls}>
+        {checkingCoupon.numbers.map((num, i) => {
+          const hitMain = matchedMainSet.has(num);
+          const hitJoker = checkResult.jokerHitNumber === num;
+          return (
+            <NumberBall
+              key={i}
+              value={num}
+              color={hitMain ? mainColor : undefined}
+              variant={hitMain ? 'matched' : hitJoker ? 'bonus' : 'muted'}
+              size={38}
+            />
+          );
+        })}
+      </View>
+
+      {checkingCoupon.superStar != null ? (
+        <>
+          <Text style={s.modalLabel}>SÜPERSTAR</Text>
+          <View style={s.modalBalls}>
+            <NumberBall
+              value={checkingCoupon.superStar}
+              variant={checkResult.matchedSuperStar ? 'star' : 'muted'}
+              size={38}
+            />
+          </View>
+        </>
+      ) : null}
+
+      <AppButton haptic={false} label="Kapat" variant="secondary" onPress={onClose} style={{ marginTop: 12 }} />
+    </ScrollView>
+  );
+}
+
 const CouponTicket = React.memo(function CouponTicket({
   coupon,
   number,
+  styles: s,
+  theme,
   onShare,
   onDelete,
   onOpenResult,
   onOpenHistory,
-  getScoreLabel,
-  theme,
 }: {
   coupon: Coupon;
   number: number;
-  onShare: () => void;
-  onDelete: () => void;
-  onOpenResult: () => void;
-  onOpenHistory: () => void;
-  getScoreLabel: (n: number, gameName: string) => { label: string; color: string; sub: string };
+  styles: TicketStyles;
   theme: AppTheme;
+  onShare: (id: number) => void;
+  onDelete: (id: number) => void;
+  onOpenResult: (id: number) => void;
+  onOpenHistory: (id: number) => void;
 }) {
   const c = theme.colors;
-  const s = useMemo(() => makeStyles(theme), [theme]);
   const id = getGameByName(coupon.game)?.id ?? 'cilgin';
-  const mainColor = GameAccent[id] ?? c.brand;
-  const isChecked = coupon.matchedCount !== undefined && coupon.matchedCount !== null;
-  const score = isChecked ? getScoreLabel(coupon.matchedCount as number, coupon.game) : null;
+  const mainColor = getGameAccentColor(id);
+  const isChecked = !isPendingCoupon(coupon);
+  const score = isChecked ? getScoreLabel(coupon) : null;
+
+  const matchedMainSet = useMemo(
+    () => (isChecked && coupon.matchedNumbers ? new Set(coupon.matchedNumbers) : null),
+    [coupon.matchedNumbers, isChecked],
+  );
+  const matchedBonusSet = useMemo(
+    () => (isChecked && coupon.matchedBonus ? new Set(coupon.matchedBonus) : null),
+    [coupon.matchedBonus, isChecked],
+  );
 
   return (
     <View style={s.ticket}>
-        <View style={[s.ticketStripe, { backgroundColor: mainColor }]} />
-        <View style={s.ticketBody}>
-          <View style={s.ticketHead}>
-            <GameEmblem game={id} size={38} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.ticketGame}>{coupon.game}</Text>
-              <Text style={s.ticketDate}>{coupon.date} · #{number}</Text>
-            </View>
-            {isChecked ? (
-              <Pressable onPress={onOpenResult} style={[s.scorePill, { backgroundColor: (score!.color) + '1A' }]}>
-                <Text style={[s.scorePillText, { color: score!.color }]} numberOfLines={1}>
-                  {coupon.matchedCount === 0 ? 'Tutmadı' : `${coupon.matchedCount} tutturdu`}
-                </Text>
-              </Pressable>
-            ) : (
-              <View style={[s.pendingPill, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
-                <Text style={s.pendingPillText}>Bekliyor</Text>
-              </View>
-            )}
+      <View style={[s.ticketStripe, { backgroundColor: mainColor }]} />
+      <View style={s.ticketBody}>
+        <View style={s.ticketHead}>
+          <View style={[s.ticketEmblem, { backgroundColor: `${mainColor}14` }]}>
+            <GameEmblem game={id} size={38} color={mainColor} />
           </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.ticketGame, { color: mainColor }]}>{coupon.game}</Text>
+            <Text style={s.ticketDate}>
+              {coupon.date} · #{number}
+            </Text>
+          </View>
+          {isChecked ? (
+            <Pressable onPress={() => onOpenResult(coupon.id)} style={[s.scorePill, { backgroundColor: c.surfaceAlt }]}>
+              <Text style={s.scorePillText} numberOfLines={1}>
+                {score!.label}
+              </Text>
+            </Pressable>
+          ) : (
+            <View style={[s.pendingPill, { backgroundColor: c.surfaceAlt }]}>
+              <Text style={s.pendingPillText}>Bekliyor</Text>
+            </View>
+          )}
+        </View>
 
-          <View style={[s.perforation, { borderTopColor: c.border }]} />
+        <View style={[s.perforation, { borderTopColor: c.border }]} />
 
+        <View style={s.ticketBalls}>
+          {coupon.numbers.map((num, i) => {
+            if (!isChecked) return <NumberBall key={i} value={num} variant="muted" size={36} />;
+            const hitMain = matchedMainSet?.has(num);
+            const hitJoker = coupon.jokerHitNumber === num;
+            return (
+              <NumberBall
+                key={i}
+                value={num}
+                color={hitMain ? mainColor : undefined}
+                variant={hitMain ? 'matched' : hitJoker ? 'bonus' : 'muted'}
+                size={36}
+              />
+            );
+          })}
+        </View>
+
+        {coupon.bonus && coupon.bonus.length > 0 ? (
           <View style={s.ticketBalls}>
-            {coupon.numbers.map((num, i) => {
+            {coupon.bonus.map((num, i) => {
               if (!isChecked) return <NumberBall key={i} value={num} variant="muted" size={36} />;
-              const hit = coupon.matchedNumbers?.includes(num);
-              return <NumberBall key={i} value={num} color={hit ? mainColor : undefined} variant={hit ? 'game' : 'muted'} size={36} />;
+              const hit = matchedBonusSet?.has(num);
+              return <NumberBall key={i} value={num} variant={hit ? 'bonus' : 'muted'} size={36} />;
             })}
           </View>
+        ) : null}
 
-          {coupon.bonus && coupon.bonus.length > 0 ? (
-            <View style={s.ticketBalls}>
-              {coupon.bonus.map((num, i) => {
-                if (!isChecked) return <NumberBall key={i} value={num} variant="muted" size={36} />;
-                const hit = coupon.matchedBonus?.includes(num);
-                return <NumberBall key={i} value={num} variant={hit ? 'bonus' : 'muted'} size={36} />;
-              })}
-            </View>
-          ) : null}
-
-          {coupon.superStar != null ? (
-            <View style={s.ticketBalls}>
-              {(() => {
-                if (!isChecked) return <NumberBall value={coupon.superStar} variant="muted" size={36} />;
-                const hit = coupon.matchedSuperStar;
-                return <NumberBall value={coupon.superStar} variant={hit ? 'star' : 'muted'} size={36} />;
-              })()}
-            </View>
-          ) : null}
-
-          <View style={s.ticketActions}>
-            <PressableScale
-              onPress={onOpenHistory}
-              style={[s.historyBtn, { flex: 1, borderColor: mainColor + '22' }]}
-            >
-              <StatsIcon color={mainColor} size={16} />
-              <Text style={[s.historyBtnText, { color: mainColor }]}>Geçmiş</Text>
-            </PressableScale>
-            <PressableScale
-              onPress={onShare}
-              style={[s.historyBtn, { flex: 1, borderColor: mainColor + '22' }]}
-            >
-              <ShareIcon color={mainColor} size={16} />
-              <Text style={[s.historyBtnText, { color: mainColor }]}>Paylaş</Text>
-            </PressableScale>
-            <PressableScale
-              onPress={onDelete}
-              style={[s.historyBtn, { flex: 1, borderColor: c.danger + '33' }]}
-            >
-              <TrashIcon color={c.danger} size={16} />
-              <Text style={[s.historyBtnText, { color: c.danger }]}>Sil</Text>
-            </PressableScale>
+        {coupon.superStar != null ? (
+          <View style={s.ticketBalls}>
+            {!isChecked ? (
+              <NumberBall value={coupon.superStar} variant="muted" size={36} />
+            ) : (
+              <NumberBall value={coupon.superStar} variant={coupon.matchedSuperStar ? 'star' : 'muted'} size={36} />
+            )}
           </View>
+        ) : null}
+
+        <View style={s.ticketActions}>
+          <PressableScale haptic={false} onPress={() => onOpenHistory(coupon.id)} style={[s.historyBtn, { flex: 1 }]}>
+            <StatsIcon color={mainColor} size={16} />
+            <Text style={[s.historyBtnText, { color: mainColor }]}>Geçmiş</Text>
+          </PressableScale>
+          <PressableScale haptic={false} onPress={() => onShare(coupon.id)} style={[s.historyBtn, { flex: 1 }]}>
+            <ShareIcon color={mainColor} size={16} />
+            <Text style={[s.historyBtnText, { color: mainColor }]}>Paylaş</Text>
+          </PressableScale>
+          <PressableScale
+            onPress={() => onDelete(coupon.id)}
+            style={[s.historyBtn, { flex: 1, backgroundColor: c.dangerSoft }]}
+          >
+            <TrashIcon color={c.danger} size={16} />
+            <Text style={[s.historyBtnText, { color: c.danger }]}>Sil</Text>
+          </PressableScale>
         </View>
       </View>
-  );
-});
-
-function Stat({ value, label, color, theme }: { value: string; label: string; color: string; theme: AppTheme }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ fontFamily: theme.font.extrabold, fontSize: 26, color, fontVariant: ['tabular-nums'] }}>{value}</Text>
-      <Text style={{ ...theme.typography.caption, color: theme.colors.text2, marginTop: 3 }}>{label}</Text>
     </View>
   );
-}
+});
 
 function makeStyles(theme: AppTheme) {
   const c = theme.colors;
@@ -622,52 +842,113 @@ function makeStyles(theme: AppTheme) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
     header: { paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
+    eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 5 },
+    eyebrowDot: { width: 7, height: 7, borderRadius: 4 },
+    eyebrow: { ...ty.micro, fontFamily: theme.font.extrabold, letterSpacing: 1 },
     title: { ...ty.h1, color: c.text },
     subtitle: { ...ty.bodyMedium, color: c.text2, marginTop: 3 },
 
-    stats: { flexDirection: 'row', marginHorizontal: spacing.xl, padding: 18, marginBottom: spacing.lg },
-    statDivider: { width: 1, height: 40, alignSelf: 'center' },
+    statsRow: { flexDirection: 'row', gap: 12, marginHorizontal: spacing.xl, marginBottom: spacing.lg },
+    statCard: { flex: 1, padding: 14, borderRadius: radius.xl },
+    statIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12,
+    },
+    statValue: {
+      fontFamily: theme.font.extrabold,
+      fontSize: 20,
+      lineHeight: 25,
+      letterSpacing: -0.3,
+      color: c.text,
+      fontVariant: ['tabular-nums'],
+    },
+    statLabel: { ...ty.caption, color: c.text3, marginTop: 2 },
 
-    statusRow: { flexDirection: 'row', gap: 6, paddingHorizontal: spacing.xl, marginBottom: spacing.lg },
-    statusBtn: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.md, borderWidth: 1 },
-    statusBtnText: { ...ty.caption, fontFamily: theme.font.bold },
-
-    topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, marginBottom: spacing.md },
+    topRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: spacing.xl,
+      marginBottom: spacing.md,
+    },
     sectionTitle: { ...ty.h3, color: c.text },
     deleteAll: { ...ty.label },
 
-    ticket: { marginHorizontal: spacing.xl, marginBottom: 12, borderRadius: radius.xl, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, flexDirection: 'row', overflow: 'hidden', ...theme.shadowSm },
-    ticketStripe: { width: 8 },
+    ticket: {
+      marginHorizontal: spacing.xl,
+      marginBottom: 12,
+      borderRadius: radius.xl,
+      backgroundColor: c.surface,
+      flexDirection: 'row',
+      overflow: 'hidden',
+    },
+    ticketHidden: { display: 'none' },
+    ticketStripe: { width: 4 },
     ticketBody: { flex: 1, padding: 16 },
     ticketHead: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 14 },
-    ticketGame: { ...ty.h3, color: c.text },
+    ticketEmblem: {
+      width: 46,
+      height: 46,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    ticketGame: { ...ty.h3 },
     ticketDate: { ...ty.caption, color: c.text3, marginTop: 2 },
     scorePill: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: radius.pill, flexShrink: 0 },
-    scorePillText: { ...ty.caption, fontFamily: theme.font.extrabold },
-    pendingPill: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, flexShrink: 0 },
-    pendingPillText: { ...ty.caption, fontFamily: theme.font.bold, color: c.text3 },
+    scorePillText: { ...ty.caption, fontFamily: theme.font.bold, color: c.text },
+    pendingPill: {
+      paddingHorizontal: 11,
+      paddingVertical: 6,
+      borderRadius: radius.pill,
+      backgroundColor: c.surfaceAlt,
+      flexShrink: 0,
+    },
+    pendingPillText: { ...ty.caption, fontFamily: theme.font.semibold, color: c.text3 },
     perforation: { borderTopWidth: 1, borderStyle: 'dashed', marginHorizontal: -16, marginBottom: 14 },
     ticketBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 8 },
 
     ticketActions: { flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'center' },
-    historyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, paddingHorizontal: 12, borderRadius: radius.md, borderWidth: 1 },
-    historyBtnText: { ...ty.label, fontFamily: theme.font.bold },
+    historyBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      height: 42,
+      paddingHorizontal: 12,
+      borderRadius: radius.pill,
+      backgroundColor: c.surfaceAlt,
+    },
+    historyBtnText: { ...ty.label },
 
     overlay: { flex: 1, justifyContent: 'flex-end' },
     sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing.xl },
-    grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: c.border, marginBottom: spacing.lg },
+    grabber: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: c.elevated,
+      marginBottom: spacing.lg,
+    },
     modalHead: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
     modalTitle: { ...ty.h2, color: c.text },
     modalSubtitle: { ...ty.caption, color: c.text2, marginTop: 3 },
     close: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-    scoreBox: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: radius.lg, borderWidth: 1, marginBottom: 14 },
-    scoreLabel: { ...ty.h3, fontFamily: theme.font.extrabold },
+    scoreBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 16,
+      borderRadius: radius.lg,
+      marginBottom: 14,
+    },
+    scoreLabel: { ...ty.h3, color: c.text },
     scoreSub: { ...ty.caption, color: c.text2, marginTop: 2 },
-    prizeCard: { padding: 14, borderRadius: radius.md, borderWidth: 1, marginBottom: 16 },
-    prizeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    prizeLabel: { ...ty.bodyMedium, color: c.text2 },
-    prizeAmount: { fontFamily: theme.font.extrabold, fontSize: 20, color: c.text },
-    prizeNote: { ...ty.micro, color: c.text3, marginTop: 6, letterSpacing: 0, lineHeight: 15 },
     modalLabel: { ...ty.caption, color: c.text2, fontFamily: theme.font.semibold, marginBottom: 9 },
     modalBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 16 },
   });

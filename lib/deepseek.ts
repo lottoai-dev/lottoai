@@ -133,6 +133,10 @@ export type CouponIntent = {
   avoidPreviousCoupons: boolean | null;
   /** Kupon sadece asal sayılardan oluşsun. */
   onlyPrimes: boolean | null;
+  /** Kupon sadece çift sayılardan oluşsun. */
+  onlyEven: boolean | null;
+  /** Kupon sadece tek sayılardan oluşsun. */
+  onlyOdd: boolean | null;
   /** Çift/tek dengesi istensin mi. */
   balanceEvenOdd: boolean | null;
   /** Bariz desenlerden (1-2-3-4-5-6, hepsi aynı son hane vb.) kaçınılsın mı. */
@@ -175,6 +179,23 @@ function sanitizePositiveInt(value: unknown): number | null {
   return n;
 }
 
+/**
+ * sumMin/sumMax için özel sağlamlaştırıcı. Bir kuponun toplamı gerçekte
+ * ASLA 0 olamaz (en düşük olası toplam bile her zaman pozitiftir) — yani
+ * "0" değeri, kullanıcının gerçekten istediği bir şey değil, sınıflandırıcı
+ * modelin (prompta rağmen) UYDURDUĞU bir varsayılan değerdir. Gerçek bir
+ * vakada tam olarak bu yaşandı: kullanıcı "toplam" kelimesini hiç
+ * kullanmadığı halde model sumMin:0, sumMax:0 üretti, sistem de kullanıcıya
+ * hiç istenmeyen bir "toplamı 0-0 olan kupon imkansız" mesajı gösterdi. Bu
+ * fonksiyon, 0 (ya da altı) gelen değerleri sessizce null'a çevirerek bu
+ * sınıfın tekrarını koddan da engeller — sadece prompt talimatına güvenmiyoruz.
+ */
+function sanitizeSumBound(value: unknown): number | null {
+  const n = sanitizePositiveInt(value);
+  if (n === null || n === 0) return null;
+  return n;
+}
+
 function sanitizeBool(value: unknown): boolean | null {
   return typeof value === 'boolean' ? value : null;
 }
@@ -194,8 +215,8 @@ function normalizeCouponIntent(parsed: Record<string, unknown>): CouponIntent {
     gameId,
     count: countResult.count,
     countRequestedRaw: countResult.requestedRaw,
-    sumMin: sanitizePositiveInt(parsed.sumMin),
-    sumMax: sanitizePositiveInt(parsed.sumMax),
+    sumMin: sanitizeSumBound(parsed.sumMin),
+    sumMax: sanitizeSumBound(parsed.sumMax),
     mustInclude: mustIncludeResult.list,
     mustExclude: mustExcludeResult.list,
     mustIncludeTruncatedFrom: mustIncludeResult.truncatedFrom,
@@ -205,6 +226,8 @@ function normalizeCouponIntent(parsed: Record<string, unknown>): CouponIntent {
     noOverlap: sanitizeBool(parsed.noOverlap),
     avoidPreviousCoupons: sanitizeBool(parsed.avoidPreviousCoupons),
     onlyPrimes: sanitizeBool(parsed.onlyPrimes),
+    onlyEven: sanitizeBool(parsed.onlyEven),
+    onlyOdd: sanitizeBool(parsed.onlyOdd),
     balanceEvenOdd: sanitizeBool(parsed.balanceEvenOdd),
     avoidPatterns: sanitizeBool(parsed.avoidPatterns),
     spreadZones: sanitizeBool(parsed.spreadZones),
@@ -281,7 +304,7 @@ export async function classifyCouponIntent(
 Yanıtın YALNIZCA tek satır JSON olmalı. Başka hiçbir karakter, açıklama veya markdown ekleme.
 
 Şema:
-{"intent":"chat"|"generate_coupon","gameId":"cilgin"|"superloto"|"sanstopu"|"onnumara"|null,"count":number|null,"sumMin":number|null,"sumMax":number|null,"mustInclude":number[]|null,"mustExclude":number[]|null,"excludeRangeMin":number|null,"excludeRangeMax":number|null,"noOverlap":boolean|null,"avoidPreviousCoupons":boolean|null,"onlyPrimes":boolean|null,"balanceEvenOdd":boolean|null,"avoidPatterns":boolean|null,"spreadZones":boolean|null,"maxConsecutive":number|null}
+{"intent":"chat"|"generate_coupon","gameId":"cilgin"|"superloto"|"sanstopu"|"onnumara"|null,"count":number|null,"sumMin":number|null,"sumMax":number|null,"mustInclude":number[]|null,"mustExclude":number[]|null,"excludeRangeMin":number|null,"excludeRangeMax":number|null,"noOverlap":boolean|null,"avoidPreviousCoupons":boolean|null,"onlyPrimes":boolean|null,"onlyEven":boolean|null,"onlyOdd":boolean|null,"balanceEvenOdd":boolean|null,"avoidPatterns":boolean|null,"spreadZones":boolean|null,"maxConsecutive":number|null}
 
 Alan açıklamaları:
 - count: kaç kupon istendiği. Ör: "5 tane kupon üret" -> 5. Belirtilmediyse null.
@@ -298,6 +321,11 @@ Alan açıklamaları:
   "hiç tekrar etmesin", "geçmişte ürettiklerinden farklı olsun" gibi bir istek varsa true.
 - onlyPrimes: "sadece asal sayılardan olsun", "asal sayılar olsun" gibi AÇIK bir istek varsa true.
   Kullanıcı "asal" kelimesini kullanmadıysa bu alanı doldurma.
+- onlyEven: "sadece çift sayılardan olsun", "hepsi çift olsun" gibi AÇIK bir istek varsa true.
+  Kullanıcı "çift" kelimesini kullanmadıysa bu alanı doldurma.
+- onlyOdd: "sadece tek sayılardan olsun", "hepsi tek olsun" gibi AÇIK bir istek varsa true.
+  Kullanıcı "tek" kelimesini kullanmadıysa bu alanı doldurma. onlyEven ve onlyOdd AYNI ANDA true
+  olamaz (kullanıcı ikisini birden istemez, biri true ise diğeri null kalmalı).
 - balanceEvenOdd: "çift tek dengeli olsun" gibi kategorik bir istekte true.
 - avoidPatterns: "ardışık olmasın", "sıra takip etmesin", "sıradan görünmesin" gibi isteklerde true.
 - spreadZones: "sayılar aralığa yayılsın", "birbirine yakın olmasın" gibi isteklerde true.
@@ -310,6 +338,10 @@ hiçbir zaman false yazma (false yerine null kullan).
 değer" uydurma. Kullanıcı "toplam", "aralık" gibi bir kelime kullanmadıysa sumMin/sumMax kesinlikle
 null olmalı. Kullanıcı "ardışık" kelimesini kullanmadıysa maxConsecutive kesinlikle null olmalı.
 Sadece kullanıcının AÇIKÇA yazdığı sayıları/isteği yansıt, kendi fikrini ekleme.
+Örnek: kullanıcı "geçmişteki uygun kombinasyonlara göre bir kupon üret" derse — bu "toplam" veya
+"aralık" kelimesi İÇERMEZ, bu yüzden sumMin ve sumMax MUTLAKA null olmalı. sumMin:0, sumMax:0 gibi
+bir değer YAZMA — 0 hiçbir zaman gerçek bir toplam olamaz, böyle bir şey görürsen bu senin bir
+hatan olur, kesinlikle üretme.
 
 Diğer kurallar:
 - Kullanıcı açıkça kupon/sayı üretmek, hazırlamak, çıkarmak veya önermek istiyorsa intent "generate_coupon" olsun.

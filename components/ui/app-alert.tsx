@@ -7,6 +7,7 @@ import {
     Text,
     View,
 } from 'react-native';
+import { softHaptic } from '../../lib/haptics';
 import { useTheme } from '../../lib/theme';
 
 export type AlertButton = {
@@ -43,14 +44,10 @@ export function AppAlert({ visible, title, message, buttons = [], onDismiss }: P
         <View
           style={[
             styles.card,
-            {
-              backgroundColor: c.surface,
-              borderColor: c.border,
-            },
-            theme.shadowSm,
+            { backgroundColor: c.elevated },
           ]}
         >
-          <Text style={[styles.title, { color: c.text, fontFamily: theme.font.extrabold }]}>
+          <Text style={[styles.title, { color: c.text, fontFamily: theme.font.bold }]}>
             {title}
           </Text>
 
@@ -70,6 +67,7 @@ export function AppAlert({ visible, title, message, buttons = [], onDismiss }: P
               <Pressable
                 key={i}
                 onPress={() => {
+                  softHaptic();
                   btn.onPress?.();
                   onDismiss();
                 }}
@@ -105,8 +103,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 320,
-    borderRadius: 20,
-    borderWidth: 1,
+    borderRadius: 22,
     overflow: 'hidden',
   },
   title: {

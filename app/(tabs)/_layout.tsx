@@ -9,12 +9,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontFamily } from '../../constants/theme';
 import { t } from '../../lib/i18n';
 import {
-  HomeIcon,
-  PlusIcon,
-  ProfileIcon,
-  ResultsIcon,
-  SavedIcon,
-  type IconProps,
+    HomeIcon,
+    PlusIcon,
+    ProfileIcon,
+    ResultsIcon,
+    SavedIcon,
+    type IconProps,
 } from '../../lib/icons';
 import { useTheme } from '../../lib/theme';
 
@@ -33,9 +33,6 @@ const TAB_ORDER: TabDef[] = [
   { name: 'profile', label: t('profile'), Icon: ProfileIcon },
 ];
 
-// Light, keyboard-like tactile feedback for tab presses.
-// iOS  -> softest impact style.
-// Android -> native "keyboard tap" constant (subtle, no VIBRATE permission needed).
 function tabHaptic() {
   if (Platform.OS === 'android') {
     Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Keyboard_Tap);
@@ -61,9 +58,8 @@ function LottoTabBar({ state, navigation }: BottomTabBarProps) {
         styles.bar,
         {
           backgroundColor: c.tabBg,
-          borderTopColor: c.tabBorder,
           paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
-          height: 62 + (insets.bottom > 0 ? insets.bottom : 10),
+          height: 64 + (insets.bottom > 0 ? insets.bottom : 10),
         },
       ]}
     >
@@ -75,11 +71,14 @@ function LottoTabBar({ state, navigation }: BottomTabBarProps) {
             <View key={tab.name} style={styles.centerSlot}>
               <Pressable
                 onPress={() => go(tab.name)}
-                style={[styles.fab, { backgroundColor: c.brand, shadowColor: c.brand }]}
+                style={[styles.fab, { backgroundColor: c.brand }]}
               >
-                <PlusIcon color={c.brandText} size={28} />
+                <PlusIcon color={c.brandText} size={26} />
               </Pressable>
-              <Text style={[styles.centerLabel, { color: focused ? c.brand : c.text3 }]} allowFontScaling={false}>
+              <Text
+                style={[styles.centerLabel, { color: focused ? c.brand : c.text3 }]}
+                allowFontScaling={false}
+              >
                 {tab.label}
               </Text>
             </View>
@@ -90,9 +89,14 @@ function LottoTabBar({ state, navigation }: BottomTabBarProps) {
         const Icon = tab.Icon!;
         return (
           <Pressable key={tab.name} style={styles.tab} onPress={() => go(tab.name)}>
-            <Icon color={tint} size={24} active={focused} />
+            <View style={styles.iconWrap}>
+              <Icon color={tint} size={22} active={focused} />
+            </View>
             <Text
-              style={[styles.label, { color: tint, fontFamily: focused ? FontFamily.bold : FontFamily.medium }]}
+              style={[
+                styles.label,
+                { color: tint, fontFamily: focused ? FontFamily.semibold : FontFamily.medium },
+              ]}
               allowFontScaling={false}
             >
               {tab.label}
@@ -108,7 +112,7 @@ export default function TabLayout() {
   return (
     <Tabs
       tabBar={(props) => <LottoTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: false, animation: 'none', freezeOnBlur: true }}
     >
       <Tabs.Screen name="home" />
       <Tabs.Screen name="results" />
@@ -116,7 +120,6 @@ export default function TabLayout() {
       <Tabs.Screen name="saved" />
       <Tabs.Screen name="profile" />
 
-      {/* Secondary screens reachable via navigation, hidden from the bar */}
       <Tabs.Screen name="ai-assistant" options={{ href: null }} />
       <Tabs.Screen name="bildirimler" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
@@ -129,23 +132,25 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    borderTopWidth: 1,
-    paddingTop: 9,
+    paddingTop: 8,
   },
-  tab: { flex: 1, alignItems: 'center', gap: 4 },
-  label: { fontSize: 10.5 },
-  centerSlot: { flex: 1, alignItems: 'center' },
-  centerLabel: { fontSize: 10.5, fontFamily: FontFamily.semibold, marginTop: 7 },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 20,
+  tab: { flex: 1, alignItems: 'center', gap: 3 },
+  iconWrap: {
+    width: 40,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -22,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
+  },
+  label: { fontSize: 10.5 },
+  centerSlot: { flex: 1, alignItems: 'center' },
+  centerLabel: { fontSize: 10.5, fontFamily: FontFamily.medium, marginTop: 6 },
+  fab: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -20,
   },
 });

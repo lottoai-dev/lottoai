@@ -56,22 +56,21 @@ export function ProfileIcon({ color, size = 24, active }: IconProps) {
 
 /* ---------------- Feature icons ---------------- */
 export function AIAssistantIcon({ color, size = 24 }: IconProps) {
-  const petal = color + '40';
   return (
     <Svg {...base(size)}>
-      <Circle cx={12} cy={7.8} r={3.2} fill={petal} />
-      <Circle cx={16.2} cy={12} r={3.2} fill={petal} />
-      <Circle cx={12} cy={16.2} r={3.2} fill={petal} />
-      <Circle cx={7.8} cy={12} r={3.2} fill={petal} />
-      <Path
-        d="M12 7l1.3 3.8 3.8 1.3-3.8 1.3L12 17l-1.3-3.8-3.8-1.3 3.8-1.3L12 7z"
-        stroke={color}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-        fill={color}
-      />
-      <Circle cx={18.8} cy={5.2} r={1.15} fill={color} />
-      <Circle cx={5.2} cy={18.2} r={0.95} fill={color} />
+      {/* Anten */}
+      <Line x1={12} y1={7.2} x2={12} y2={5} stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+      <Circle cx={12} cy={3.8} r={1.25} fill={color} />
+      {/* Kafa */}
+      <Rect x={4.8} y={7.2} width={14.4} height={11.4} rx={3.6} stroke={color} strokeWidth={1.7} />
+      {/* Kulaklar */}
+      <Line x1={2.9} y1={11.6} x2={2.9} y2={14.2} stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+      <Line x1={21.1} y1={11.6} x2={21.1} y2={14.2} stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+      {/* Gözler */}
+      <Circle cx={9.3} cy={11.9} r={1.3} fill={color} />
+      <Circle cx={14.7} cy={11.9} r={1.3} fill={color} />
+      {/* Gülümseme */}
+      <Path d="M9.4 15.1c1.6 1.35 3.6 1.35 5.2 0" stroke={color} strokeWidth={1.6} strokeLinecap="round" fill="none" />
     </Svg>
   );
 }

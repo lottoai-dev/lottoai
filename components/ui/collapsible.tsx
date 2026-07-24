@@ -6,6 +6,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { softHaptic } from '@/lib/haptics';
 
 export function Collapsible({ children, title }: PropsWithChildren & { title: string }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,8 +16,11 @@ export function Collapsible({ children, title }: PropsWithChildren & { title: st
     <ThemedView>
       <TouchableOpacity
         style={styles.heading}
-        onPress={() => setIsOpen((value) => !value)}
-        activeOpacity={0.8}>
+        onPress={() => {
+          softHaptic();
+          setIsOpen((value) => !value);
+        }}
+        activeOpacity={1}>
         <IconSymbol
           name="chevron.right"
           size={18}

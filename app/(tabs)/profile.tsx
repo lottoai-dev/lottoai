@@ -13,22 +13,24 @@ import { AppTheme } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBildirim } from '../../contexts/BildirimContext';
-import { clearAllAppData } from '../../lib/clear-app-data';
+import { deleteAccount } from '../../lib/delete-account';
 import { BrandMark } from '../../lib/emblems';
 import {
-  BellIcon,
-  CheckIcon,
-  ChevronRightIcon,
-  CloseIcon,
-  DocIcon,
-  EditIcon,
-  InfoIcon,
-  LogOutIcon,
-  MailIcon,
-  SearchIcon,
-  ShieldIcon,
-  StatsIcon,
-  TrashIcon,
+    BellIcon,
+    CheckIcon,
+    ChevronRightIcon,
+    CloseIcon,
+    DocIcon,
+    EditIcon,
+    InfoIcon,
+    LogOutIcon,
+    MailIcon,
+    SearchIcon,
+    ShieldIcon,
+    StatsIcon,
+    TicketIcon,
+    TrashIcon,
+    TrophyIcon,
 } from '../../lib/icons';
 import { useTheme } from '../../lib/theme';
 
@@ -86,6 +88,7 @@ export default function ProfileScreen() {
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
   const saveName = async () => {
+    softHaptic();
     if (tempName.trim() === '') {
       showAlert('Uyarı', 'İsim boş olamaz.');
       return;
@@ -93,34 +96,36 @@ export default function ProfileScreen() {
     await AsyncStorage.setItem(STORAGE_KEYS.USER_NAME, tempName.trim());
     setName(tempName.trim());
     setEditing(false);
-    softHaptic();
   };
 
-  const clearData = () => {
-    showAlert('Tüm verileri sil', 'Tüm kuponların, ayarların ve verilerin silinecek. Bu işlem geri alınamaz.', [
-      { text: 'Vazgeç', style: 'cancel' },
-      {
-        text: 'Sil',
-        style: 'destructive',
-        onPress: async () => {
-          softHaptic();
-          try {
-            await clearAllAppData();
+  const handleDeleteAccount = () => {
+    showAlert(
+      'Hesabımı sil',
+      'Hesabın, AI sohbet kayıtların ve bu cihazdaki tüm verilerin kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Hesabı sil',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await deleteAccount();
+            if (!result.ok) {
+              showAlert('Hata', result.message);
+              return;
+            }
             clearBildirimler();
             setTotalCoupons(0);
             setBestResult(0);
             setName('');
             setNotificationsEnabled(false);
             setEditing(false);
-            showAlert('Silindi', 'Tüm verilerin temizlendi.', [
+            showAlert('Hesap silindi', 'Hesabın ve verilerin silindi.', [
               { text: 'Tamam', onPress: () => router.replace('/onboarding') },
             ]);
-          } catch {
-            showAlert('Hata', 'Veriler silinirken bir sorun oluştu.');
-          }
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   const handleSignOut = () => {
@@ -130,7 +135,6 @@ export default function ProfileScreen() {
         text: 'Çıkış Yap',
         style: 'destructive',
         onPress: async () => {
-          softHaptic();
           await signOut();
         },
       },
@@ -146,10 +150,11 @@ export default function ProfileScreen() {
     last?: boolean;
   }) => (
     <PressableScale
+      haptic={false}
       onPress={() => { softHaptic(); onPress?.(); }}
       style={[s.menuRow, ...(!last ? [{ borderBottomWidth: 1, borderBottomColor: c.hairline }] : [])]}
     >
-      <View style={[s.menuIcon, { backgroundColor: color + '1A' }]}>
+      <View style={[s.menuIcon, { backgroundColor: `${color}14` }]}>
         <Icon color={color} size={20} />
       </View>
       <View style={{ flex: 1 }}>
@@ -162,38 +167,43 @@ export default function ProfileScreen() {
 
   return (
     <View style={s.container}>
-      <StatusBar style="light" />
+      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}
       >
         <View style={s.header}>
+          <View style={s.eyebrowRow}>
+            <View style={[s.eyebrowDot, { backgroundColor: c.brand }]} />
+            <Text style={[s.eyebrow, { color: c.brand }]}>HESAP</Text>
+          </View>
           <Text style={s.title}>Profil</Text>
         </View>
 
         {!user && (
           <Pressable
             onPress={() => { softHaptic(); router.push('/login' as any); }}
-            style={[s.loginBanner, { backgroundColor: c.brandSoft, borderColor: c.brandBorder }]}
+            style={[s.loginBanner, { backgroundColor: c.brandSoft }]}
           >
             <View style={{ flex: 1 }}>
               <Text style={[s.loginBannerTitle, { color: c.brand }]}>Hesabına giriş yap</Text>
-              <Text style={[s.loginBannerSub, { color: c.text2 }]}>Kuponlarını kaydet ve her cihazdan eriş</Text>
+              <Text style={[s.loginBannerSub, { color: c.text2 }]}>Kuponlarını kaydet ve AI Asistan'ı kullan</Text>
             </View>
             <ChevronRightIcon color={c.brand} size={20} />
           </Pressable>
         )}
 
         <Surface style={s.avatarCard}>
-          <View style={[s.avatar, { backgroundColor: c.brand }]}>
-            <Text style={s.avatarText}>{name ? name.charAt(0).toUpperCase() : 'L'}</Text>
+          <View style={[s.panelAccent, { backgroundColor: c.brand }]} />
+          <View style={[s.avatar, { backgroundColor: c.brandSoft }]}>
+            <Text style={[s.avatarText, { color: c.brand }]}>{name ? name.charAt(0).toUpperCase() : 'L'}</Text>
           </View>
           <View style={{ flex: 1 }}>
             {editing ? (
               <View style={s.editRow}>
                 <TextInput
-                  style={[s.nameInput, { backgroundColor: c.surfaceAlt, borderColor: c.brandBorder, color: c.text }]}
+                  style={[s.nameInput, { backgroundColor: c.surfaceAlt, color: c.text }]}
                   value={tempName}
                   onChangeText={setTempName}
                   placeholder="İsmini gir"
@@ -221,23 +231,36 @@ export default function ProfileScreen() {
           </View>
         </Surface>
 
-        <Surface style={s.statsCard}>
-          <Stat value={String(totalCoupons)} label="Kupon" color={c.brand} theme={theme} divider />
-          <Stat value={String(bestResult)} label="En çok tutan" color={c.gold} theme={theme} divider={false} />
-        </Surface>
+        <View style={s.statsRow}>
+          <Surface style={s.statCard}>
+            <View style={[s.statIcon, { backgroundColor: c.brandSoft }]}>
+              <TicketIcon color={c.brand} size={19} />
+            </View>
+            <Text style={s.statValue}>{totalCoupons}</Text>
+            <Text style={s.statLabel}>Kupon</Text>
+          </Surface>
+          <Surface style={s.statCard}>
+            <View style={[s.statIcon, { backgroundColor: c.surfaceAlt }]}>
+              <TrophyIcon color={c.text2} size={19} />
+            </View>
+            <Text style={s.statValue}>{bestResult}</Text>
+            <Text style={s.statLabel}>En çok tutan</Text>
+          </Surface>
+        </View>
 
         <Surface style={s.card}>
+          <View style={[s.panelAccent, { backgroundColor: c.brand }]} />
           <Text style={s.cardLabel}>ARAÇLAR</Text>
           <MenuRow
             Icon={BellIcon}
             color={c.brand}
             title="Hatırlatıcılar"
-            sub={notificationsEnabled ? 'Açık' : 'Çekiliş öncesi/sonrası bildirim'}
+            sub={notificationsEnabled ? 'Açık' : 'Çekiliş hatırlatma ve sonuç bildirimi'}
             onPress={() => router.push('/notifications')}
           />
           <MenuRow
             Icon={StatsIcon}
-            color={c.gold}
+            color={c.brand}
             title="İstatistikler"
             sub="Sıcak/soğuk sayılar, dağılım"
             onPress={() => router.push('/(tabs)/results?tab=stats')}
@@ -252,9 +275,12 @@ export default function ProfileScreen() {
           />
         </Surface>
 
-        <View style={[s.responsible, { backgroundColor: c.brandSoft, borderColor: c.brandBorder }]}>
+        <Surface style={s.responsible}>
+          <View style={[s.panelAccent, { backgroundColor: c.brand }]} />
           <View style={s.responsibleHead}>
-            <ShieldIcon color={c.brand} size={20} />
+            <View style={[s.responsibleIcon, { backgroundColor: c.brandSoft }]}>
+              <ShieldIcon color={c.brand} size={20} />
+            </View>
             <Text style={s.responsibleTitle}>Sorumlu oyun</Text>
           </View>
           <Text style={s.responsibleText}>
@@ -267,9 +293,10 @@ export default function ProfileScreen() {
             </Text>{' '}
             danışma hattını arayabilirsin.
           </Text>
-        </View>
+        </Surface>
 
         <Surface style={s.card}>
+          <View style={[s.panelAccent, { backgroundColor: c.brand }]} />
           <Text style={s.cardLabel}>HAKKINDA</Text>
           <MenuRow Icon={ShieldIcon} color={c.text2} title="Gizlilik politikası" sub="Kişisel verilerin" onPress={() => Linking.openURL(PRIVACY_URL)} />
           <MenuRow Icon={DocIcon} color={c.text2} title="Kullanım koşulları" sub="Uygulama kuralları" onPress={() => Linking.openURL(TERMS_URL)} />
@@ -279,53 +306,34 @@ export default function ProfileScreen() {
         </Surface>
 
         {user && (
-          <PressableScale
-            onPress={() => { softHaptic(); handleSignOut(); }}
-            style={[s.danger, { backgroundColor: c.dangerSoft, borderColor: c.danger + '33' }]}
-          >
-            <LogOutIcon color={c.danger} size={20} />
-            <Text style={[s.dangerText, { color: c.danger }]}>Çıkış Yap</Text>
-          </PressableScale>
+          <>
+            <PressableScale
+              haptic={false}
+              onPress={() => { softHaptic(); handleSignOut(); }}
+              style={[s.danger, { backgroundColor: c.dangerSoft }]}
+            >
+              <LogOutIcon color={c.danger} size={20} />
+              <Text style={[s.dangerText, { color: c.danger }]}>Çıkış Yap</Text>
+            </PressableScale>
+
+            <PressableScale
+              haptic={false}
+              onPress={() => { softHaptic(); handleDeleteAccount(); }}
+              style={[s.danger, { backgroundColor: c.dangerSoft }]}
+            >
+              <TrashIcon color={c.danger} size={20} />
+              <Text style={[s.dangerText, { color: c.danger }]}>Hesabımı sil</Text>
+            </PressableScale>
+          </>
         )}
 
-        <PressableScale
-          onPress={() => { softHaptic(); clearData(); }}
-          style={[s.danger, { backgroundColor: c.dangerSoft, borderColor: c.danger + '33' }]}
-        >
-          <TrashIcon color={c.danger} size={20} />
-          <Text style={[s.dangerText, { color: c.danger }]}>Tüm verileri sil</Text>
-        </PressableScale>
-
         <View style={s.footer}>
-          <BrandMark size={34} />
+          <BrandMark size={38} />
           <Text style={s.footerText}>LottoAI · v1.0.0</Text>
           <Text style={s.footerSub}>18+ · Şans oyunları asistanı</Text>
         </View>
       </ScrollView>
     </View>
-  );
-}
-
-function Stat({ value, label, color, theme, divider }: {
-  value: string;
-  label: string;
-  color: string;
-  theme: AppTheme;
-  divider?: boolean;
-}) {
-  const c = theme.colors;
-  return (
-    <>
-      <View style={{ flex: 1, alignItems: 'center' }}>
-        <Text style={{ fontFamily: theme.font.extrabold, fontSize: 26, color, fontVariant: ['tabular-nums'] }}>
-          {value}
-        </Text>
-        <Text style={{ ...theme.typography.caption, color: c.text2, marginTop: 3 }}>{label}</Text>
-      </View>
-      {divider ? (
-        <View style={{ width: 1, height: 40, backgroundColor: c.hairline, alignSelf: 'center' }} />
-      ) : null}
-    </>
   );
 }
 
@@ -335,52 +343,79 @@ function makeStyles(theme: AppTheme) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
     header: { paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
+    eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 5 },
+    eyebrowDot: { width: 7, height: 7, borderRadius: 4 },
+    eyebrow: { ...ty.micro, fontFamily: theme.font.extrabold, letterSpacing: 1 },
     title: { ...ty.h1, color: c.text },
 
     loginBanner: {
       flexDirection: 'row', alignItems: 'center',
       marginHorizontal: spacing.xl, marginBottom: spacing.md,
-      padding: 16, borderRadius: radius.xl, borderWidth: 1,
+      padding: 16, borderRadius: radius.xl,
     },
     loginBannerTitle: { ...ty.bodySemibold },
     loginBannerSub: { ...ty.caption, marginTop: 2 },
 
     avatarCard: {
-      marginHorizontal: spacing.xl, marginBottom: spacing.md,
-      padding: 22, flexDirection: 'row', alignItems: 'center',
-      gap: 16, borderRadius: radius.xxl,
+      marginHorizontal: spacing.xl,
+      marginBottom: spacing.md,
+      padding: 22,
+      paddingLeft: 26,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+      borderRadius: radius.xxl,
+      overflow: 'hidden',
+    },
+    panelAccent: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 4,
     },
     avatar: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-    avatarText: { fontFamily: theme.font.extrabold, fontSize: 28, color: '#fff' },
+    avatarText: { fontFamily: theme.font.bold, fontSize: 28 },
     nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     nameText: { ...ty.h2, color: c.text },
-    memberText: { ...ty.caption, color: c.text2, marginTop: 3 },
+    memberText: { ...ty.caption, color: c.text3, marginTop: 3 },
     editRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     nameInput: {
-      flex: 1, height: 42, borderRadius: radius.md, borderWidth: 1,
-      paddingHorizontal: 12, fontFamily: theme.font.bold, fontSize: 16,
+      flex: 1, height: 42, borderRadius: radius.lg,
+      paddingHorizontal: 12, fontFamily: theme.font.semibold, fontSize: 16,
     },
-    editBtn: { width: 42, height: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+    editBtn: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
 
-    statsCard: { flexDirection: 'row', marginHorizontal: spacing.xl, padding: 18, marginBottom: spacing.md },
+    statsRow: { flexDirection: 'row', gap: 12, marginHorizontal: spacing.xl, marginBottom: spacing.md },
+    statCard: { flex: 1, padding: 14, borderRadius: radius.xl },
+    statIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+    statValue: { fontFamily: theme.font.bold, fontSize: 20, lineHeight: 25, letterSpacing: -0.3, color: c.text, fontVariant: ['tabular-nums'] },
+    statLabel: { ...ty.caption, color: c.text3, marginTop: 2 },
 
-    card: { marginHorizontal: spacing.xl, marginBottom: spacing.md, paddingHorizontal: 18, paddingVertical: 16 },
-    cardLabel: { ...ty.micro, color: c.text2, marginBottom: 10 },
+    card: { marginHorizontal: spacing.xl, marginBottom: spacing.md, paddingHorizontal: 22, paddingVertical: 16, overflow: 'hidden' },
+    cardLabel: { ...ty.micro, color: c.text3, marginBottom: 10 },
 
     menuRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13 },
-    menuIcon: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+    menuIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     menuTitle: { ...ty.bodySemibold, color: c.text },
     menuSub: { ...ty.caption, color: c.text3, marginTop: 1 },
 
-    responsible: { marginHorizontal: spacing.xl, marginBottom: spacing.md, padding: 16, borderRadius: radius.xl, borderWidth: 1 },
+    responsible: { marginHorizontal: spacing.xl, marginBottom: spacing.md, padding: 16, paddingLeft: 20, borderRadius: radius.xl, overflow: 'hidden' },
     responsibleHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+    responsibleIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     responsibleTitle: { ...ty.title, color: c.text },
     responsibleText: { ...ty.caption, color: c.text2, lineHeight: 19 },
 
     danger: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
       gap: 10, marginHorizontal: spacing.xl, marginBottom: spacing.md,
-      padding: 14, borderRadius: radius.md, borderWidth: 1,
+      padding: 14, borderRadius: radius.pill,
     },
     dangerText: { ...ty.title },
 

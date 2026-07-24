@@ -1,6 +1,6 @@
 // constants/theme.ts
-// LottoAI design system — calm, trustworthy fintech.
-// Emerald brand accent + neutral surfaces. Full light/dark token set.
+// LottoAI design system — Calm Emerald.
+// Soft dark surfaces (blue-gray tonal layers) + softened emerald accent.
 
 import type { TextStyle, ViewStyle } from 'react-native';
 import { Platform } from 'react-native';
@@ -33,10 +33,10 @@ export const spacing = {
 } as const;
 
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
+  sm: 10,
+  md: 14,
+  lg: 18,
+  xl: 22,
   xxl: 26,
   pill: 999,
 } as const;
@@ -45,17 +45,17 @@ export const radius = {
 /* Typography roles                                                   */
 /* ------------------------------------------------------------------ */
 export const typography = {
-  display: { fontFamily: FontFamily.extrabold, fontSize: 46, lineHeight: 48, letterSpacing: -1.2 },
-  h1: { fontFamily: FontFamily.extrabold, fontSize: 26, lineHeight: 32, letterSpacing: -0.6 },
-  h2: { fontFamily: FontFamily.extrabold, fontSize: 19, lineHeight: 24, letterSpacing: -0.4 },
-  h3: { fontFamily: FontFamily.bold, fontSize: 16, lineHeight: 21, letterSpacing: -0.2 },
-  title: { fontFamily: FontFamily.bold, fontSize: 15, lineHeight: 20, letterSpacing: -0.1 },
+  display: { fontFamily: FontFamily.extrabold, fontSize: 42, lineHeight: 46, letterSpacing: -1.1 },
+  h1: { fontFamily: FontFamily.bold, fontSize: 24, lineHeight: 30, letterSpacing: -0.5 },
+  h2: { fontFamily: FontFamily.bold, fontSize: 18, lineHeight: 24, letterSpacing: -0.3 },
+  h3: { fontFamily: FontFamily.semibold, fontSize: 16, lineHeight: 21, letterSpacing: -0.2 },
+  title: { fontFamily: FontFamily.semibold, fontSize: 15, lineHeight: 20, letterSpacing: -0.1 },
   body: { fontFamily: FontFamily.regular, fontSize: 14.5, lineHeight: 21 },
   bodyMedium: { fontFamily: FontFamily.medium, fontSize: 14.5, lineHeight: 21 },
   bodySemibold: { fontFamily: FontFamily.semibold, fontSize: 14.5, lineHeight: 21 },
   label: { fontFamily: FontFamily.semibold, fontSize: 13, lineHeight: 17 },
   caption: { fontFamily: FontFamily.medium, fontSize: 12, lineHeight: 16 },
-  micro: { fontFamily: FontFamily.semibold, fontSize: 10.5, lineHeight: 13, letterSpacing: 0.4 },
+  micro: { fontFamily: FontFamily.semibold, fontSize: 10.5, lineHeight: 13, letterSpacing: 0.8 },
 } as const satisfies Record<string, TextStyle>;
 
 /* ------------------------------------------------------------------ */
@@ -85,22 +85,23 @@ export interface AppColors {
   tabBg: string;
   tabBorder: string;
   overlay: string;
+  highlight: string;
 }
 
 const lightColors: AppColors = {
-  bg: '#F4F5F7',
+  bg: '#F3F5F8',
   surface: '#FFFFFF',
-  surfaceAlt: '#FAFBFC',
+  surfaceAlt: '#F0F2F5',
   elevated: '#FFFFFF',
-  border: '#E9EBEF',
-  hairline: '#EEF0F3',
-  text: '#12161B',
-  text2: '#5C6571',
-  text3: '#9AA1AB',
+  border: 'rgba(15,20,30,0.06)',
+  hairline: 'rgba(15,20,30,0.04)',
+  text: '#0F141B',
+  text2: '#5C6573',
+  text3: '#949BA8',
   brand: '#1C9E73',
   brandText: '#FFFFFF',
   brandSoft: 'rgba(28,158,115,0.10)',
-  brandBorder: 'rgba(28,158,115,0.22)',
+  brandBorder: 'rgba(28,158,115,0.20)',
   brandPressed: '#157E5C',
   gold: '#C29A2B',
   goldSoft: 'rgba(194,154,43,0.12)',
@@ -109,66 +110,68 @@ const lightColors: AppColors = {
   success: '#1C9E73',
   warning: '#D9822B',
   tabBg: 'rgba(255,255,255,0.94)',
-  tabBorder: '#E9EBEF',
-  overlay: 'rgba(18,22,27,0.45)',
+  tabBorder: 'rgba(15,20,30,0.06)',
+  overlay: 'rgba(15,20,30,0.45)',
+  highlight: 'rgba(255,255,255,0.7)',
 };
 
 const darkColors: AppColors = {
-  bg: '#0E1212',
-  surface: '#171C1C',
-  surfaceAlt: '#1C2222',
-  elevated: '#1F2626',
-  border: '#272E2E',
-  hairline: '#222929',
-  text: '#ECEFEE',
-  text2: '#9BA3A0',
-  text3: '#69716E',
-  brand: '#2FBE8C',
-  brandText: '#04130D',
-  brandSoft: 'rgba(47,190,140,0.13)',
-  brandBorder: 'rgba(47,190,140,0.26)',
-  brandPressed: '#26A579',
+  bg: '#0A0C10',
+  surface: '#12151B',
+  surfaceAlt: '#181C24',
+  elevated: '#1E232C',
+  border: 'rgba(255,255,255,0.05)',
+  hairline: 'rgba(255,255,255,0.04)',
+  text: '#F2F4F7',
+  text2: '#98A0AD',
+  text3: '#5C6470',
+  brand: '#3DD68C',
+  brandText: '#06110B',
+  brandSoft: 'rgba(61,214,140,0.12)',
+  brandBorder: 'rgba(61,214,140,0.22)',
+  brandPressed: '#32B877',
   gold: '#D6B348',
   goldSoft: 'rgba(214,179,72,0.14)',
   danger: '#E5706B',
-  dangerSoft: 'rgba(229,112,107,0.13)',
-  success: '#2FBE8C',
+  dangerSoft: 'rgba(229,112,107,0.12)',
+  success: '#3DD68C',
   warning: '#E0954A',
-  tabBg: 'rgba(20,25,25,0.94)',
-  tabBorder: '#242B2B',
+  tabBg: 'rgba(10,12,16,0.94)',
+  tabBorder: 'rgba(255,255,255,0.04)',
   overlay: 'rgba(0,0,0,0.55)',
+  highlight: 'rgba(255,255,255,0.04)',
 };
 
 /* ------------------------------------------------------------------ */
-/* Elevation / shadows                                                */
+/* Elevation / shadows — soft & minimal on dark                       */
 /* ------------------------------------------------------------------ */
 const lightShadow: ViewStyle = {
   shadowColor: '#101620',
-  shadowOffset: { width: 0, height: 10 },
-  shadowOpacity: 0.07,
-  shadowRadius: 24,
-  elevation: 5,
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.06,
+  shadowRadius: 20,
+  elevation: 4,
 };
 const lightShadowSm: ViewStyle = {
   shadowColor: '#101620',
   shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.05,
+  shadowOpacity: 0.04,
   shadowRadius: 8,
-  elevation: 2,
+  elevation: 1,
 };
 const darkShadow: ViewStyle = {
   shadowColor: '#000000',
-  shadowOffset: { width: 0, height: 12 },
-  shadowOpacity: 0.5,
-  shadowRadius: 26,
-  elevation: 6,
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.28,
+  shadowRadius: 18,
+  elevation: 4,
 };
 const darkShadowSm: ViewStyle = {
   shadowColor: '#000000',
   shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.4,
-  shadowRadius: 8,
-  elevation: 2,
+  shadowOpacity: 0.22,
+  shadowRadius: 6,
+  elevation: 1,
 };
 
 /* ------------------------------------------------------------------ */
@@ -213,14 +216,9 @@ export const themes: Record<ThemeMode, AppTheme> = {
 };
 
 /* ------------------------------------------------------------------ */
-/* Game accent colors (calmed from the official palette)              */
+/* Game accent colors — official MP palette (from lib/games.ts)       */
 /* ------------------------------------------------------------------ */
-export const GameAccent: Record<string, string> = {
-  cilgin: '#ea0029',
-  superloto: '#ff5100',
-  sanstopu: '#e10098',
-  onnumara: '#a25eb5',
-};
+export { GAME_ACCENT as GameAccent } from '../lib/games';
 
 /* ------------------------------------------------------------------ */
 /* Backward-compatible exports (legacy starter files import these)    */
@@ -252,8 +250,8 @@ export const Fonts = Platform.select({
   default: { sans: FontFamily.regular, serif: 'serif', rounded: FontFamily.bold, mono: 'monospace' },
   web: {
     sans: "'Plus Jakarta Sans', system-ui, sans-serif",
-    serif: "Georgia, serif",
+    serif: 'Georgia, serif',
     rounded: "'Plus Jakarta Sans', sans-serif",
-    mono: "SFMono-Regular, Menlo, monospace",
+    mono: 'SFMono-Regular, Menlo, monospace',
   },
 });

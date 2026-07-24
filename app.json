@@ -17,12 +17,13 @@
       "bundleIdentifier": "app.getlottoai.ios",
       "buildNumber": "1",
       "icon": "./assets/images/LottoAI-iOS-180.png",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSUserNotificationsUsageDescription": "Çekiliş saatlerinde hatırlatıcı bildirimi almak için izin gereklidir.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "splash": {
-        "backgroundColor": "#0E1212"
+        "backgroundColor": "#0A0C10"
       }
     },
     "android": {
@@ -53,7 +54,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0E1212",
+          "backgroundColor": "#0A0C10",
           "image": "./assets/images/splash-icon-dark.png",
           "imageWidth": 200,
           "resizeMode": "contain"
@@ -70,6 +71,7 @@
       "expo-font",
       "expo-web-browser",
       "expo-localization",
+      "expo-apple-authentication",
       [
         "@react-native-google-signin/google-signin",
         {

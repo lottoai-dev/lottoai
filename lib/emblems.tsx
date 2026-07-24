@@ -2,13 +2,13 @@
 import React from 'react';
 import { Image } from 'react-native';
 import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
-import { GameAccent } from '../constants/theme';
+import { getGameAccentColor } from './games';
 import { useTheme } from './theme';
 
-type EmblemProps = { game: string; size?: number };
+type EmblemProps = { game: string; size?: number; color?: string };
 
-export const GameEmblem = React.memo(function GameEmblem({ game, size = 40 }: EmblemProps) {
-  const c = GameAccent[game] ?? '#1C9E73';
+export const GameEmblem = React.memo(function GameEmblem({ game, size = 40, color }: EmblemProps) {
+  const c = color ?? getGameAccentColor(game);
   const s = size;
   return (
     <Svg width={s} height={s} viewBox="0 0 40 40" fill="none">
