@@ -97,6 +97,7 @@ async function fetchUnreadNotifications(
     if (unread && unread.length > 0) {
       for (const notif of unread) {
         addBildirim({
+          id: notif.id != null ? String(notif.id) : undefined,
           title: notif.title || 'Bildirim',
           body: notif.body || '',
           screen: notif.screen,
@@ -154,18 +155,29 @@ function RootContent() {
       if (url.includes('access_token') || url.includes('token_hash') || url.includes('type=signup') || url.includes('type=recovery')) {
         try {
           const urlObj = new URL(url);
+          const hashParams = new URLSearchParams(urlObj.hash.replace('#', ''));
           const accessToken = urlObj.searchParams.get('access_token') ||
-            new URLSearchParams(urlObj.hash.replace('#', '')).get('access_token');
+            hashParams.get('access_token');
           const refreshToken = urlObj.searchParams.get('refresh_token') ||
-            new URLSearchParams(urlObj.hash.replace('#', '')).get('refresh_token');
+            hashParams.get('refresh_token');
+          const linkType = urlObj.searchParams.get('type') || hashParams.get('type');
+          const isRecovery = linkType === 'recovery' || url.includes('type=recovery');
 
           if (accessToken && refreshToken) {
             const { error } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
             });
-            if (error) console.error('[deepLink] session error:', error);
-            else console.log('[deepLink] oturum başarıyla alındı');
+            if (error) {
+              console.error('[deepLink] session error:', error);
+            } else {
+              console.log('[deepLink] oturum başarıyla alındı', { isRecovery });
+              // Recovery: kullanıcı henüz yeni şifre belirlemedi — ana sayfaya değil
+              // şifre belirleme ekranına yönlendir.
+              if (isRecovery) {
+                router.replace('/auth/reset-password' as any);
+              }
+            }
           }
         } catch (e) {
           console.error('[deepLink] url parse error:', e);
@@ -257,6 +269,8 @@ function RootContent() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="login" />
+        <Stack.Screen name="auth/callback" />
+        <Stack.Screen name="auth/reset-password" />
       </Stack>
     </View>
   );

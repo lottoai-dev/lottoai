@@ -3,16 +3,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View
+  ActivityIndicator,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -21,24 +23,54 @@ import { NumberBall } from '../../components/ui/number-ball';
 import { PressableScale, Surface } from '../../components/ui/surface';
 import { Toggle } from '../../components/ui/toggle';
 import { STORAGE_KEYS } from '../../constants/storage-keys';
-import { AppTheme } from '../../constants/theme';
+import { AppTheme, spacing } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { showRewardedAd } from '../../lib/adMob';
 import { markCouponsDirty } from '../../lib/couponsStore';
 import { GameEmblem } from '../../lib/emblems';
+import { formatQuotaResetIn, msUntilQuotaReset } from '../../lib/aiQuota';
+import {
+  ADS_REWARDS_ENABLED,
+  FEATURE_FREE_DAILY_LIMIT,
+  FEATURE_REWARD_AMOUNT,
+  getFeatureQuotaStatus,
+  grantFeatureReward,
+  recordFeatureUsage,
+} from '../../lib/featureQuota';
 import { GAMES, getGameAccentColor } from '../../lib/games';
 import GameSelector from '../../lib/GameSelector';
 import {
-    BookmarkIcon,
-    CheckIcon,
-    ClockIcon,
-    CloseIcon,
-    DiceIcon,
-    InfoIcon,
-    SlidersIcon,
-    TrashIcon,
+  BookmarkIcon,
+  CheckIcon,
+  ClockIcon,
+  CloseIcon,
+  DiceIcon,
+  InfoIcon,
+  PlayIcon,
+  SlidersIcon,
+  TrashIcon,
 } from '../../lib/icons';
 import { useTheme } from '../../lib/theme';
+
+/**
+ * Top boyutu Sayısal Loto (6 sayı) ile aynı: ekrana göre 30–42px.
+ * 6 sayılı oyunlarda tek satır (nowrap); On Numara wrap eder.
+ */
+function mainBallLayout(count: number, screenWidth: number): { size: number; gap: number; nowrap: boolean } {
+  // resultCard: margin xl*2 + paddingLeft (xl+4) + paddingRight xl
+  const available = screenWidth - spacing.xl * 2 - (spacing.xl + 4) - spacing.xl;
+  const sayisalGap = 6;
+  const sayisalCount = 6;
+  const size = Math.max(
+    30,
+    Math.min(42, Math.floor((available - sayisalGap * (sayisalCount - 1)) / sayisalCount)),
+  );
+
+  if (count < 6) return { size, gap: 10, nowrap: true };
+  if (count > 6) return { size, gap: 6, nowrap: false };
+  return { size, gap: 6, nowrap: true };
+}
 
 function softHaptic() {
   if (Platform.OS === 'android') {
@@ -243,6 +275,7 @@ export default function GenerateScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ game?: string }>();
   const theme = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const c = theme.colors;
   const s = useMemo(() => makeStyles(theme), [theme]);
   const { showAlert } = useAlert();
@@ -264,8 +297,23 @@ export default function GenerateScreen() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyModal, setHistoryModal] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
+  const [savingCoupon, setSavingCoupon] = useState(false);
+  const savingCouponRef = useRef(false);
+  // Filtreli kupon üretimi günlük ücretsiz hakkı doldurduğunda bu kart
+  // açılır: kullanıcı ya reklam izleyip +3 hak kazanır ya da filtresiz
+  // üretime geçer. generateAfterAd, "reklam izlendi" sonrası hangi
+  // isteğin otomatik tekrar deneneceğini tutar.
+  const [quotaCardVisible, setQuotaCardVisible] = useState(false);
+  const [watchingAd, setWatchingAd] = useState(false);
+  const [checkingQuota, setCheckingQuota] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const generatingRef = useRef(false);
 
   const mainColor = getGameAccentColor(selectedGame.id);
+  const ballLayout = useMemo(
+    () => mainBallLayout(generatedNumbers.length || selectedGame.count, windowWidth),
+    [generatedNumbers.length, selectedGame.count, windowWidth],
+  );
 
   const includeNumbers = parseNumberList(includeText, selectedGame.max);
   const excludeNumbers = parseNumberList(excludeText, selectedGame.max);
@@ -319,8 +367,12 @@ export default function GenerateScreen() {
     [history]
   );
 
-  const handleGenerate = () => {
-    softHaptic();
+  /**
+   * Sayıları gerçekten üretip ekrana basan, geçmişe kaydeden asıl iş.
+   * Kilit yönetmez — çağıran taraf (performGeneration veya handleGenerate
+   * async yolu) generatingRef'i tutuyor olmalı.
+   */
+  const performGenerationCore = () => {
     const sumMinNum = sumMin.trim() !== '' ? parseInt(sumMin, 10) : null;
     const sumMaxNum = sumMax.trim() !== '' ? parseInt(sumMax, 10) : null;
 
@@ -372,6 +424,105 @@ export default function GenerateScreen() {
       superStar: ss,
       timestamp: Date.now(),
     });
+
+    // Filtreli üretim başarıyla tamamlandıysa günlük kullanımı işaretle.
+    // Filtresiz üretim (filterActive false) bu kotaya hiç dahil değil.
+    if (filterActive) {
+      void recordFeatureUsage('filtered_coupon');
+    }
+  };
+
+  /**
+   * Üretim giriş noktası: generatingRef kilidi burada. handleWatchAd /
+   * handleUseWithoutFilter / filtresiz handleGenerate bu fonksiyonu çağırır;
+   * yeni çağıranlar da otomatik korunur.
+   */
+  const performGeneration = () => {
+    if (generatingRef.current) return;
+    generatingRef.current = true;
+    setGenerating(true);
+    try {
+      performGenerationCore();
+    } finally {
+      generatingRef.current = false;
+      setGenerating(false);
+    }
+  };
+
+  /**
+   * "Kupon üret" butonuna basıldığında çağrılır. Filtresiz üretim her
+   * zaman anında çalışır. Filtreli üretimde önce günlük hak kontrol
+   * edilir — hak varsa direkt üretilir, yoksa reklam kartı açılır.
+   * Kota await'i boyunca da kilidi tutar (çift tık → çift recordFeatureUsage önlenir).
+   */
+  const handleGenerate = async () => {
+    if (generatingRef.current) return;
+    softHaptic();
+
+    if (!filterActive) {
+      performGeneration();
+      return;
+    }
+
+    if (!user) {
+      router.push('/login' as any);
+      return;
+    }
+
+    generatingRef.current = true;
+    setGenerating(true);
+    setCheckingQuota(true);
+    try {
+      const status = await getFeatureQuotaStatus('filtered_coupon');
+      if (status.exhausted) {
+        setQuotaCardVisible(true);
+        return;
+      }
+      // Kilit zaten bizde — performGeneration tekrar kilitlemesin diye core çağrılır.
+      performGenerationCore();
+    } finally {
+      setCheckingQuota(false);
+      generatingRef.current = false;
+      setGenerating(false);
+    }
+  };
+
+  /**
+   * Kota kartındaki "Reklam izle" butonuna basıldığında çağrılır.
+   * Reklam tamamlanıp ödül kazanılırsa +3 hak eklenir ve üretim otomatik
+   * tekrar denenir — kullanıcının "reklamı izledim, şimdi tekrar
+   * dokunmam mı gerekiyor?" diye sormasına gerek kalmaz.
+   */
+  const handleWatchAd = async () => {
+    softHaptic();
+    setWatchingAd(true);
+    try {
+      const result = await showRewardedAd('filtered_coupon');
+      if (result.status === 'earned') {
+        await grantFeatureReward('filtered_coupon');
+        setQuotaCardVisible(false);
+        performGeneration();
+      } else if (result.status === 'closed_without_reward') {
+        showAlert('Tamamlanmadı', 'Ödül kazanmak için reklamı sonuna kadar izlemen gerekiyor.');
+      } else {
+        showAlert('Reklam yüklenemedi', 'Şu an reklam gösterilemiyor, birazdan tekrar dener misin?');
+      }
+    } finally {
+      setWatchingAd(false);
+    }
+  };
+
+  const handleUseWithoutFilter = () => {
+    softHaptic();
+    setQuotaCardVisible(false);
+    setEvenCount(null);
+    setBalanced(false);
+    setNoConsecutive(false);
+    setSumMin('');
+    setSumMax('');
+    setIncludeText('');
+    setExcludeText('');
+    performGeneration();
   };
 
   const handleGameSelect = (game: (typeof GAMES)[0]) => {
@@ -512,6 +663,7 @@ export default function GenerateScreen() {
   };
 
   const handleSave = async () => {
+    if (savingCouponRef.current || savingCoupon) return;
     softHaptic();
     if (generatedNumbers.length === 0) {
       showAlert('Uyarı', 'Önce bir kupon üretin.');
@@ -521,6 +673,8 @@ export default function GenerateScreen() {
       router.push('/login' as any);
       return;
     }
+    savingCouponRef.current = true;
+    setSavingCoupon(true);
     const entry = {
       game: selectedGame.name,
       numbers: generatedNumbers,
@@ -545,7 +699,22 @@ export default function GenerateScreen() {
           'Bu kombinasyon daha önce kaydedilmiş. Yine de kaydetmek ister misiniz?',
           [
             { text: 'Vazgeç', style: 'cancel' },
-            { text: 'Yine de kaydet', onPress: persist },
+            {
+              text: 'Yine de kaydet',
+              onPress: async () => {
+                if (savingCouponRef.current) return;
+                savingCouponRef.current = true;
+                setSavingCoupon(true);
+                try {
+                  await persist();
+                } catch {
+                  showAlert('Hata', 'Kupon kaydedilemedi.');
+                } finally {
+                  savingCouponRef.current = false;
+                  setSavingCoupon(false);
+                }
+              },
+            },
           ]
         );
         return;
@@ -553,6 +722,9 @@ export default function GenerateScreen() {
       await persist();
     } catch {
       showAlert('Hata', 'Kupon kaydedilemedi.');
+    } finally {
+      savingCouponRef.current = false;
+      setSavingCoupon(false);
     }
   };
 
@@ -618,13 +790,20 @@ export default function GenerateScreen() {
             <>
               <View style={[s.resultAccent, { backgroundColor: mainColor }]} />
               <Text style={s.resultEyebrow}>SENİN KUPONUN</Text>
-              <View style={s.balls} key={`n-${genId}`}>
+              <View
+                style={[
+                  s.balls,
+                  { gap: ballLayout.gap },
+                  ballLayout.nowrap ? s.ballsNowrap : null,
+                ]}
+                key={`n-${genId}`}
+              >
                 {generatedNumbers.map((num, i) => (
                   <NumberBall
                     key={`${genId}-${i}`}
                     value={num}
                     color={mainColor}
-                    size={46}
+                    size={ballLayout.size}
                     variant="matched"
                     revealIndex={i}
                   />
@@ -640,7 +819,7 @@ export default function GenerateScreen() {
                         key={`b-${genId}-${i}`}
                         value={num}
                         variant="bonus"
-                        size={46}
+                        size={ballLayout.size}
                         revealIndex={generatedNumbers.length + i}
                       />
                     ))}
@@ -656,7 +835,7 @@ export default function GenerateScreen() {
                       key={`ss-${genId}`}
                       value={superStarNumber}
                       variant="star"
-                      size={46}
+                      size={ballLayout.size}
                       revealIndex={generatedNumbers.length + bonusNumbers.length}
                     />
                   </View>
@@ -686,10 +865,23 @@ export default function GenerateScreen() {
         <View style={s.btnRow}>
           <AppButton
             haptic={false}
-            label={generatedNumbers.length > 0 ? 'Yeniden üret' : 'Kupon üret'}
+            label={
+              checkingQuota || generating
+                ? 'Üretiliyor…'
+                : generatedNumbers.length > 0
+                  ? 'Yeniden üret'
+                  : 'Kupon üret'
+            }
             accent={mainColor}
             onPress={handleGenerate}
-            iconLeft={(color, size) => <DiceIcon color={color} size={size} />}
+            disabled={checkingQuota || generating}
+            iconLeft={(color, size) =>
+              checkingQuota || generating ? (
+                <ActivityIndicator color={color} size="small" />
+              ) : (
+                <DiceIcon color={color} size={size} />
+              )
+            }
             fullWidth={false}
             style={{ flex: 1 }}
           />
@@ -711,8 +903,10 @@ export default function GenerateScreen() {
         {generatedNumbers.length > 0 ? (
           <AppButton
             haptic={false}
-            label="Kuponu kaydet"
+            label={savingCoupon ? 'Kaydediliyor…' : 'Kuponu kaydet'}
             onPress={handleSave}
+            disabled={savingCoupon}
+            loading={savingCoupon}
             iconLeft={(color, size) => <BookmarkIcon color={color} size={size} />}
             fullWidth={false}
             style={s.saveBtn}
@@ -926,6 +1120,55 @@ export default function GenerateScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={quotaCardVisible} transparent animationType="fade" onRequestClose={() => setQuotaCardVisible(false)}>
+        <View style={[s.modalOverlay, { backgroundColor: c.overlay }]}>
+          <View style={[s.quotaCard, { backgroundColor: c.surface, marginBottom: insets.bottom + 24 }]}>
+            <View style={[s.quotaIcon, { backgroundColor: `${mainColor}14` }]}>
+              <SlidersIcon color={mainColor} size={26} />
+            </View>
+            <Text style={s.quotaTitle}>Filtreli üretim hakkın bitti</Text>
+            {ADS_REWARDS_ENABLED ? (
+              <>
+                <Text style={s.quotaDesc}>
+                  Bugün için {FEATURE_FREE_DAILY_LIMIT} filtreli kupon hakkını kullandın. Kısa bir reklam izleyip {FEATURE_REWARD_AMOUNT} hak daha kazanabilir, ya da filtresiz üretmeye devam edebilirsin.
+                </Text>
+                <AppButton
+                  haptic={false}
+                  label={watchingAd ? 'Reklam yükleniyor…' : `Reklam izle, +${FEATURE_REWARD_AMOUNT} hak kazan`}
+                  accent={mainColor}
+                  onPress={handleWatchAd}
+                  disabled={watchingAd}
+                  iconLeft={(color, size) =>
+                    watchingAd ? <ActivityIndicator color={color} size="small" /> : <PlayIcon color={color} size={size} />
+                  }
+                  style={{ marginTop: 6 }}
+                />
+              </>
+            ) : (
+              <Text style={s.quotaDesc}>
+                Bugün için {FEATURE_FREE_DAILY_LIMIT} filtreli kupon hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek. İstersen filtresiz üretmeye devam edebilirsin.
+              </Text>
+            )}
+
+            <AppButton
+              haptic={false}
+              label="Filtresiz üret"
+              variant="secondary"
+              onPress={handleUseWithoutFilter}
+              iconLeft={(color, size) => <DiceIcon color={color} size={size} />}
+              style={{ marginTop: 10 }}
+            />
+            <Pressable
+              onPress={() => { softHaptic(); setQuotaCardVisible(false); }}
+              style={{ marginTop: 14, alignItems: 'center' }}
+              hitSlop={8}
+            >
+              <Text style={[s.quotaCancel, { color: c.text3 }]}>Vazgeç</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -984,6 +1227,7 @@ function makeStyles(theme: AppTheme) {
     emptyIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
     emptyText: { ...ty.bodyMedium, color: c.text3, textAlign: 'center', maxWidth: 220 },
     balls: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
+    ballsNowrap: { flexWrap: 'nowrap' },
     bonusBlock: { alignItems: 'center', marginTop: spacing.lg },
     bonusLabel: { ...ty.micro, color: c.text3, marginBottom: 10 },
     resultFooter: { alignItems: 'center', marginTop: spacing.lg, paddingTop: spacing.lg },
@@ -1055,5 +1299,16 @@ function makeStyles(theme: AppTheme) {
     historyEntryTime: { ...ty.caption, color: c.text3 },
     historyEntryBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, alignItems: 'center' },
     modalActions: { marginTop: spacing.md, gap: spacing.sm },
+
+    quotaCard: {
+      marginHorizontal: 24,
+      borderRadius: 28,
+      padding: 24,
+      alignItems: 'center',
+    },
+    quotaIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+    quotaTitle: { ...ty.h2, color: c.text, textAlign: 'center' },
+    quotaDesc: { ...ty.bodyMedium, color: c.text2, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+    quotaCancel: { ...ty.label },
   });
 }

@@ -7,12 +7,13 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "development",
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug"
       },
       "ios": {
-        "simulator": true
+        "simulator": false
       },
       "env": {
         "APP_ENV": "development"
@@ -29,6 +30,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "environment": "production",
       "android": {
         "buildType": "app-bundle"
       },
@@ -36,8 +38,7 @@
       },
       "env": {
         "APP_ENV": "production"
-      },
-      "prebuildCommand": "cp $GOOGLE_SERVICES_JSON_FILE android/app/google-services.json"
+      }
     }
   }
 }

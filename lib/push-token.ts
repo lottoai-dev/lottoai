@@ -6,7 +6,18 @@ import { supabase } from './supabase';
 
 export const EXPO_PROJECT_ID = '1686d4a1-7dbf-4293-a0b3-a71afc9e4a61';
 
-export async function registerPushToken(): Promise<string | null> {
+type RegisterOptions = {
+  /** Verilirse upsert sırasında notify_results de yazılır. */
+  notifyResults?: boolean;
+};
+
+/**
+ * Expo push token'ını alır ve giriş yapmış kullanıcı için push_tokens'a yazar.
+ * Conflict anahtarı (user_id, platform): token değeri değişse bile aynı satır
+ * güncellenir — aksi halde her FCM/Expo token yenilemesinde yeni satır birikir
+ * ve aynı kullanıcıya tekrarlayan bildirimler gider.
+ */
+export async function registerPushToken(options?: RegisterOptions): Promise<string | null> {
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
@@ -24,12 +35,29 @@ export async function registerPushToken(): Promise<string | null> {
 
     const token = tokenData.data;
 
+    const { data: { user } } = await supabase.auth.getUser();
+    // user_id + platform unique için kimlik şart; giriş yoksa sunucuya yazma.
+    if (!user) return token;
+
+    const row: {
+      user_id: string;
+      token: string;
+      platform: string;
+      updated_at: string;
+      notify_results?: boolean;
+    } = {
+      user_id: user.id,
+      token,
+      platform: Platform.OS,
+      updated_at: new Date().toISOString(),
+    };
+    if (options?.notifyResults !== undefined) {
+      row.notify_results = options.notifyResults;
+    }
+
     const { error } = await supabase
       .from('push_tokens')
-      .upsert(
-        { token, platform: Platform.OS, updated_at: new Date().toISOString() },
-        { onConflict: 'token' }
-      );
+      .upsert(row, { onConflict: 'user_id,platform' });
 
     if (error) logError('registerPushToken', error);
 
@@ -41,22 +69,7 @@ export async function registerPushToken(): Promise<string | null> {
 }
 
 export async function syncNotifyResults(notifyResults: boolean): Promise<void> {
-  const token = await registerPushToken();
-  if (!token) return;
-
-  const { error } = await supabase
-    .from('push_tokens')
-    .upsert(
-      {
-        token,
-        platform: Platform.OS,
-        notify_results: notifyResults,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'token' }
-    );
-
-  if (error) logError('syncNotifyResults', error);
+  await registerPushToken({ notifyResults });
 }
 
 /** Eski sabit-saatli "sonuç açıklandı" yerel bildirimlerini iptal eder. */

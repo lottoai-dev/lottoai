@@ -418,3 +418,8 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/delete-account/deno.json"
 entrypoint = "./functions/delete-account/index.ts"
+
+[functions.ai-chat]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/ai-chat/index.ts"

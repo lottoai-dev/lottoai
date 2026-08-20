@@ -6,6 +6,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    ActivityIndicator,
     Modal,
     Platform,
     Pressable,
@@ -26,6 +27,7 @@ import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { showRewardedAd } from '../../lib/adMob';
 import CouponHistory from '../../lib/CouponHistory';
 import {
     formatMatchCategory,
@@ -36,9 +38,19 @@ import {
     type DrawSnapshot,
 } from '../../lib/couponMatch';
 import { consumeCouponsDirty } from '../../lib/couponsStore';
+import { formatQuotaResetIn, msUntilQuotaReset } from '../../lib/aiQuota';
+import {
+    ADS_REWARDS_ENABLED,
+    FEATURE_FREE_DAILY_LIMIT,
+    FEATURE_REWARD_AMOUNT,
+    getFeatureQuotaStatus,
+    grantFeatureReward,
+    recordFeatureUsage,
+    todayInTurkey,
+} from '../../lib/featureQuota';
 import { GameEmblem } from '../../lib/emblems';
 import { getGameAccentColor, getGameByName } from '../../lib/games';
-import { CloseIcon, ShareIcon, StatsIcon, TicketIcon, TrashIcon, TrophyIcon } from '../../lib/icons';
+import { CloseIcon, PlayIcon, ShareIcon, StatsIcon, TicketIcon, TrashIcon, TrophyIcon } from '../../lib/icons';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
 
@@ -47,6 +59,36 @@ function softHaptic() {
     Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Keyboard_Tap);
   } else {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+  }
+}
+
+type ViewedHistoryToday = { date: string; couponIds: number[] };
+
+function viewedHistoryStorageKey(userId: string) {
+  return `${STORAGE_KEYS.VIEWED_HISTORY_TODAY}:${userId}`;
+}
+
+async function getViewedHistoryToday(userId: string): Promise<number[]> {
+  try {
+    const raw = await AsyncStorage.getItem(viewedHistoryStorageKey(userId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as ViewedHistoryToday;
+    if (parsed?.date !== todayInTurkey() || !Array.isArray(parsed.couponIds)) return [];
+    return parsed.couponIds.filter((id) => typeof id === 'number');
+  } catch {
+    return [];
+  }
+}
+
+async function markHistoryViewedToday(userId: string, couponId: number): Promise<void> {
+  try {
+    const day = todayInTurkey();
+    const existing = await getViewedHistoryToday(userId);
+    if (existing.includes(couponId)) return;
+    const payload: ViewedHistoryToday = { date: day, couponIds: [...existing, couponId] };
+    await AsyncStorage.setItem(viewedHistoryStorageKey(userId), JSON.stringify(payload));
+  } catch {
+    // Yerel cache başarısız olsa bile kota/UX bozulmasın
   }
 }
 
@@ -94,9 +136,16 @@ function getScoreLabel(
     Coupon,
     'game' | 'matchedCount' | 'matchedNumbers' | 'matchedJoker' | 'matchedSuperStar' | 'matchedBonus' | 'superStar'
   >,
+  colors: AppTheme['colors'],
 ) {
   const display = getMatchDisplay(toMatchDisplayInput(coupon));
-  return { label: display.label, sub: display.sub };
+  const color =
+    display.tier === 'jackpot'
+      ? colors.gold
+      : display.tier === 'winner'
+        ? colors.brand
+        : colors.text3;
+  return { label: display.label, sub: display.sub, color };
 }
 
 function isPendingCoupon(cp: Coupon) {
@@ -121,6 +170,13 @@ export default function SavedScreen() {
   const [historyModalCoupon, setHistoryModalCoupon] = useState<Coupon | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [isLoading, setIsLoading] = useState(true);
+  // "Geçmiş" (rapor) görüntüleme günlük ücretsiz hakkı doldurduğunda bu
+  // kart açılır. pendingHistoryId, reklam izlenip ödül kazanıldığında
+  // hangi kuponun geçmişinin otomatik açılacağını tutar.
+  const [reportQuotaVisible, setReportQuotaVisible] = useState(false);
+  const [pendingHistoryId, setPendingHistoryId] = useState<number | null>(null);
+  const [watchingAd, setWatchingAd] = useState(false);
+  const [checkingQuota, setCheckingQuota] = useState<number | null>(null);
 
   const couponsRef = useRef(coupons);
   couponsRef.current = coupons;
@@ -488,11 +544,82 @@ export default function SavedScreen() {
     setCheckModal(true);
   }, []);
 
-  const openHistory = useCallback((id: number) => {
+  /**
+   * "Geçmiş" butonuna basıldığında çağrılır. Önce günlük ücretsiz hak
+   * kontrol edilir — hak varsa geçmiş direkt açılır, yoksa reklam kartı
+   * gösterilir. pendingHistoryId, reklam izlenip ödül kazanılınca hangi
+   * kuponun geçmişinin açılacağını hatırlamak için tutulur.
+   */
+  const openHistory = useCallback(async (id: number) => {
     const coupon = couponsRef.current.find((cp) => cp.id === id);
     if (!coupon) return;
     softHaptic();
+
+    if (!user) {
+      router.push('/login' as any);
+      return;
+    }
+
+    // Aynı kupon aynı gün içinde daha önce açıldıysa kotadan düşme.
+    const viewedIds = await getViewedHistoryToday(user.id);
+    if (viewedIds.includes(id)) {
+      setHistoryModalCoupon(coupon);
+      return;
+    }
+
+    setCheckingQuota(id);
+    const status = await getFeatureQuotaStatus('report');
+    setCheckingQuota(null);
+
+    if (status.exhausted) {
+      setPendingHistoryId(id);
+      setReportQuotaVisible(true);
+      return;
+    }
+
+    void recordFeatureUsage('report');
+    void markHistoryViewedToday(user.id, id);
     setHistoryModalCoupon(coupon);
+  }, [router, user]);
+
+  /**
+   * Rapor kotası kartındaki "Reklam izle" butonuna basıldığında çağrılır.
+   * Ödül kazanılırsa +3 hak eklenir ve bekleyen kuponun geçmişi otomatik
+   * açılır — kullanıcının reklamdan sonra tekrar butona basmasına gerek
+   * kalmaz.
+   */
+  const handleWatchAd = useCallback(async () => {
+    softHaptic();
+    setWatchingAd(true);
+    try {
+      const result = await showRewardedAd('report');
+      if (result.status === 'earned') {
+        await grantFeatureReward('report');
+        setReportQuotaVisible(false);
+        const couponId = pendingHistoryId;
+        const coupon = couponId != null ? couponsRef.current.find((cp) => cp.id === couponId) : null;
+        setPendingHistoryId(null);
+        if (coupon && user) {
+          void recordFeatureUsage('report');
+          void markHistoryViewedToday(user.id, coupon.id);
+          setHistoryModalCoupon(coupon);
+        } else if (coupon) {
+          setHistoryModalCoupon(coupon);
+        }
+      } else if (result.status === 'closed_without_reward') {
+        showAlert('Tamamlanmadı', 'Ödül kazanmak için reklamı sonuna kadar izlemen gerekiyor.');
+      } else {
+        showAlert('Reklam yüklenemedi', 'Şu an reklam gösterilemiyor, birazdan tekrar dener misin?');
+      }
+    } finally {
+      setWatchingAd(false);
+    }
+  }, [pendingHistoryId, showAlert, user]);
+
+  const handleCancelReportQuota = useCallback(() => {
+    softHaptic();
+    setReportQuotaVisible(false);
+    setPendingHistoryId(null);
   }, []);
 
   const goGenerate = useCallback(() => {
@@ -576,6 +703,7 @@ export default function SavedScreen() {
                     onDelete={handleDelete}
                     onOpenResult={openCheckResult}
                     onOpenHistory={openHistory}
+                    historyLoading={checkingQuota === coupon.id}
                   />
                 </View>
               );
@@ -616,6 +744,51 @@ export default function SavedScreen() {
           onClose={() => setHistoryModalCoupon(null)}
         />
       )}
+
+      <Modal visible={reportQuotaVisible} transparent animationType="fade" onRequestClose={handleCancelReportQuota}>
+        <View style={[s.overlay, { backgroundColor: c.overlay }]}>
+          <View style={[s.quotaCard, { backgroundColor: c.surface, marginBottom: insets.bottom + 24 }]}>
+            <View style={[s.quotaIcon, { backgroundColor: c.brandSoft }]}>
+              <StatsIcon color={c.brand} size={26} />
+            </View>
+            <Text style={s.quotaTitle}>Geçmiş görüntüleme hakkın bitti</Text>
+            {ADS_REWARDS_ENABLED ? (
+              <>
+                <Text style={s.quotaDesc}>
+                  Bugün için {FEATURE_FREE_DAILY_LIMIT} kupon geçmişi görüntüleme hakkını kullandın. Kısa bir reklam izleyip {FEATURE_REWARD_AMOUNT} hak daha kazanabilirsin.
+                </Text>
+                <AppButton
+                  haptic={false}
+                  label={watchingAd ? 'Reklam yükleniyor…' : `Reklam izle, +${FEATURE_REWARD_AMOUNT} hak kazan`}
+                  accent={c.brand}
+                  onPress={handleWatchAd}
+                  disabled={watchingAd}
+                  iconLeft={(color, size) =>
+                    watchingAd ? <ActivityIndicator color={color} size="small" /> : <PlayIcon color={color} size={size} />
+                  }
+                  style={{ marginTop: 6 }}
+                />
+                <Pressable onPress={handleCancelReportQuota} style={{ marginTop: 16, alignItems: 'center' }} hitSlop={8}>
+                  <Text style={[s.quotaCancel, { color: c.text3 }]}>Vazgeç</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={s.quotaDesc}>
+                  Bugün için {FEATURE_FREE_DAILY_LIMIT} kupon geçmişi görüntüleme hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek.
+                </Text>
+                <AppButton
+                  haptic={false}
+                  label="Tamam"
+                  variant="secondary"
+                  onPress={handleCancelReportQuota}
+                  style={{ marginTop: 10 }}
+                />
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -654,7 +827,7 @@ function CheckResultBody({
 }) {
   const id = getGameByName(checkingCoupon.game)?.id ?? 'cilgin';
   const mainColor = getGameAccentColor(id);
-  const score = getScoreLabel(checkingCoupon);
+  const score = getScoreLabel(checkingCoupon, c);
   const matchedMainSet = useMemo(() => new Set(checkResult.matchedNumbers), [checkResult.matchedNumbers]);
 
   return (
@@ -671,10 +844,10 @@ function CheckResultBody({
         </Pressable>
       </View>
 
-      <View style={[s.scoreBox, { backgroundColor: c.surfaceAlt }]}>
-        <TrophyIcon color={c.text2} size={22} />
+      <View style={[s.scoreBox, { backgroundColor: score.color + '14', borderColor: score.color + '33' }]}>
+        <TrophyIcon color={score.color} size={22} />
         <View style={{ flex: 1 }}>
-          <Text style={s.scoreLabel}>{score.label}</Text>
+          <Text style={[s.scoreLabel, { color: score.color }]}>{score.label}</Text>
           <Text style={s.scoreSub}>{score.sub}</Text>
         </View>
       </View>
@@ -723,6 +896,7 @@ const CouponTicket = React.memo(function CouponTicket({
   onDelete,
   onOpenResult,
   onOpenHistory,
+  historyLoading,
 }: {
   coupon: Coupon;
   number: number;
@@ -732,12 +906,13 @@ const CouponTicket = React.memo(function CouponTicket({
   onDelete: (id: number) => void;
   onOpenResult: (id: number) => void;
   onOpenHistory: (id: number) => void;
+  historyLoading?: boolean;
 }) {
   const c = theme.colors;
   const id = getGameByName(coupon.game)?.id ?? 'cilgin';
   const mainColor = getGameAccentColor(id);
   const isChecked = !isPendingCoupon(coupon);
-  const score = isChecked ? getScoreLabel(coupon) : null;
+  const score = isChecked ? getScoreLabel(coupon, c) : null;
 
   const matchedMainSet = useMemo(
     () => (isChecked && coupon.matchedNumbers ? new Set(coupon.matchedNumbers) : null),
@@ -763,8 +938,11 @@ const CouponTicket = React.memo(function CouponTicket({
             </Text>
           </View>
           {isChecked ? (
-            <Pressable onPress={() => onOpenResult(coupon.id)} style={[s.scorePill, { backgroundColor: c.surfaceAlt }]}>
-              <Text style={s.scorePillText} numberOfLines={1}>
+            <Pressable
+              onPress={() => onOpenResult(coupon.id)}
+              style={[s.scorePill, { backgroundColor: score!.color + '1A' }]}
+            >
+              <Text style={[s.scorePillText, { color: score!.color }]} numberOfLines={1}>
                 {score!.label}
               </Text>
             </Pressable>
@@ -815,8 +993,17 @@ const CouponTicket = React.memo(function CouponTicket({
         ) : null}
 
         <View style={s.ticketActions}>
-          <PressableScale haptic={false} onPress={() => onOpenHistory(coupon.id)} style={[s.historyBtn, { flex: 1 }]}>
-            <StatsIcon color={mainColor} size={16} />
+          <PressableScale
+            haptic={false}
+            onPress={() => onOpenHistory(coupon.id)}
+            disabled={historyLoading}
+            style={[s.historyBtn, { flex: 1, opacity: historyLoading ? 0.6 : 1 }]}
+          >
+            {historyLoading ? (
+              <ActivityIndicator color={mainColor} size="small" />
+            ) : (
+              <StatsIcon color={mainColor} size={16} />
+            )}
             <Text style={[s.historyBtnText, { color: mainColor }]}>Geçmiş</Text>
           </PressableScale>
           <PressableScale haptic={false} onPress={() => onShare(coupon.id)} style={[s.historyBtn, { flex: 1 }]}>
@@ -900,7 +1087,7 @@ function makeStyles(theme: AppTheme) {
     ticketGame: { ...ty.h3 },
     ticketDate: { ...ty.caption, color: c.text3, marginTop: 2 },
     scorePill: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: radius.pill, flexShrink: 0 },
-    scorePillText: { ...ty.caption, fontFamily: theme.font.bold, color: c.text },
+    scorePillText: { ...ty.caption, fontFamily: theme.font.bold },
     pendingPill: {
       paddingHorizontal: 11,
       paddingVertical: 6,
@@ -945,11 +1132,23 @@ function makeStyles(theme: AppTheme) {
       gap: 12,
       padding: 16,
       borderRadius: radius.lg,
+      borderWidth: 1,
       marginBottom: 14,
     },
-    scoreLabel: { ...ty.h3, color: c.text },
+    scoreLabel: { ...ty.h3 },
     scoreSub: { ...ty.caption, color: c.text2, marginTop: 2 },
     modalLabel: { ...ty.caption, color: c.text2, fontFamily: theme.font.semibold, marginBottom: 9 },
     modalBalls: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 16 },
+
+    quotaCard: {
+      marginHorizontal: 24,
+      borderRadius: 28,
+      padding: 24,
+      alignItems: 'center',
+    },
+    quotaIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+    quotaTitle: { ...ty.h2, color: c.text, textAlign: 'center' },
+    quotaDesc: { ...ty.bodyMedium, color: c.text2, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+    quotaCancel: { ...ty.label },
   });
 }

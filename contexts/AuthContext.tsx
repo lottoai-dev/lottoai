@@ -2,6 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useState } from 'react';
+import { registerPushToken } from '../lib/push-token';
 import { supabase } from '../lib/supabase';
 
 type AuthContextType = {
@@ -29,6 +30,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
+      // _layout mount'ta registerPushToken oturumdan önce koşabilir; girişliyse burada yaz.
+      if (session?.user) void registerPushToken();
     });
 
     // Oturum değişikliklerini dinle (giriş/çıkış)
@@ -36,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
+      if (session?.user) void registerPushToken();
     });
 
     return () => subscription.unsubscribe();

@@ -20,7 +20,7 @@ import { AppButton } from '../../components/ui/app-button';
 import { NumberBall } from '../../components/ui/number-ball';
 import { PressableScale, Surface } from '../../components/ui/surface';
 import { STORAGE_KEYS } from '../../constants/storage-keys';
-import { AppTheme } from '../../constants/theme';
+import { AppTheme, spacing } from '../../constants/theme';
 import { useBildirim } from '../../contexts/BildirimContext';
 import { BrandMark, GameEmblem } from '../../lib/emblems';
 import {
@@ -46,7 +46,9 @@ import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = width - 64;
+/** Match hero width: screen minus horizontal xl margins on both sides. */
+const CARD_WIDTH = width - spacing.xl * 2;
+const DRAW_CARD_GAP = 14;
 const ON_NUMARA_PREVIEW_COUNT = 7;
 const LAST_SEEN_PREFIX = 'lastSeenResult_';
 /** Skip full network reload when returning to Home within this window. */
@@ -542,8 +544,8 @@ export default function HomeScreen() {
               horizontal
               showsHorizontalScrollIndicator={false}
               decelerationRate="fast"
-              snapToInterval={CARD_WIDTH + 14}
-              contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}
+              snapToInterval={CARD_WIDTH + DRAW_CARD_GAP}
+              contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: DRAW_CARD_GAP }}
             >
               {lastDraws.map((draw, index) => {
                 const meta = gameMeta(draw.game);

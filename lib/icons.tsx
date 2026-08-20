@@ -298,6 +298,14 @@ export function DiceIcon({ color, size = 24, strokeWidth = 1.8 }: IconProps) {
   );
 }
 
+export function PlayIcon({ color, size = 24 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M7 4.5l12 7.5-12 7.5v-15z" fill={color} strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function SlidersIcon({ color, size = 24, strokeWidth = 1.8 }: IconProps) {
   return (
     <Svg {...base(size)}>

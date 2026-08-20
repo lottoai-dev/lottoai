@@ -68,6 +68,7 @@ export const t = (key: string, params?: Record<string, string | number>): string
     clearAllData: 'Tüm verileri sil',
     onboardingNext: 'İleri',
     onboardingStart: 'Kabul ediyorum, başla',
+    onboardingConsentHint: 'Önce onay kutusunu işaretle',
     onboardingSkip: 'Geç',
     onboarding_welcome_title: "LottoAI'a hoş geldin",
     onboarding_welcome_desc: "Türkiye'nin kapsamlı loto asistanı. Şansını akıllıca kullan.",

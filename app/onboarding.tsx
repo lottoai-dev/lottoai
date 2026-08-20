@@ -3,8 +3,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useMemo, useRef, useState } from 'react';
-import { Dimensions, FlatList, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  FlatList,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '../components/ui/app-button';
@@ -20,7 +30,6 @@ import {
 } from '../lib/notificationSettings';
 import { useTheme } from '../lib/theme';
 
-const { width } = Dimensions.get('window');
 const TERMS_URL = 'https://getlottoai.app/legal#terms';
 const PRIVACY_URL = 'https://getlottoai.app/legal';
 
@@ -68,17 +77,26 @@ export default function OnboardingScreen() {
   const theme = useTheme();
   const c = theme.colors;
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const s = useMemo(() => makeStyles(theme), [theme]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [consentChecked, setConsentChecked] = useState(false);
+  const [consentHighlight, setConsentHighlight] = useState(false);
   const [notifOptIn, setNotifOptIn] = useState<boolean | null>(null);
   const listRef = useRef<FlatList>(null);
+  const warningScrollRef = useRef<ScrollView>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    };
+  }, []);
 
   const slide = SLIDES[currentIndex];
   const isLast = currentIndex === SLIDES.length - 1;
   const isNotification = !!slide.isNotification;
-  const canFinish = !isLast || consentChecked;
 
   const goToSlide = (index: number) => {
     softHaptic();
@@ -91,8 +109,19 @@ export default function OnboardingScreen() {
     goToSlide(WARNING_INDEX);
   };
 
+  const promptConsent = () => {
+    softHaptic();
+    warningScrollRef.current?.scrollToEnd({ animated: true });
+    setConsentHighlight(true);
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => setConsentHighlight(false), 1600);
+  };
+
   const finishOnboarding = async () => {
-    if (!consentChecked) return;
+    if (!consentChecked) {
+      promptConsent();
+      return;
+    }
     softHaptic();
 
     const resultNotifications = notifOptIn ?? true;
@@ -118,6 +147,83 @@ export default function OnboardingScreen() {
     }
   };
 
+  const renderSlideBody = (item: Slide) => (
+    <>
+      <View style={[s.iconWrap, { backgroundColor: item.isWarning ? c.goldSoft : c.brandSoft }]}>
+        {item.Icon === 'brand' ? (
+          <BrandMark size={76} />
+        ) : (
+          <SlideIcon
+            icon={item.Icon}
+            isWarning={item.isWarning}
+            brandColor={c.brand}
+            warningColor={c.gold}
+          />
+        )}
+      </View>
+      <Text style={s.title}>{t(item.titleKey)}</Text>
+      <Text style={s.desc}>{t(item.descKey)}</Text>
+      {item.isWarning ? (
+        <View
+          style={[
+            s.warningBox,
+            {
+              backgroundColor: c.surfaceAlt,
+              borderWidth: consentHighlight ? 1.5 : 0,
+              borderColor: consentHighlight ? c.brand : 'transparent',
+            },
+          ]}
+        >
+          <Text style={s.warningText}>{t('onboarding_warning_text_1')}</Text>
+          <Text style={s.warningText}>{t('onboarding_warning_text_2')}</Text>
+          <Text
+            style={[s.warningText, { color: c.brand, fontFamily: theme.font.bold }]}
+            onPress={() => { softHaptic(); Linking.openURL('tel:115'); }}
+          >
+            {t('onboarding_warning_text_3')}
+          </Text>
+          <Pressable
+            style={[
+              s.consentRow,
+              {
+                borderTopColor: c.border,
+                backgroundColor: consentHighlight ? c.brandSoft : 'transparent',
+                marginHorizontal: -8,
+                paddingHorizontal: 8,
+                borderRadius: 10,
+              },
+            ]}
+            onPress={() => { softHaptic(); setConsentChecked((v) => !v); setConsentHighlight(false); }}
+            hitSlop={6}
+          >
+            <View
+              style={[
+                s.checkbox,
+                {
+                  borderColor: consentChecked || consentHighlight ? c.brand : c.text3,
+                  backgroundColor: consentChecked ? c.brand : 'transparent',
+                },
+              ]}
+            >
+              {consentChecked ? <CheckIcon color={c.brandText} size={13} /> : null}
+            </View>
+            <Text style={s.consentText}>
+              18 yaşından büyüğüm ve{' '}
+              <Text style={s.consentLink} onPress={() => Linking.openURL(TERMS_URL)}>
+                Kullanım Koşulları
+              </Text>
+              {"'"}nı ile{' '}
+              <Text style={s.consentLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
+                Gizlilik Politikası
+              </Text>
+              {"'"}nı okudum, kabul ediyorum.
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </>
+  );
+
   return (
     <View style={[s.container, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 20 }]}>
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
@@ -134,74 +240,33 @@ export default function OnboardingScreen() {
 
       <FlatList
         ref={listRef}
-        style={{ flex: 1 }}
+        style={s.pager}
         data={SLIDES}
+        extraData={{ consentChecked, consentHighlight, width }}
         keyExtractor={(_, i) => String(i)}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
+        getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
         onMomentumScrollEnd={(e) => {
           const i = Math.round(e.nativeEvent.contentOffset.x / width);
           if (i < SLIDES.length) setCurrentIndex(i);
         }}
-        renderItem={({ item }) => (
-          <View style={[s.slide, { width }]}>
-            <View style={[s.iconWrap, { backgroundColor: item.isWarning ? c.goldSoft : c.brandSoft }]}>
-              {item.Icon === 'brand' ? (
-                <BrandMark size={76} />
-              ) : (
-                <SlideIcon
-                  icon={item.Icon}
-                  isWarning={item.isWarning}
-                  brandColor={c.brand}
-                  warningColor={c.gold}
-                />
-              )}
-            </View>
-            <Text style={s.title}>{t(item.titleKey)}</Text>
-            <Text style={s.desc}>{t(item.descKey)}</Text>
-            {item.isWarning ? (
-              <View style={[s.warningBox, { backgroundColor: c.surfaceAlt }]}>
-                <Text style={s.warningText}>{t('onboarding_warning_text_1')}</Text>
-                <Text style={s.warningText}>{t('onboarding_warning_text_2')}</Text>
-                <Text
-                  style={[s.warningText, { color: c.brand, fontFamily: theme.font.bold }]}
-                  onPress={() => { softHaptic(); Linking.openURL('tel:115'); }}
-                >
-                  {t('onboarding_warning_text_3')}
-                </Text>
-                <Pressable
-                  style={[s.consentRow, { borderTopColor: c.border }]}
-                  onPress={() => { softHaptic(); setConsentChecked((v) => !v); }}
-                  hitSlop={6}
-                >
-                  <View
-                    style={[
-                      s.checkbox,
-                      {
-                        borderColor: consentChecked ? c.brand : c.text3,
-                        backgroundColor: consentChecked ? c.brand : 'transparent',
-                      },
-                    ]}
-                  >
-                    {consentChecked ? <CheckIcon color={c.brandText} size={13} /> : null}
-                  </View>
-                  <Text style={s.consentText}>
-                    18 yaşından büyüğüm ve{' '}
-                    <Text style={s.consentLink} onPress={() => Linking.openURL(TERMS_URL)}>
-                      Kullanım Koşulları
-                    </Text>
-                    {"'"}nı ile{' '}
-                    <Text style={s.consentLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
-                      Gizlilik Politikası
-                    </Text>
-                    {"'"}nı okudum, kabul ediyorum.
-                  </Text>
-                </Pressable>
-              </View>
-            ) : null}
-          </View>
-        )}
+        renderItem={({ item }) =>
+          item.isWarning ? (
+            <ScrollView
+              ref={warningScrollRef}
+              style={{ width }}
+              contentContainerStyle={s.slideScroll}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {renderSlideBody(item)}
+            </ScrollView>
+          ) : (
+            <View style={[s.slide, { width }]}>{renderSlideBody(item)}</View>
+          )
+        }
       />
 
       <View style={s.dots}>
@@ -222,11 +287,13 @@ export default function OnboardingScreen() {
 
       {!isNotification ? (
         <View style={s.footerActions}>
+          {isLast && !consentChecked ? (
+            <Text style={s.consentHint}>{t('onboardingConsentHint')}</Text>
+          ) : null}
           <AppButton
             haptic={false}
             label={isLast ? t('onboardingStart') : t('onboardingNext')}
             onPress={handleNext}
-            disabled={!canFinish}
           />
         </View>
       ) : null}
@@ -257,6 +324,7 @@ function makeStyles(theme: AppTheme) {
     container: { flex: 1, backgroundColor: c.bg },
     topBar: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 24, height: 32 },
     skip: { ...ty.label, color: c.text2 },
+    pager: { flex: 1, overflow: 'hidden' },
     slide: {
       alignItems: 'center',
       justifyContent: 'flex-start',
@@ -264,6 +332,14 @@ function makeStyles(theme: AppTheme) {
       paddingTop: 40,
       gap: 18,
       height: '100%',
+    },
+    slideScroll: {
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      paddingHorizontal: 32,
+      paddingTop: 40,
+      paddingBottom: 24,
+      gap: 18,
     },
     iconWrap: { width: 132, height: 132, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
     title: { ...ty.h1, color: c.text, textAlign: 'center' },
@@ -288,10 +364,24 @@ function makeStyles(theme: AppTheme) {
     },
     consentText: { ...ty.caption, color: c.text2, flex: 1, lineHeight: 18, textAlign: 'left' },
     consentLink: { color: c.brand, fontFamily: theme.font.semibold, textDecorationLine: 'underline' },
-    dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 24 },
+    dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 24, zIndex: 2 },
     dot: { height: 8, borderRadius: 4 },
+    consentHint: { ...ty.caption, color: c.gold, textAlign: 'center', marginBottom: 8 },
     // Keep primary CTA at the same Y across slides (notif has 2 buttons: 52 + 8 + 52).
-    footerActions: { marginHorizontal: 24, minHeight: 112, justifyContent: 'flex-end' },
-    notifActions: { gap: 8, marginHorizontal: 24, minHeight: 112, justifyContent: 'flex-end' },
+    footerActions: {
+      marginHorizontal: 24,
+      minHeight: 112,
+      justifyContent: 'flex-end',
+      zIndex: 2,
+      elevation: 2,
+    },
+    notifActions: {
+      gap: 8,
+      marginHorizontal: 24,
+      minHeight: 112,
+      justifyContent: 'flex-end',
+      zIndex: 2,
+      elevation: 2,
+    },
   });
 }

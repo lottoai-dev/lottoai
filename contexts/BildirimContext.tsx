@@ -14,9 +14,18 @@ export type Bildirim = {
 };
 
 export type AddBildirimInput = Omit<Bildirim, 'id' | 'createdAt' | 'isRead'> & {
+  /** DB notifications.id veya başka kararlı anahtar; verilmezse rastgele üretilir. */
+  id?: string;
   /** Gerçek gönderim zamanı; verilmezse ekleme anı kullanılır. */
   createdAt?: string;
 };
+
+/** Push date ile DB created_at milisaniye farkını yumuşatmak için saniye hassasiyeti. */
+function createdAtKey(iso: string): string {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return iso;
+  return new Date(Math.floor(ms / 1000) * 1000).toISOString();
+}
 
 type BildirimContextType = {
   bildirimler: Bildirim[];
@@ -54,15 +63,29 @@ export function BildirimProvider({ children }: { children: React.ReactNode }) {
         ? parsed.toISOString()
         : new Date().toISOString();
 
+    const id =
+      b.id && b.id.length > 0
+        ? b.id
+        : Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
     const yeni: Bildirim = {
       title: b.title,
       body: b.body,
       screen: b.screen,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id,
       createdAt,
       isRead: false,
     };
+
     setBildirimler((prev) => {
+      const contentKey = `${yeni.title}\0${yeni.body}\0${createdAtKey(yeni.createdAt)}`;
+      const isDup = prev.some(
+        (existing) =>
+          existing.id === yeni.id ||
+          `${existing.title}\0${existing.body}\0${createdAtKey(existing.createdAt)}` === contentKey
+      );
+      if (isDup) return prev;
+
       const updated = [yeni, ...prev];
       persist(updated);
       return updated;

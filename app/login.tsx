@@ -2,7 +2,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { GoogleSignin, isErrorWithCode, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { useRouter } from 'expo-router';
+import * as ExpoLinking from 'expo-linking';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,11 +25,17 @@ import { useTheme } from '../lib/theme';
 
 type Mode = 'login' | 'register' | 'forgot';
 
+const GOOGLE_WEB_CLIENT_ID =
+  '775120851198-fkplgqbpkljuf173g63d5ivpr6mt2c5o.apps.googleusercontent.com';
+const GOOGLE_IOS_CLIENT_ID =
+  '775120851198-e7vqla2tctm62lkccaiqtcir6sbm4ter.apps.googleusercontent.com';
+
 const TERMS_URL = 'https://getlottoai.app/legal#terms';
 const PRIVACY_URL = 'https://getlottoai.app/legal';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ message?: string }>();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const c = theme.colors;
@@ -46,7 +53,8 @@ export default function LoginScreen() {
 
   useEffect(() => {
     GoogleSignin.configure({
-      webClientId: '775120851198-fkplgqbpkljuf173g63d5ivpr6mt2c5o.apps.googleusercontent.com',
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+      iosClientId: GOOGLE_IOS_CLIENT_ID,
       scopes: ['email', 'profile'],
     });
   }, []);
@@ -61,6 +69,11 @@ export default function LoginScreen() {
     }
   }, []);
 
+  useEffect(() => {
+    const msg = typeof params.message === 'string' ? params.message : null;
+    if (msg) setSuccessMessage(msg);
+  }, [params.message]);
+
   const resetState = () => {
     setError(null);
     setSuccessMessage(null);
@@ -74,24 +87,34 @@ export default function LoginScreen() {
       const userInfo = await GoogleSignin.signIn();
       const idToken = userInfo.data?.idToken;
 
+      console.log('[GoogleSignIn] type:', userInfo.type);
+      console.log('[GoogleSignIn] has idToken:', Boolean(idToken));
+      console.log('[GoogleSignIn] user:', userInfo.data?.user?.email ?? null);
+
       if (!idToken) {
+        console.warn('[GoogleSignIn] idToken missing:', JSON.stringify(userInfo));
         setError('Google girişi başarısız. Tekrar dene.');
         return;
       }
 
-      const { error } = await supabase.auth.signInWithIdToken({
+      // iOS native SDK id_token'a nonce koyar; custom nonce veremediğimiz için
+      // Supabase Dashboard → Google → "Skip nonce checks" açık olmalı.
+      const { data, error } = await supabase.auth.signInWithIdToken({
         provider: 'google',
         token: idToken,
       });
 
       if (error) {
+        console.error('[GoogleSignIn] Supabase error:', error.message, error);
         setError('Google ile giriş yapılamadı. Tekrar dene.');
         return;
       }
 
+      console.log('[GoogleSignIn] Supabase OK, user:', data.user?.id ?? null);
       router.canGoBack() ? router.back() : router.replace('/(tabs)/home');
 
     } catch (err: any) {
+      console.error('[GoogleSignIn] catch:', err?.code ?? err?.name, err?.message ?? err);
       if (isErrorWithCode(err)) {
         if (err.code === statusCodes.SIGN_IN_CANCELLED) {
           // kullanıcı iptal etti
@@ -185,7 +208,7 @@ export default function LoginScreen() {
         router.canGoBack() ? router.back() : router.replace('/(tabs)/home');
 
       } else if (mode === 'register') {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
         });
@@ -199,12 +222,22 @@ export default function LoginScreen() {
           }
           return;
         }
+        // Supabase, e-posta zaten kayıtlıysa güvenlik gereği HATA DÖNDÜRMEZ —
+        // "başarılıymış gibi" bir cevap verir ama identities listesi boş gelir.
+        const identities = data?.user?.identities ?? [];
+        if (identities.length === 0) {
+          setError('Bu e-posta adresi zaten kayıtlı.');
+          return;
+        }
         setSuccessMessage('Hesabın oluşturuldu! E-posta adresine bir doğrulama bağlantısı gönderdik. Doğruladıktan sonra giriş yapabilirsin.');
         setMode('login');
         setPassword('');
 
       } else if (mode === 'forgot') {
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+        const redirectTo = ExpoLinking.createURL('auth/callback');
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo,
+        });
         if (error) {
           setError('Şifre sıfırlama maili gönderilemedi. E-posta adresini kontrol et.');
           return;
@@ -388,10 +421,21 @@ export default function LoginScreen() {
       fontSize: 15,
     },
     appleButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 999,
       height: 54,
       marginTop: 12,
     },
     appleButtonDisabled: { opacity: 0.6 },
+    appleButtonText: {
+      fontFamily: theme.font.semibold,
+      color: '#000000',
+      fontSize: 15,
+    },
     footer: {
       marginTop: 28,
       gap: 14,
@@ -569,19 +613,21 @@ export default function LoginScreen() {
               </Pressable>
 
               {appleAvailable && (
-                <View style={appleLoading ? s.appleButtonDisabled : undefined}>
-                  <AppleAuthentication.AppleAuthenticationButton
-                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-                    cornerRadius={27}
-                    style={s.appleButton}
-                    onPress={() => {
-                      if (appleLoading) return;
-                      softHaptic();
-                      handleAppleSignIn();
-                    }}
-                  />
-                </View>
+                <Pressable
+                  style={[s.appleButton, appleLoading && s.appleButtonDisabled]}
+                  onPress={() => { softHaptic(); handleAppleSignIn(); }}
+                  disabled={appleLoading}
+                >
+                  {appleLoading
+                    ? <ActivityIndicator color="#000000" />
+                    : (
+                      <>
+                        <Ionicons name="logo-apple" size={20} color="#000000" />
+                        <Text style={s.appleButtonText}>Apple ile devam et</Text>
+                      </>
+                    )
+                  }
+                </Pressable>
               )}
             </>
           )}

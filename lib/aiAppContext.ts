@@ -10,7 +10,11 @@ export const APP_SCREEN_MAP = `Uygulama yapısı (alt menü ve erişilebilir ekr
 - Ana Sayfa: Yaklaşan çekilişler, son sonuçlar özeti, AI asistanına kısayol ve bildirim zili.
 - Sonuçlar: Geçmiş çekiliş sonuçları, istatistikler ve sayı analizi (Sonuçlar / İstatistik / Analiz sekmeleri).
 - Kupon Üret (ortadaki + butonu): Manuel veya rastgele kupon oluşturma, gelişmiş filtreler, üretim geçmişi.
-- Kuponlarım: Kayıtlı kuponları listeleme, çekilişe göre kontrol etme, paylaşma ve silme.
+- Kuponlarım: Kayıtlı kuponları listeleme ve sonuç takibi. Kontrol OTOMATİKTİR — çekiliş
+  sonuçları uygulamaya girildiğinde kuponlar kendiliğinden güncellenir; "Kontrol Et" gibi bir
+  buton YOKTUR. Üstte Tümü / Bekleyen / Kontrol filtreleri vardır. Bekleyen kuponlarda "Bekliyor"
+  rozeti görünür; sonuçlananlarda eşleşme rozeti ve renkli sayılar. Her kupon kartında Geçmiş,
+  Paylaş ve Sil butonları vardır (sonuç rozeti detay modalını açar).
 - Profil: İsim düzenleme, bildirim ayarları, uygulama istatistikleri, yasal bilgiler, çıkış.
 - AI Asistan (Lota): Şu an konuşulan ekran — sohbet ve kupon üretimi burada yapılır.
 - Bildirimler: Uygulama içi bildirim geçmişi (Ana Sayfa'daki zilden erişilir).

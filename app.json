@@ -9,13 +9,10 @@
     "newArchEnabled": true,
     "description": "LottoAI, Türkiye'nin en akıllı loto asistanı! Çılgın Sayısal Loto, Süper Loto, Şans Topu ve On Numara için akıllı kuponlar üret, çekiliş sonuçlarını anında takip et, detaylı istatistikler ve AI analizi ile şansını artır. 18 yaş ve üzeri içindir. Şans oyunları bağımlılık yapabilir, sorumlu oynayın.",
     "primaryColor": "#1C9E73",
-    "privacy": "https://getlottoai.app/legal",
-    "keywords": ["loto", "kupon", "çekiliş", "sayısal", "şans", "istatistik", "analiz", "AI"],
-    "categories": ["utilities", "entertainment"],
     "ios": {
       "supportsTablet": false,
+      "requireFullScreen": true,
       "bundleIdentifier": "app.getlottoai.ios",
-      "buildNumber": "1",
       "icon": "./assets/images/LottoAI-iOS-180.png",
       "usesAppleSignIn": true,
       "infoPlist": {
@@ -32,16 +29,14 @@
         "backgroundColor": "#1C9E73",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "package": "com.lottoai.app",
-      "versionCode": 1,
+      "package": "app.getlottoai.android",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "POST_NOTIFICATIONS",
-        "SCHEDULE_EXACT_ALARM",
-        "USE_EXACT_ALARM"
+        "SCHEDULE_EXACT_ALARM"
       ],
       "jsEngine": "hermes"
     },
@@ -75,7 +70,14 @@
       [
         "@react-native-google-signin/google-signin",
         {
-          "iosUrlScheme": "com.googleusercontent.apps.775120851198-fkplgqbpkljuf173g63d5ivpr6mt2c5o"
+          "iosUrlScheme": "com.googleusercontent.apps.775120851198-e7vqla2tctm62lkccaiqtcir6sbm4ter"
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-6473293791186582~4038773731",
+          "iosAppId": "ca-app-pub-6473293791186582~6686024934"
         }
       ],
       [
@@ -85,7 +87,8 @@
             "useFrameworks": "static"
           }
         }
-      ]
+      ],
+      "./plugins/withAndroidPhoneOnly"
     ],
     "experiments": {
       "typedRoutes": true,

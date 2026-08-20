@@ -8,17 +8,39 @@
 //  - Başarısız ilk denemeden sonra sessiz 1 tekrar (kullanıcı fark etmez)
 //  - Hata türü döndürülür; arayüz türe göre farklı mesaj gösterebilir
 
+// expo/fetch: React Native'in yerleşik fetch'i akışı (response.body)
+// desteklemez; Expo'nun WinterCG uyumlu fetch'i destekler.
+import { fetch as expoFetch } from 'expo/fetch';
+
 import { logError } from './logger';
 import { supabase } from './supabase';
 
 const AI_FUNCTION_URL = "https://tsxzukctomvnyzalgxap.supabase.co/functions/v1/ai-chat";
 const TIMEOUT_MS = 20000;
 
-export type AIErrorType = 'network' | 'timeout' | 'auth' | 'server';
+export type AIErrorType = 'network' | 'timeout' | 'auth' | 'server' | 'quota';
+
+/** Sunucunun SSE / JSON cevabında ilettiği ham tool çağrısı. */
+export type AIToolCallRaw = {
+  id?: string;
+  name: string;
+  /** JSON string — henüz parse edilmemiş. */
+  arguments: string;
+};
+
+export type AIToolCall = {
+  name: string;
+  arguments: Record<string, unknown>;
+};
 
 export type AIResult = {
   reply: string | null;
   errorType?: AIErrorType;
+  /** Sunucunun bildirdiği, o gün için kalan token. Yalnızca başarılı
+   *  çağrılarda dolar; 0 ise bir sonraki istek kotaya takılacak demektir. */
+  remaining?: number;
+  /** Model generate_coupon vb. bir araç çağırdıysa burada döner. */
+  toolCalls?: AIToolCall[];
 };
 
 type ChatMsg = { role: "system" | "user" | "assistant"; content: string };
@@ -27,7 +49,39 @@ type ChatOptions = {
   /** 0 (kararlı/deterministik) ile 1 (yaratıcı) arası. Belirtilmezse sunucu varsayılanı (0.7) kullanılır. */
   temperature?: number;
   maxTokens?: number;
+  /** true ise sunucu generate_coupon tool şemasını DeepSeek'e ekler. */
+  enableCouponTool?: boolean;
 };
+
+function parseToolCalls(raw: unknown): AIToolCall[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const parsed: AIToolCall[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const name = typeof (item as AIToolCallRaw).name === 'string' ? (item as AIToolCallRaw).name : '';
+    if (!name) continue;
+    const argStr = typeof (item as AIToolCallRaw).arguments === 'string'
+      ? (item as AIToolCallRaw).arguments
+      : '';
+    let args: Record<string, unknown> = {};
+    if (argStr.trim()) {
+      try {
+        const value = JSON.parse(argStr);
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          args = value as Record<string, unknown>;
+        }
+      } catch {
+        logError('parseToolCalls', new Error(`Unparseable tool args for ${name}: ${argStr.slice(0, 120)}`));
+      }
+    }
+    parsed.push({ name, arguments: args });
+  }
+  return parsed.length > 0 ? parsed : undefined;
+}
+
+function hasUsefulResult(result: AIResult): boolean {
+  return Boolean(result.reply || (result.toolCalls && result.toolCalls.length > 0));
+}
 
 async function callOnce(
   messages: ChatMsg[],
@@ -48,6 +102,7 @@ async function callOnce(
         messages,
         ...(options?.temperature != null ? { temperature: options.temperature } : {}),
         ...(options?.maxTokens != null ? { max_tokens: options.maxTokens } : {}),
+        ...(options?.enableCouponTool ? { enable_coupon_tool: true } : {}),
       }),
       signal: controller.signal,
     });
@@ -55,13 +110,32 @@ async function callOnce(
     if (response.status === 401) {
       return { reply: null, errorType: 'auth' };
     }
+    // 429: günlük token kotası doldu (sunucuda kullanıcı başına sayılıyor).
+    if (response.status === 429) {
+      return { reply: null, errorType: 'quota' };
+    }
     if (!response.ok) {
-      logError('chatWithAI', new Error(`Edge Function returned ${response.status}`));
+      // Sunucu 502'de DeepSeek'in gerçek status/mesajını da gönderiyor —
+      // logda görünsün ki "502 ama neden?" tek bakışta anlaşılsın.
+      let detail = '';
+      try {
+        const errBody = await response.json();
+        if (errBody?.upstream_status) {
+          detail = ` (upstream ${errBody.upstream_status}: ${errBody.upstream_body ?? ''})`;
+        }
+      } catch {
+        // gövde JSON değilse status yeterli
+      }
+      logError('chatWithAI', new Error(`Edge Function returned ${response.status}${detail}`));
       return { reply: null, errorType: 'server' };
     }
 
     const data = await response.json();
-    return { reply: data.reply || null };
+    return {
+      reply: data.reply || null,
+      remaining: typeof data.remaining === 'number' ? data.remaining : undefined,
+      toolCalls: parseToolCalls(data.tool_calls),
+    };
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') {
       return { reply: null, errorType: 'timeout' };
@@ -82,20 +156,216 @@ export async function chatWithAI(messages: ChatMsg[], options?: ChatOptions): Pr
   }
 
   const first = await callOnce(messages, session.access_token, options);
-  if (first.reply) return first;
+  if (hasUsefulResult(first)) return first;
 
-  // Oturum hatasında tekrar denemek anlamsız (aynı token, aynı sonuç).
-  if (first.errorType === 'auth') return first;
+  // Oturum ve kota hatalarında tekrar denemek anlamsız (aynı sonuç döner).
+  if (first.errorType === 'auth' || first.errorType === 'quota') return first;
 
   // Sessiz tek tekrar — geçici ağ/sunucu sorunlarının çoğunu görünmeden çözer.
   return callOnce(messages, session.access_token, options);
+}
+
+/* ─────────────────────────────── akış (streaming) ─────────────────────────────── */
+// Cevabın tamamlanmasını beklemek yerine parçaları geldikçe göstermek, ilk
+// kelimenin ekrana gelme süresini saniyelerce öne çeker. Sunucu (ai-chat)
+// bize sadeleştirilmiş bir SSE gönderir: her satır `data: {"delta":"..."}`,
+// en sonda `data: {"done":true,"remaining":N}`.
+
+/** İlk parçaya kadar beklenen süre; sunucudaki 18 sn ile uyumlu. */
+const STREAM_FIRST_CHUNK_TIMEOUT_MS = 20000;
+/** İki parça arası kabul edilen en uzun sessizlik — akış donarsa kurtarır. */
+const STREAM_IDLE_TIMEOUT_MS = 15000;
+
+/**
+ * Byte parçalarını UTF-8 metne çevirir. Bir parçanın sonunda yarım kalan
+ * çok baytlı karakter (Türkçe'de sık: ğ, ş, ı...) bir sonraki parçaya
+ * devredilir; aksi halde ekranda bozuk karakter belirir.
+ *
+ * TextDecoder her React Native sürümünde global olarak bulunmadığı için
+ * varsa o kullanılır, yoksa elle çözen yedek devreye girer.
+ */
+function createUtf8Decoder(): (bytes: Uint8Array) => string {
+  const NativeDecoder = (globalThis as { TextDecoder?: new (label?: string) => { decode: (input: Uint8Array, opts?: { stream?: boolean }) => string } }).TextDecoder;
+  if (NativeDecoder) {
+    const decoder = new NativeDecoder('utf-8');
+    return (bytes) => decoder.decode(bytes, { stream: true });
+  }
+
+  let pending: number[] = [];
+  return (bytes) => {
+    const all = pending.length ? [...pending, ...Array.from(bytes)] : Array.from(bytes);
+
+    // Sondan geriye doğru en fazla 4 bayt tarayıp yarım kalan diziyi bul.
+    let end = all.length;
+    for (let i = all.length - 1, steps = 0; i >= 0 && steps < 4; i--, steps++) {
+      const byte = all[i];
+      if (byte < 0x80) break; // tek baytlık karakter, dizi tam
+      if ((byte & 0xc0) === 0x80) continue; // devam baytı, başını aramaya devam
+      const needed = (byte & 0xe0) === 0xc0 ? 2 : (byte & 0xf0) === 0xe0 ? 3 : (byte & 0xf8) === 0xf0 ? 4 : 1;
+      if (all.length - i < needed) end = i;
+      break;
+    }
+    pending = all.slice(end);
+
+    let out = '';
+    for (let i = 0; i < end;) {
+      const byte = all[i];
+      let codePoint: number;
+      if (byte < 0x80) {
+        codePoint = byte;
+        i += 1;
+      } else if ((byte & 0xe0) === 0xc0) {
+        codePoint = ((byte & 0x1f) << 6) | (all[i + 1] & 0x3f);
+        i += 2;
+      } else if ((byte & 0xf0) === 0xe0) {
+        codePoint = ((byte & 0x0f) << 12) | ((all[i + 1] & 0x3f) << 6) | (all[i + 2] & 0x3f);
+        i += 3;
+      } else {
+        codePoint = ((byte & 0x07) << 18) | ((all[i + 1] & 0x3f) << 12) | ((all[i + 2] & 0x3f) << 6) | (all[i + 3] & 0x3f);
+        i += 4;
+      }
+      out += String.fromCodePoint(codePoint);
+    }
+    return out;
+  };
+}
+
+type StreamOnceResult = AIResult & {
+  /** Ekrana en az bir parça yazıldı mı — yazıldıysa sessiz tekrar yapılamaz
+   *  (kullanıcı metnin baştan yeniden yazılmasını görürdü). */
+  streamed: boolean;
+};
+
+async function streamOnce(
+  messages: ChatMsg[],
+  accessToken: string,
+  onDelta: (fullText: string) => void,
+  options?: ChatOptions,
+): Promise<StreamOnceResult> {
+  const controller = new AbortController();
+  let timer = setTimeout(() => controller.abort(), STREAM_FIRST_CHUNK_TIMEOUT_MS);
+  const resetIdleTimer = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS);
+  };
+
+  let fullText = '';
+  let streamed = false;
+  let remaining: number | undefined;
+  let toolCalls: AIToolCall[] | undefined;
+
+  /** Sunucudan gelen ham metni satır satır işler; yarım satırı geri döndürür. */
+  const consume = (chunk: string, carry: string): string => {
+    const lines = (carry + chunk).split('\n');
+    const leftover = lines.pop() ?? '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const payload = trimmed.slice(5).trim();
+      if (!payload) continue;
+      try {
+        const event = JSON.parse(payload);
+        if (typeof event.delta === 'string') {
+          fullText += event.delta;
+          streamed = true;
+          onDelta(fullText);
+        } else if (event.done) {
+          if (typeof event.remaining === 'number') remaining = event.remaining;
+          toolCalls = parseToolCalls(event.tool_calls);
+        }
+      } catch {
+        // Bozuk parça — akışı kesmeye değmez.
+      }
+    }
+    return leftover;
+  };
+
+  try {
+    const response = await expoFetch(AI_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        messages,
+        stream: true,
+        ...(options?.temperature != null ? { temperature: options.temperature } : {}),
+        ...(options?.maxTokens != null ? { max_tokens: options.maxTokens } : {}),
+        ...(options?.enableCouponTool ? { enable_coupon_tool: true } : {}),
+      }),
+      signal: controller.signal,
+    });
+
+    if (response.status === 401) return { reply: null, errorType: 'auth', streamed };
+    if (response.status === 429) return { reply: null, errorType: 'quota', streamed };
+    if (!response.ok) {
+      logError('chatWithAIStream', new Error(`Edge Function returned ${response.status}`));
+      return { reply: null, errorType: 'server', streamed };
+    }
+
+    const body = response.body;
+    if (!body) {
+      // Akış desteklenmiyorsa gövde tek parça gelir; aynı ayrıştırıcıyla
+      // okunur — kullanıcı sadece canlı yazma efektini kaçırır, cevabı alır.
+      consume(await response.text(), '');
+      return { reply: fullText || null, remaining, streamed, toolCalls };
+    }
+
+    const reader = body.getReader();
+    const decode = createUtf8Decoder();
+    let carry = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      resetIdleTimer();
+      if (value) carry = consume(decode(value), carry);
+    }
+
+    return { reply: fullText || null, remaining, streamed, toolCalls };
+  } catch (err) {
+    // Yarıda kesilse bile eldeki metni döndürüyoruz: kullanıcı zaten okumaya
+    // başlamıştı, onu silip hata göstermek daha kötü bir deneyim olurdu.
+    if (fullText || toolCalls?.length) {
+      return { reply: fullText || null, remaining, streamed, toolCalls };
+    }
+    if ((err as Error)?.name === 'AbortError') {
+      return { reply: null, errorType: 'timeout', streamed };
+    }
+    logError('chatWithAIStream', err);
+    return { reply: null, errorType: 'network', streamed };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * chatWithAI'ın akışlı sürümü: cevabı beklerken `onDelta` her yeni parçada
+ * o ana kadarki TAM metinle çağrılır. Dönen sonuç chatWithAI ile aynıdır.
+ */
+export async function chatWithAIStream(
+  messages: ChatMsg[],
+  onDelta: (fullText: string) => void,
+  options?: ChatOptions,
+): Promise<AIResult> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    return { reply: null, errorType: 'auth' };
+  }
+
+  const first = await streamOnce(messages, session.access_token, onDelta, options);
+  if (hasUsefulResult(first)) return first;
+  if (first.errorType === 'auth' || first.errorType === 'quota') return first;
+
+  // Hiç parça / tool gösterilmediyse sessiz tek tekrar güvenli.
+  return streamOnce(messages, session.access_token, onDelta, options);
 }
 
 import { stripMarkdown } from './stripMarkdown';
 
 export { stripMarkdown };
 
-/* ─────────────────────────── kupon niyeti sınıflandırma ─────────────────────────── */
+/* ─────────────────────────── kupon tool argümanları ─────────────────────────── */
 
 export type CouponIntent = {
   intent: 'chat' | 'generate_coupon';
@@ -235,144 +505,14 @@ function normalizeCouponIntent(parsed: Record<string, unknown>): CouponIntent {
   };
 }
 
-/** Metin içinden dengeli süslü parantez bloğu çıkarır. */
-function extractBalancedJsonObject(text: string): string | null {
-  const codeBlock = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i);
-  if (codeBlock) return codeBlock[1].trim();
-
-  const start = text.indexOf('{');
-  if (start < 0) return null;
-
-  let depth = 0;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === '{') depth++;
-    else if (ch === '}') {
-      depth--;
-      if (depth === 0) return text.slice(start, i + 1);
-    }
-  }
-  return null;
+/** generate_coupon tool argümanlarını CouponIntent'e çevirir. */
+export function couponIntentFromToolArgs(args: Record<string, unknown>): CouponIntent {
+  return normalizeCouponIntent({ ...args, intent: 'generate_coupon' });
 }
 
-/** JSON bozuk olsa bile temel intent/gameId alanlarını gevşek eşleşmeyle okur. */
-function parseCouponIntentLoose(text: string): CouponIntent | null {
-  const intentMatch = text.match(/"intent"\s*:\s*"(chat|generate_coupon)"/i);
-  if (!intentMatch) return null;
-
-  const gameMatch = text.match(/"gameId"\s*:\s*"(cilgin|superloto|sanstopu|onnumara)"/i);
-
-  return normalizeCouponIntent({
-    intent: intentMatch[1],
-    gameId: gameMatch ? gameMatch[1] : null,
-  });
-}
-
-function parseCouponIntentReply(reply: string): CouponIntent | null {
-  const trimmed = reply.trim();
-  if (!trimmed) return null;
-
-  try {
-    return normalizeCouponIntent(JSON.parse(trimmed) as Record<string, unknown>);
-  } catch {
-    // Tam metin JSON değilse süslü parantez bloğunu dene.
-  }
-
-  const jsonText = extractBalancedJsonObject(trimmed);
-  if (jsonText) {
-    try {
-      return normalizeCouponIntent(JSON.parse(jsonText) as Record<string, unknown>);
-    } catch {
-      // JSON bloğu bozuksa gevşek ayrıştırmaya düş.
-    }
-  }
-
-  return parseCouponIntentLoose(trimmed);
-}
-
-type IntentContextMessage = { role: 'user' | 'assistant'; content: string };
-
-export async function classifyCouponIntent(
-  content: string,
-  recentContext?: IntentContextMessage[]
-): Promise<CouponIntent | null> {
-  const messages: ChatMsg[] = [
-    {
-      role: 'system',
-      content: `Kullanıcının LottoAI asistanına yazdığı son mesajı sınıflandır. Önceki sohbet bağlam olarak verilmiştir.
-
-Yanıtın YALNIZCA tek satır JSON olmalı. Başka hiçbir karakter, açıklama veya markdown ekleme.
-
-Şema:
-{"intent":"chat"|"generate_coupon","gameId":"cilgin"|"superloto"|"sanstopu"|"onnumara"|null,"count":number|null,"sumMin":number|null,"sumMax":number|null,"mustInclude":number[]|null,"mustExclude":number[]|null,"excludeRangeMin":number|null,"excludeRangeMax":number|null,"noOverlap":boolean|null,"avoidPreviousCoupons":boolean|null,"onlyPrimes":boolean|null,"onlyEven":boolean|null,"onlyOdd":boolean|null,"balanceEvenOdd":boolean|null,"avoidPatterns":boolean|null,"spreadZones":boolean|null,"maxConsecutive":number|null}
-
-Alan açıklamaları:
-- count: kaç kupon istendiği. Ör: "5 tane kupon üret" -> 5. Belirtilmediyse null.
-- sumMin/sumMax: "toplamı 250 ile 300 arasında olsun" gibi açık bir istek varsa doldur, yoksa null.
-- mustInclude: "37 mutlaka olsun", "içinde 7 olsun" gibi isteklerde belirtilen TEKİL sayılar.
-- mustExclude: "13 olmasın", "7 hariç" gibi isteklerde belirtilen TEKİL (birkaç taneyi geçmeyen)
-  sayılar. Genel/kategorik isteklerde ("çift sayı olmasın" gibi) bu alanı kullanma, boş bırak.
-- excludeRangeMin/excludeRangeMax: "1 ile 20 arasındaki sayılar olmasın", "50'den büyük olmasın"
-  gibi bir ARALIĞIN TAMAMEN hariç tutulması istendiğinde doldur. Bu durumda mustExclude'a bu
-  aralıktaki sayıları TEK TEK YAZMA, sadece excludeRangeMin ve excludeRangeMax'ı doldur.
-- noOverlap: birden fazla kupon isteniyorsa VE "hepsi farklı olsun", "ortak sayı olmasın" gibi
-  bir istek varsa true.
-- avoidPreviousCoupons: "önceki kuponlarımdan farklı olsun", "daha önce çıkanlardan olmasın",
-  "hiç tekrar etmesin", "geçmişte ürettiklerinden farklı olsun" gibi bir istek varsa true.
-- onlyPrimes: "sadece asal sayılardan olsun", "asal sayılar olsun" gibi AÇIK bir istek varsa true.
-  Kullanıcı "asal" kelimesini kullanmadıysa bu alanı doldurma.
-- onlyEven: "sadece çift sayılardan olsun", "hepsi çift olsun" gibi AÇIK bir istek varsa true.
-  Kullanıcı "çift" kelimesini kullanmadıysa bu alanı doldurma.
-- onlyOdd: "sadece tek sayılardan olsun", "hepsi tek olsun" gibi AÇIK bir istek varsa true.
-  Kullanıcı "tek" kelimesini kullanmadıysa bu alanı doldurma. onlyEven ve onlyOdd AYNI ANDA true
-  olamaz (kullanıcı ikisini birden istemez, biri true ise diğeri null kalmalı).
-- balanceEvenOdd: "çift tek dengeli olsun" gibi kategorik bir istekte true.
-- avoidPatterns: "ardışık olmasın", "sıra takip etmesin", "sıradan görünmesin" gibi isteklerde true.
-- spreadZones: "sayılar aralığa yayılsın", "birbirine yakın olmasın" gibi isteklerde true.
-- maxConsecutive: "en fazla 2 ardışık sayı olsun" gibi NET bir sayı belirtilmişse doldur.
-
-Belirtilmeyen her alan için null kullan. Boolean alanları yalnızca açıkça istenmişse true yap,
-hiçbir zaman false yazma (false yerine null kullan).
-
-ÇOK ÖNEMLİ: sumMin, sumMax, maxConsecutive gibi sayısal alanları ASLA tahmin etme veya "makul bir
-değer" uydurma. Kullanıcı "toplam", "aralık" gibi bir kelime kullanmadıysa sumMin/sumMax kesinlikle
-null olmalı. Kullanıcı "ardışık" kelimesini kullanmadıysa maxConsecutive kesinlikle null olmalı.
-Sadece kullanıcının AÇIKÇA yazdığı sayıları/isteği yansıt, kendi fikrini ekleme.
-Örnek: kullanıcı "geçmişteki uygun kombinasyonlara göre bir kupon üret" derse — bu "toplam" veya
-"aralık" kelimesi İÇERMEZ, bu yüzden sumMin ve sumMax MUTLAKA null olmalı. sumMin:0, sumMax:0 gibi
-bir değer YAZMA — 0 hiçbir zaman gerçek bir toplam olamaz, böyle bir şey görürsen bu senin bir
-hatan olur, kesinlikle üretme.
-
-Diğer kurallar:
-- Kullanıcı açıkça kupon/sayı üretmek, hazırlamak, çıkarmak veya önermek istiyorsa intent "generate_coupon" olsun.
-- "Oluştur", "Evet", "Yap", "Tamam" gibi kısa onaylar SADECE şu durumda intent "generate_coupon"
-  olsun: bir önceki ASİSTAN mesajı açıkça bir KUPON ÜRETİMİ teklif ediyorsa (örn. "kupon üretmemi
-  ister misin?", "sana bir kupon hazırlayayım mı?", "deneyelim mi?" bir kupon bağlamında).
-  Eğer önceki asistan mesajı sadece istatistik gösteriyor, genel bir soru soruyor ("ilginç değil
-  mi?", "bakalım mı?" gibi istatistik/bilgi bağlamında) veya kupon üretimiyle İLGİSİZ bir konuda
-  onay istiyorsa, kısa "evet/tamam" gibi cevaplar intent "chat" kalmalı. Şüpheye düşersen "chat"
-  seç — yanlışlıkla istenmeyen bir kupon üretmek, kullanıcıyı üretmemekten daha kötü bir deneyimdir.
-- Kullanıcı oyun kuralları, farklar, istatistikler, "nasıl", "nedir", "ne demek" gibi bilgi soruyorsa intent "chat" olsun.
-- Mesajda "üretmek" kelimesi geçmesi tek başına kupon isteği değildir.
-- Oyun adı son mesajda veya önceki sohbette geçiyorsa gameId doldur; hiçbir yerde geçmiyorsa null bırak.
-- Önceki mesajlarda tek bir oyun konuşuluyorsa ve kullanıcı kupon istiyorsa gameId'yi o oyuna ayarla.
-- Çılgın Sayısal, Çılgın Loto veya Sayısal Loto için gameId "cilgin".
-- Süper Loto için "superloto", Şans Topu için "sanstopu", On Numara için "onnumara".`,
-    },
-    ...(recentContext ?? []).map((m) => ({ role: m.role, content: m.content })),
-    { role: 'user', content },
-  ];
-
-  // Sınıflandırma bir JSON şeması doldurma görevi — yaratıcılık burada
-  // istenmez, düşük temperature ile daha tutarlı/kararlı sonuç alınır.
-  // maxTokens büyütüldü: mustInclude/mustExclude artık 30 sayıya kadar
-  // liste tutabiliyor, JSON cevabının yarıda kesilmemesi için pay bırakıldı.
-  const result = await chatWithAI(messages, { temperature: 0.1, maxTokens: 700 });
-  if (!result.reply) return null;
-
-  const parsed = parseCouponIntentReply(result.reply);
-  if (!parsed) {
-    logError('classifyCouponIntent', new Error(`Unparseable intent reply: ${result.reply.slice(0, 120)}`));
-  }
-  return parsed;
+/** AIResult içinden ilk generate_coupon çağrısını çıkarır. */
+export function extractCouponToolIntent(result: AIResult): CouponIntent | null {
+  const call = result.toolCalls?.find((t) => t.name === 'generate_coupon');
+  if (!call) return null;
+  return couponIntentFromToolArgs(call.arguments);
 }
