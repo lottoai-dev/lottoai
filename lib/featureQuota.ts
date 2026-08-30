@@ -6,11 +6,10 @@
 // bu değer ai-chat'teki todayInTurkey() ile TUTARLI olmalı, aksi halde
 // AI kotası bir günde sıfırlanırken bu kota başka bir anda sıfırlanır.
 //
-// Offline koruma (Seçenek B): başarılı sunucu okumasından sonra used/day
-// AsyncStorage'a yazılır. Sunucu erişilemezse bugünkü cache'e güvenilir —
-// used >= limit ise kilitli kalır. Cache yoksa veya gün eskiyse fail-open
-// (yeni cihaz / yeni gün). recordFeatureUsage her çağrıda yerel used'ı +1
-// artırır; böylece offline art arda üretimler limitte kilitlenir.
+/**
+ * Kota sistemi: sunucu öncelikli, cache yedek.
+ * Sunucu okunamazsa güvenilir bugünkü cache kullanılır; yoksa fail-closed.
+ */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -109,7 +108,7 @@ async function incrementQuotaCache(feature: FeatureKey, userId: string, day: str
 
 /**
  * Sunucu okunamazsa son bilinen bugünkü cache'e güvenir.
- * Cache yoksa veya gün eskiyse fail-open (exhausted: false).
+ * Cache yoksa veya gün eskiyse fail-closed (exhausted: true).
  */
 async function statusFromCacheOrFailOpen(
   feature: FeatureKey,
@@ -117,14 +116,12 @@ async function statusFromCacheOrFailOpen(
   day: string,
 ): Promise<FeatureQuotaStatus> {
   const cached = await readQuotaCache(feature, userId);
-  if (!cached) {
-    return statusFromUsed(0);
+  // Yalnızca bugüne ait cache güvenilir; yokluğunda veya gün eskidiğinde
+  // kotayı sıfır varsaymak limiti atlatmaya izin verir (veri silme / uçak modu).
+  if (cached && cached.day === day) {
+    return statusFromUsed(cached.used);
   }
-  if (cached.day !== day) {
-    // Yeni gün — eski cache'i yok say; sunucu bilinmiyor → fail-open.
-    return statusFromUsed(0);
-  }
-  return statusFromUsed(cached.used);
+  return statusFromUsed(FREE_DAILY_LIMIT);
 }
 
 /**

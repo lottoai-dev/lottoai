@@ -81,6 +81,9 @@ async function fetchUnreadNotifications(
     const lastLoad = await AsyncStorage.getItem(lastLoadKey);
     const now = new Date().toISOString();
 
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+
     let query = supabase
       .from('notifications')
       .select('*')
@@ -109,7 +112,8 @@ async function fetchUnreadNotifications(
       await supabase
         .from('notifications')
         .update({ is_read: true })
-        .in('id', ids);
+        .in('id', ids)
+        .eq('token', token);
     }
 
     await AsyncStorage.setItem(lastLoadKey, now);
