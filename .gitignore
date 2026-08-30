@@ -12,6 +12,9 @@ expo-env.d.ts
 /android/
 /ios/
 
+# Supabase CLI'nin urettigi gecici dosyalar
+supabase/.temp/
+
 # Guvenlik - hassas dosyalar
 .env
 .env.local
