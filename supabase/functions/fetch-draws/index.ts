@@ -60,7 +60,26 @@ async function fetchDrawResult(game: { name: string; url: string }) {
   return { numbers: numbers.join(', '), drawDate, drawNo };
 }
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
+  // ─── GÜVENLİK KAPISI: sadece service_role çağırabilir ───
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  let role = "";
+  try {
+    let b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    b64 += "=".repeat((4 - (b64.length % 4)) % 4);
+    role = JSON.parse(
+      new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)))
+    ).role ?? "";
+  } catch {
+    role = "";
+  }
+  if (role !== "service_role") {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   try {
     const results = [];
 
