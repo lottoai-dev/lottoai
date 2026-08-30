@@ -110,7 +110,7 @@ async function incrementQuotaCache(feature: FeatureKey, userId: string, day: str
  * Sunucu okunamazsa son bilinen bugünkü cache'e güvenir.
  * Cache yoksa veya gün eskiyse fail-closed (exhausted: true).
  */
-async function statusFromCacheOrFailOpen(
+async function statusFromCacheOrFailClosed(
   feature: FeatureKey,
   userId: string,
   day: string,
@@ -128,7 +128,7 @@ async function statusFromCacheOrFailOpen(
  * Bir özelliğin bugünkü kullanım durumunu okur.
  * Başarılı okumada sonuç AsyncStorage'a yazılır.
  * Okuma başarısız olursa bugünkü cache kullanılır; cache'de used >= limit
- * ise kilitli kalır. Cache yoksa / gün eskiyse fail-open.
+ * ise kilitli kalır. Cache yoksa / gün eskiyse fail-closed.
  */
 export async function getFeatureQuotaStatus(feature: FeatureKey): Promise<FeatureQuotaStatus> {
   const userId = await getLocalUserId();
@@ -145,7 +145,7 @@ export async function getFeatureQuotaStatus(feature: FeatureKey): Promise<Featur
     .maybeSingle();
 
   if (error) {
-    return statusFromCacheOrFailOpen(feature, userId, day);
+    return statusFromCacheOrFailClosed(feature, userId, day);
   }
 
   const used = (data as Record<string, number> | null)?.[field] ?? 0;
