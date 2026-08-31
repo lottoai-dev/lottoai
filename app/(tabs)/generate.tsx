@@ -40,6 +40,7 @@ import {
 } from '../../lib/featureQuota';
 import { GAMES, getGameAccentColor } from '../../lib/games';
 import GameSelector from '../../lib/GameSelector';
+import { recordGoodMoment } from '../../lib/review-prompt';
 import {
   BookmarkIcon,
   CheckIcon,
@@ -430,6 +431,8 @@ export default function GenerateScreen() {
     if (filterActive) {
       void recordFeatureUsage('filtered_coupon');
     }
+
+    void recordGoodMoment();
   };
 
   /**
