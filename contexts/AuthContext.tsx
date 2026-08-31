@@ -2,7 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useState } from 'react';
-import { registerPushToken } from '../lib/push-token';
+import { registerPushToken, unregisterPushToken } from '../lib/push-token';
 import { supabase } from '../lib/supabase';
 
 type AuthContextType = {
@@ -46,6 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    // Oturum açıkken silinmeli; sonrası RLS'e takılır.
+    await unregisterPushToken();
     await supabase.auth.signOut();
     // Kullanıcıya ait lokal verileri temizle
     await AsyncStorage.multiRemove([

@@ -68,6 +68,31 @@ export async function registerPushToken(options?: RegisterOptions): Promise<stri
   return null;
 }
 
+/**
+ * Bu cihazın push_tokens satırını siler. Çıkıştan ÖNCE çağrılmalı: oturum
+ * kapandıktan sonra RLS (push_tokens_delete_own) silmeye izin vermez ve satır
+ * geride kalır — send-push notify_results=true olan her satıra gönderdiği için
+ * çıkmış kullanıcıya bildirim gitmeye devam eder. Aynı cihazda başka bir hesap
+ * açılırsa (user_id, platform) yeni satır üretir ve aynı token iki kez listelenip
+ * bildirim çift gider.
+ */
+export async function unregisterPushToken(): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('push_tokens')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('platform', Platform.OS);
+
+    if (error) logError('unregisterPushToken', error);
+  } catch (err) {
+    logError('unregisterPushToken', err);
+  }
+}
+
 export async function syncNotifyResults(notifyResults: boolean): Promise<void> {
   await registerPushToken({ notifyResults });
 }
