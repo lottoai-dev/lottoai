@@ -1,6 +1,6 @@
 # LottoAI — Proje Durumu
 
-> Son güncelleme: 31 Ağustos 2026
+> Son güncelleme: 31 Ağustos 2026 (akşam)
 > Bu dosya her tamamlanan işten sonra güncellenir. Yeni bir sohbete başlarken
 > "durum dosyasını oku" demek yeterli.
 
@@ -38,7 +38,7 @@ sunan React Native / Expo uygulaması.
 | Android | 1.1.0 | Google Play'de yayında (30 Ağu 2026, build 7) |
 | Website | — | getlottoai.app yayında, git + otomatik deploy kurulu |
 | Apple Search Ads | — | Aktif ($25/ay, $0.64 max CPI) |
-| AdMob | — | Hesap onayı bekleniyor (3. başvuru, 30 Ağu) |
+| AdMob | — | Android uygulaması doğrulandı (31 Ağu); reklam sunumu incelemesi sürüyor (2–3 gün) |
 
 ### Mağaza hesapları
 
@@ -51,13 +51,18 @@ kalıyor, kendi güncellemelerini önce orada test ediyor.
 
 ### Google onayı bekliyor
 
-AdMob hesabı henüz onaylanmadı; uygulama doğrulaması buna bağlı olduğu için
-`app-ads.txt` taraması da sonuçlanmıyor. Bizim tarafımızda eksik yok — dosya
-doğru içerikle, yönlendirmesiz, her iki alan adında 200 dönüyor ve Play
-girişindeki `getlottoai.app` adresiyle eşleşiyor. Yapılacak tek şey beklemek;
-doğrulama butonuna tekrar basmanın faydası yok.
+Android uygulaması 31 Ağustos akşamı `app-ads.txt` ile başarıyla doğrulandı.
+Şimdi reklam gösterimine hazır olup olmadığına dair ayrı bir inceleme sürüyor;
+2–3 gün sürmesi bekleniyor, o bitene kadar reklam sunumu sınırlı. Sonuç
+e-postayla bildirilecek.
 
-Onay geldiğinde: fazladan AdMob kaydını (`ca-app-pub-...~4015509427`) sil,
+iOS uygulaması hâlâ doğrulanmadı — App Store'daki Marketing URL boş olduğu için
+AdMob tarayacak alan adı bulamıyor. 1.1.1 ile çözülecek.
+
+AEA / CMP uyarısı bizi ilgilendirmiyor: uygulama yalnızca Türkiye'de yayında ve
+reklamlar NPA modunda planlanıyor.
+
+İnceleme olumlu sonuçlanınca: fazladan AdMob kaydını (`ca-app-pub-...~4015509427`) sil,
 `ADS_REWARDS_ENABLED` değerini `true` yap, `FREE_DAILY_LIMIT` değerini 3'e
 döndür, SSV (sunucu taraflı ödül doğrulaması) kur.
 
@@ -131,7 +136,8 @@ politikaları nedeniyle; ayrıca taklit edilecek özgün bir kalıp yok.
   sorunu çözüldü
 - Uygulama içi değerlendirme istemi eklendi (`lib/review-prompt.ts`) — ilk
   kullanımdan 3 gün sonra, 5 kupon üretiminden sonra, 120 günde bir
-- Play uygulama adı `LottoAI: Sayısal Loto Kupon` olarak güncellendi (incelemede)
+- Play uygulama adı `LottoAI: Sayısal Loto Kupon` olarak güncellendi ve yayına girdi
+- AdMob Android uygulaması `app-ads.txt` ile doğrulandı
 - Çekiliş verisinin güvenlik değişikliğinden etkilenmediği doğrulandı
 
 ### 30 Ağustos 2026
