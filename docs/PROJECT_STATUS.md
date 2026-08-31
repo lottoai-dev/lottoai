@@ -1,0 +1,185 @@
+# LottoAI — Proje Durumu
+
+> Son güncelleme: 31 Ağustos 2026
+> Bu dosya her tamamlanan işten sonra güncellenir. Yeni bir sohbete başlarken
+> "durum dosyasını oku" demek yeterli.
+
+## Uygulama hakkında
+
+Türkiye loto oyunları (Çılgın Sayısal Loto, Süper Loto, Şans Topu, On Numara)
+için AI destekli kupon üretme, çekiliş sonucu takibi, istatistik ve bildirim
+sunan React Native / Expo uygulaması.
+
+| | |
+| --- | --- |
+| Backend | Supabase (Postgres + Auth + Edge Functions), proje ref `tsxzukctomvnyzalgxap` (panelde adı: LuckyPick) |
+| AI | DeepSeek `deepseek-v4-flash`, günlük 100.000 token kotası |
+| Reklam | Google AdMob (ödüllü), NPA modunda — **hesap onayı bekleniyor** |
+| Tasarım | "Calm Emerald" — koyu tema `#0A0C10`, marka yeşili koyu temada `#3DD68C` / açık temada `#1C9E73`, Plus Jakarta Sans |
+| Uygulama deposu | `C:\Dev\LottoAI` → github.com/lottoai-dev/lottoai |
+| Web sitesi deposu | `C:\Users\vatan\lottoai-web` → github.com/lottoai-dev/lottoai-web (Vercel'e bağlı, otomatik deploy) |
+
+### Kimlik bilgileri
+
+| | |
+| --- | --- |
+| Geliştirici | İbrahim Kaya, bireysel, Şanlıurfa / Türkiye |
+| İletişim | support@getlottoai.app · getlottoai.app |
+| Apple Team ID | PMN6Z259PJ (Enrollment 67A8HL27ZY) |
+| iOS | `app.getlottoai.ios` — App Store ID 6798183647 |
+| Android | `app.getlottoai.android` |
+| AdMob yayıncı | `pub-6473293791186582` |
+
+## Genel durum
+
+| Platform | Sürüm | Durum |
+| --- | --- | --- |
+| iOS | 1.1.0 | App Store'da yayında (30 Ağu 2026, build 6) |
+| Android | 1.1.0 | Google Play'de yayında (30 Ağu 2026, build 7) |
+| Website | — | getlottoai.app yayında, git + otomatik deploy kurulu |
+| Apple Search Ads | — | Aktif ($25/ay, $0.64 max CPI) |
+| AdMob | — | Hesap onayı bekleniyor (3. başvuru, 30 Ağu) |
+
+### Mağaza hesapları
+
+Apple Developer Program kurulu ve doğrulanmış; Small Business Program onaylı
+(15 Ağu 2026, komisyon %15). Google Play üretim erişimi onaylı (kapalı test
+9–25 Ağu tamamlandı). Kullanıcı Android'de alpha kanalında beta testçisi olarak
+kalıyor, kendi güncellemelerini önce orada test ediyor.
+
+## Bekleyen işler
+
+### Google onayı bekliyor
+
+AdMob hesabı henüz onaylanmadı; uygulama doğrulaması buna bağlı olduğu için
+`app-ads.txt` taraması da sonuçlanmıyor. Bizim tarafımızda eksik yok — dosya
+doğru içerikle, yönlendirmesiz, her iki alan adında 200 dönüyor ve Play
+girişindeki `getlottoai.app` adresiyle eşleşiyor. Yapılacak tek şey beklemek;
+doğrulama butonuna tekrar basmanın faydası yok.
+
+Onay geldiğinde: fazladan AdMob kaydını (`ca-app-pub-...~4015509427`) sil,
+`ADS_REWARDS_ENABLED` değerini `true` yap, `FREE_DAILY_LIMIT` değerini 3'e
+döndür, SSV (sunucu taraflı ödül doğrulaması) kur.
+
+### 1.1.1 sürümünde yapılacaklar
+
+Kod tarafı hazır ve commit edilmiş durumda (çıkışta push token temizliği,
+değerlendirme istemi). Sürümle birlikte App Store Connect'te girilecekler:
+
+| Alan | Değer |
+| --- | --- |
+| Uygulama adı | `LottoAI: Sayısal Loto Kupon` |
+| Alt başlık | `Sayısal Loto Kupon & Sonuçlar` |
+| Anahtar kelimeler | `şans topu,on numara,süper,çekiliş,istatistik,tahmin,rastgele,numara,şans,oyun` |
+| Marketing URL | `https://getlottoai.app` (şu an boş — AdMob iOS doğrulaması buna bağlı) |
+
+Not: iOS'ta ad, alt başlık ve Marketing URL yayındaki sürümde kilitli; yalnızca
+yeni sürüm taslağında düzenlenebiliyor. Anahtar kelimelerden `piyango` ve
+`milli piyango` bilinçli olarak çıkarıldı (marka adı → inceleme riski).
+
+### Açık maddeler
+
+| Öncelik | Madde |
+| --- | --- |
+| Orta | AdMob SSV — kullanıcı reklamı izlemeden `-3` ödül çağrısı yapabiliyor (günde en fazla 5 ödül, RPC tavanı `-15` ile sınırlı). Reklamlar açılınca gerekli |
+| Düşük | `ai-chat` kota yarış durumu — paralel istekler kotayı aşabilir. Öneri: kullanıcı başına advisory lock |
+| Düşük | `push_tokens` varsayılanı `true`→`false` (tek satır ALTER) |
+| Düşük | `push_tokens` unique constraint hatası (arka planda, UX'i etkilemiyor) |
+| Düşük | Offline kota kartının gecikmeli görünmesi (UX pürüzü) |
+| Düşük | App Store'da büyük harf "IBRAHIM KAYA" görünmesi |
+| İleride | Çekiliş girişinin otomatikleştirilmesi — aşağıya bakınız |
+
+### Çekiliş verisi (bilinçli karar)
+
+Sonuçlar elle giriliyor; kullanıcı sayısı arttıkça daha düzenli girilecek.
+`fetch-draws` fonksiyonu bu işi doğru yapamıyor: HTML'i basit regex'lerle
+kazıyor, `bonus` alanını hep `'-'` yazıyor, `superstar` ve `estimated_prize`
+alanlarına hiç dokunmuyor. Ayrıca oyun adını `'Çılgın Sayısal'` olarak yazıyor
+— uygulama `'Çılgın Sayısal Loto'` bekliyor, yani kayıt görünmez olurdu.
+Otomasyona geçilecekse bu fonksiyon düzeltilerek değil, sıfırdan yazılmalı.
+
+## Büyüme durumu
+
+App Store Analytics (90 gün, 29 Ağu): 411 gösterim → 151 ürün sayfası
+görüntüleme → 4 ilk kez indirme.
+
+Gösterimden sayfaya geçiş %37 ile sağlıklı — ad ve ikon işini yapıyor. Sayfadan
+indirmeye geçiş ise %2,6, asıl kırık halka burası. Ekran görüntüleri kaliteli
+(beş görsel, tutarlı tasarım, net başlıklar), dolayısıyla en olası sebep sıfır
+puan: her iki mağazada da hiç değerlendirme yok. Aynı aramada rakip
+"LotoAI Süper Loto Analiz" 4,2 puan ve 500+ indirmeyle listeleniyor.
+
+Bu yüzden 1.1.1'e uygulama içi değerlendirme istemi eklendi. Puanlar gelmeden
+reklam bütçesini artırmak veya ekran görüntülerini elden geçirmek erken olur;
+önce dönüşüm düzelmeli, sonra aynı metrikler yeniden ölçülmeli.
+
+Rakip adına benzer bir isim kullanmama kararı alındı — karışıklık riski ve Play
+politikaları nedeniyle; ayrıca taklit edilecek özgün bir kalıp yok.
+
+## Tamamlananlar
+
+### 31 Ağustos 2026
+
+- `lottoai-web` git deposuna bağlandı, GitHub'a gönderildi, Vercel'e bağlandı —
+  `main` dalına her commit otomatik yayına gidiyor
+- Tablo temizleme (retention) kuruldu: `purge_old_records()` fonksiyonu +
+  gecelik `pg_cron` işi (03:30 UTC). Okunmuş bildirimler 30, okunmamışlar ve AI
+  sohbet kayıtları 90, app log'ları 30 gün. Çakışan eski
+  `app_logs_retention_daily` işi kaldırıldı. Migration olarak repoda
+- Çıkışta push token temizliği eklendi (`unregisterPushToken`) — çıkmış
+  kullanıcıya bildirim gitmesi ve aynı cihazda ikinci hesapta çift bildirim
+  sorunu çözüldü
+- Uygulama içi değerlendirme istemi eklendi (`lib/review-prompt.ts`) — ilk
+  kullanımdan 3 gün sonra, 5 kupon üretiminden sonra, 120 günde bir
+- Play uygulama adı `LottoAI: Sayısal Loto Kupon` olarak güncellendi (incelemede)
+- Çekiliş verisinin güvenlik değişikliğinden etkilenmediği doğrulandı
+
+### 30 Ağustos 2026
+
+- iOS ve Android 1.1.0 yayınlandı (Türkçe dil desteği, yeni ekran görüntüleri,
+  bildirim ve kota iyileştirmeleri)
+- Website'e Google Play rozeti eklendi
+- AdMob için `app-ads.txt` oluşturuldu ve yayınlandı; Vercel'de çıplak alan
+  adının `www`'ye yönlendirmesi kaldırıldı (doğrulama yönlendirmeye takılabiliyor)
+- 1.1.0 çalışmasının tamamı git'e commit edilip GitHub'a gönderildi
+
+### Güvenlik denetimi — kapandı
+
+Canlı veritabanı ve dağıtılmış fonksiyonlar üzerinden doğrulandı:
+
+| Madde | Durum |
+| --- | --- |
+| `app_logs` anon INSERT | Saatlik hız sınırı (anon 500, kullanıcı 200) + zaman penceresi, `user_id` varsayılanı `auth.uid()` |
+| `fetch-draws` auth | service_role kapısı — canlı kod yereldekiyle birebir doğrulandı |
+| `send-push` | Repoda, service_role korumalı, canlıda doğrulandı |
+| `draws` INSERT | Politika yok + RLS açık → authenticated yazamıyor |
+| `notifications` | Oturum kontrolü ve `token` filtresi eklendi |
+| `feature_usage_daily` | RPC kimlik (`auth.uid()`), miktar (`1` / `-3`), alan ve ödül tavanı (`-15`) kontrolü yapıyor |
+| `push_tokens` | Sahip bazlı SELECT/INSERT/UPDATE/DELETE politikaları mevcut |
+
+Üç tabloda da RLS açık. Servis anahtarı rotasyonu ve legacy API key geçişi
+kullanıcı kararıyla iptal edildi — tekrar gündeme getirilmeyecek.
+
+### Notlar
+
+Kota davranışı **fail-closed**: sunucu okunamaz ve bugüne ait geçerli cache
+yoksa kota dolu sayılıyor (veri silme / uçak modu ile limit atlatmayı engeller).
+
+İngilizce gizlilik politikası maddesi listeden çıkarıldı: ortada eksik bir
+İngilizce metin yok, Türkçe metin GDPR ve KVKK'ya açıkça atıf yapıyor ve
+uygulama yalnızca Türkiye'de yayında.
+
+`android/` klasörünün git'te görünmemesi sorun değil — `.gitignore`'da, Expo
+prebuild ile üretiliyor.
+
+## Çalışma tercihleri
+
+- Kod açıklamaları sade, herkesin anlayabileceği dilde
+- Kod değişiklikleri KALDIR / YERİNE YAPIŞTIR formatında (istenirse tam dosya)
+- Büyük değişikliklerde önce plan netleşir, sonra kod tek seferde verilir
+- Play Console / App Store Connect gibi arayüzlerde adım adım yönlendirme;
+  bir adım bitmeden diğerine geçilmez, ekran görüntüsüyle teyit edilir
+- Tahmin yerine gerçek kod / veritabanı / build-log durumu doğrulanır
+- Web'de bulunan bilgiler eleştirel değerlendirilir (özellikle ticari kaynaklar)
+- Güvenlik konularında öneri sunulur, ama kullanıcının risk/emek değerlendirmesine
+  saygı gösterilir
