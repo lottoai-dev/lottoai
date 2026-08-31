@@ -184,35 +184,36 @@ export async function recordFeatureUsage(feature: FeatureKey): Promise<void> {
 }
 
 /**
- * Kullanıcı ödüllü reklamı tamamladığında çağrılır: o özelliğe REWARD_AMOUNT
- * (3) kadar ekstra hak ekler. Teknik olarak "negatif kullanım" yazarak
- * yapılır (increment_feature_usage aynı RPC'yi -3 ile çağırır) — limiti
- * yükseltmek yerine kullanımı azaltmak, tek bir sayaç/tek bir RPC ile
- * hem organik hem reklamla kazanılan hakları aynı yerde tutar.
+ * Ödül, istemcide DEĞİL sunucuda verilir: reklam tamamlanınca Google,
+ * admob-ssv Edge Function'ına imzalı bir çağrı yapar ve hak orada yazılır
+ * (kullanımı REWARD_AMOUNT kadar azaltarak — limiti yükseltmek yerine tek
+ * sayaç üzerinden gitmek organik ve reklamla kazanılan hakları aynı yerde
+ * tutar). feature_usage_daily üzerindeki trigger, kotanın service_role
+ * dışında azaltılmasını engeller; bu yüzden istemci tarafında ödül veren
+ * bir fonksiyon kasıtlı olarak yoktur.
+ *
+ * Bu fonksiyon o çağrının gelmesini bekler: kullanım usedBefore'un altına
+ * düşene kadar kotayı yoklar. Zaman aşımında null döner — çağıran taraf
+ * kullanıcıya "birazdan yansıyacak" demeli, hakkı kendisi vermemeli.
  */
-export async function grantFeatureReward(feature: FeatureKey): Promise<FeatureQuotaStatus> {
-  const userId = await getLocalUserId();
-  if (!userId) return statusFromUsed(0);
+export async function waitForRewardGrant(
+  feature: FeatureKey,
+  usedBefore: number,
+  timeoutMs = 12000,
+): Promise<FeatureQuotaStatus | null> {
+  const deadline = Date.now() + timeoutMs;
+  // İlk yoklamadan önce kısa bir bekleme: SSV çağrısı reklam kapanmadan
+  // hemen önce yola çıkar, genelde ilk saniyede ulaşır.
+  let delay = 700;
 
-  const day = todayInTurkey();
-  const field = FIELD_BY_FEATURE[feature];
-
-  try {
-    const { data: newUsed, error } = await supabase.rpc('increment_feature_usage', {
-      p_user_id: userId,
-      p_day: day,
-      p_field: field,
-      p_amount: -REWARD_AMOUNT,
-    });
-    if (error) throw error;
-    const used = Math.max(typeof newUsed === 'number' ? newUsed : 0, 0);
-    await writeQuotaCache(feature, userId, { day, used });
-    return statusFromUsed(used);
-  } catch {
-    // Yazım başarısız olursa kullanıcıya "hak eklendi" yalanı söylemeyiz —
-    // çağıran taraf bunu tekrar denemeyi teklif edebilir.
-    return await getFeatureQuotaStatus(feature);
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    const status = await getFeatureQuotaStatus(feature);
+    if (status.used < usedBefore) return status;
+    delay = 1500;
   }
+
+  return null;
 }
 
 export const FEATURE_FREE_DAILY_LIMIT = FREE_DAILY_LIMIT;

@@ -35,8 +35,8 @@ import {
   FEATURE_FREE_DAILY_LIMIT,
   FEATURE_REWARD_AMOUNT,
   getFeatureQuotaStatus,
-  grantFeatureReward,
   recordFeatureUsage,
+  waitForRewardGrant,
 } from '../../lib/featureQuota';
 import { GAMES, getGameAccentColor } from '../../lib/games';
 import GameSelector from '../../lib/GameSelector';
@@ -492,17 +492,27 @@ export default function GenerateScreen() {
 
   /**
    * Kota kartındaki "Reklam izle" butonuna basıldığında çağrılır.
-   * Reklam tamamlanıp ödül kazanılırsa +3 hak eklenir ve üretim otomatik
-   * tekrar denenir — kullanıcının "reklamı izledim, şimdi tekrar
-   * dokunmam mı gerekiyor?" diye sormasına gerek kalmaz.
+   * Hak, reklam bitince Google'ın sunucumuza yaptığı SSV çağrısıyla
+   * eklenir; burada o çağrının kotaya yansımasını bekleriz. Yansıyınca
+   * üretim otomatik tekrar denenir — kullanıcının "reklamı izledim, şimdi
+   * tekrar dokunmam mı gerekiyor?" diye sormasına gerek kalmaz.
    */
   const handleWatchAd = async () => {
+    if (!user) return;
     softHaptic();
     setWatchingAd(true);
     try {
-      const result = await showRewardedAd('filtered_coupon');
+      const before = await getFeatureQuotaStatus('filtered_coupon');
+      const result = await showRewardedAd('filtered_coupon', { userId: user.id });
       if (result.status === 'earned') {
-        await grantFeatureReward('filtered_coupon');
+        const granted = await waitForRewardGrant('filtered_coupon', before.used);
+        if (!granted) {
+          showAlert(
+            'Ödülün yolda',
+            'Reklamı izledin ama hakkın henüz yansımadı. Birkaç saniye içinde eklenecek, sonra tekrar dener misin?',
+          );
+          return;
+        }
         setQuotaCardVisible(false);
         performGeneration();
       } else if (result.status === 'closed_without_reward') {

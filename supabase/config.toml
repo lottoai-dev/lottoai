@@ -422,6 +422,12 @@ verify_jwt = true
 import_map = "./functions/delete-account/deno.json"
 entrypoint = "./functions/delete-account/index.ts"
 
+[functions.admob-ssv]
+enabled = true
+# Cagriyi Google yapar, Supabase oturumu yoktur; guvenlik ECDSA imzasindan gelir.
+verify_jwt = false
+entrypoint = "./functions/admob-ssv/index.ts"
+
 [functions.ai-chat]
 enabled = true
 verify_jwt = true

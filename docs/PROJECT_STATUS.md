@@ -64,7 +64,23 @@ reklamlar NPA modunda planlanıyor.
 
 İnceleme olumlu sonuçlanınca: fazladan AdMob kaydını (`ca-app-pub-...~4015509427`) sil,
 `ADS_REWARDS_ENABLED` değerini `true` yap, `FREE_DAILY_LIMIT` değerini 3'e
-döndür, SSV (sunucu taraflı ödül doğrulaması) kur.
+döndür, `admob-ssv` fonksiyonunu dağıt ve dört reklam biriminin SSV alanına
+adresini gir.
+
+**Karar (31 Ağu):** 1.1.1 sürümü AdMob incelemesi bitene kadar bekletiliyor;
+böylece mağaza metinleri, reklam bayrağı ve hazır düzeltmeler tek sürümde
+çıkar. Cuma akşamına kadar onay gelmezse reklamlar 1.1.2'ye bırakılıp 1.1.1
+elimizdekilerle yayınlanacak.
+
+### SSV dağıtımı (kod hazır, dağıtım bekliyor)
+
+`supabase/functions/admob-ssv` yazıldı ama henüz dağıtılmadı. Reklamlar
+açılmadan önce yapılacaklar:
+
+1. `npx supabase functions deploy admob-ssv` (config'te `verify_jwt = false`)
+2. `npx supabase db push` — `admob_ssv_rewards` tablosu ve kota koruma trigger'ı
+3. AdMob konsolunda dört ödüllü reklam biriminin SSV alanına
+   `https://<proje-ref>.supabase.co/functions/v1/admob-ssv` adresini gir
 
 ### 1.1.1 sürümünde yapılacaklar
 
@@ -86,7 +102,6 @@ yeni sürüm taslağında düzenlenebiliyor. Anahtar kelimelerden `piyango` ve
 
 | Öncelik | Madde |
 | --- | --- |
-| Orta | AdMob SSV — kullanıcı reklamı izlemeden `-3` ödül çağrısı yapabiliyor (günde en fazla 5 ödül, RPC tavanı `-15` ile sınırlı). Reklamlar açılınca gerekli |
 | Düşük | `ai-chat` kota yarış durumu — paralel istekler kotayı aşabilir. Öneri: kullanıcı başına advisory lock |
 | Düşük | `push_tokens` varsayılanı `true`→`false` (tek satır ALTER) |
 | Düşük | `push_tokens` unique constraint hatası (arka planda, UX'i etkilemiyor) |
@@ -138,6 +153,8 @@ politikaları nedeniyle; ayrıca taklit edilecek özgün bir kalıp yok.
   kullanımdan 3 gün sonra, 5 kupon üretiminden sonra, 120 günde bir
 - Play uygulama adı `LottoAI: Sayısal Loto Kupon` olarak güncellendi ve yayına girdi
 - AdMob Android uygulaması `app-ads.txt` ile doğrulandı
+- AdMob SSV yazıldı: ödül artık istemcide değil, Google'ın imzalı çağrısıyla
+  sunucuda veriliyor; kotanın istemciden düşürülmesi trigger ile engellendi
 - Çekiliş verisinin güvenlik değişikliğinden etkilenmediği doğrulandı
 
 ### 30 Ağustos 2026

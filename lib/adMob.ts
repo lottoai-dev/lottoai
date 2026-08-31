@@ -40,6 +40,15 @@ function getAdUnitId(feature: FeatureKey): string {
   return Platform.OS === 'ios' ? ids.ios : ids.android;
 }
 
+export type ShowRewardedAdOptions = {
+  /**
+   * Supabase kullanici kimligi. Google, SSV cagrisinda bunu geri gonderir;
+   * admob-ssv fonksiyonu odulu bu kullaniciya yazar. Verilmezse odul
+   * sunucuda islenemez.
+   */
+  userId: string;
+};
+
 export type ShowRewardedAdResult =
   | { status: 'earned' }
   | { status: 'closed_without_reward' }
@@ -48,8 +57,10 @@ export type ShowRewardedAdResult =
 
 /**
  * Bir ödüllü reklamı yükler ve gösterir. Kullanıcı reklamı sonuna kadar
- * izlerse 'earned' döner — çağıran taraf bunu görünce grantFeatureReward'ı
- * çağırmalı. Web'de reklam SDK'sı çalışmadığı için 'not_supported' döner
+ * izlerse 'earned' döner — ancak hak İSTEMCİDE eklenmez: Google'ın SSV
+ * çağrısı admob-ssv Edge Function'ına ulaşınca sunucuda yazılır. Çağıran
+ * taraf 'earned' sonrası waitForRewardGrant ile kotanın güncellenmesini
+ * beklemeli. Web'de reklam SDK'sı çalışmadığı için 'not_supported' döner
  * (react-native-google-mobile-ads web'de no-op).
  *
  * Basitlik için reklam İSTEK ÜZERİNE yüklenir (önceden ön-yükleme yok) —
@@ -58,7 +69,10 @@ export type ShowRewardedAdResult =
  * İlk sürüm için kabul edilebilir; ileride performans sorun olursa
  * ekran açılışında ön-yükleme eklenebilir.
  */
-export function showRewardedAd(feature: FeatureKey): Promise<ShowRewardedAdResult> {
+export function showRewardedAd(
+  feature: FeatureKey,
+  options: ShowRewardedAdOptions,
+): Promise<ShowRewardedAdResult> {
   if (Platform.OS === 'web') {
     return Promise.resolve({ status: 'not_supported' });
   }
@@ -68,6 +82,10 @@ export function showRewardedAd(feature: FeatureKey): Promise<ShowRewardedAdResul
     // NPA: kişiselleştirilmiş reklam / IDFA / ATT kullanmıyoruz.
     const rewarded = RewardedAd.createForAdRequest(adUnitId, {
       requestNonPersonalizedAdsOnly: true,
+      serverSideVerificationOptions: {
+        userId: options.userId,
+        customData: JSON.stringify({ feature }),
+      },
     });
 
     let earned = false;

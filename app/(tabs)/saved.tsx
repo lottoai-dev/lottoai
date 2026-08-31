@@ -44,8 +44,8 @@ import {
     FEATURE_FREE_DAILY_LIMIT,
     FEATURE_REWARD_AMOUNT,
     getFeatureQuotaStatus,
-    grantFeatureReward,
     recordFeatureUsage,
+    waitForRewardGrant,
     todayInTurkey,
 } from '../../lib/featureQuota';
 import { GameEmblem } from '../../lib/emblems';
@@ -584,17 +584,26 @@ export default function SavedScreen() {
 
   /**
    * Rapor kotası kartındaki "Reklam izle" butonuna basıldığında çağrılır.
-   * Ödül kazanılırsa +3 hak eklenir ve bekleyen kuponun geçmişi otomatik
-   * açılır — kullanıcının reklamdan sonra tekrar butona basmasına gerek
-   * kalmaz.
+   * Hak, Google'ın sunucumuza yaptığı SSV çağrısıyla eklenir; burada o
+   * çağrının kotaya yansımasını bekleriz. Yansıyınca bekleyen kuponun
+   * geçmişi otomatik açılır.
    */
   const handleWatchAd = useCallback(async () => {
+    if (!user) return;
     softHaptic();
     setWatchingAd(true);
     try {
-      const result = await showRewardedAd('report');
+      const before = await getFeatureQuotaStatus('report');
+      const result = await showRewardedAd('report', { userId: user.id });
       if (result.status === 'earned') {
-        await grantFeatureReward('report');
+        const granted = await waitForRewardGrant('report', before.used);
+        if (!granted) {
+          showAlert(
+            'Ödülün yolda',
+            'Reklamı izledin ama hakkın henüz yansımadı. Birkaç saniye içinde eklenecek, sonra tekrar dener misin?',
+          );
+          return;
+        }
         setReportQuotaVisible(false);
         const couponId = pendingHistoryId;
         const coupon = couponId != null ? couponsRef.current.find((cp) => cp.id === couponId) : null;
