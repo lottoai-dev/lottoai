@@ -1,6 +1,6 @@
 # LottoAI — Proje Durumu
 
-> Son güncelleme: 31 Ağustos 2026 (akşam)
+> Son güncelleme: 1 Eylül 2026
 > Bu dosya her tamamlanan işten sonra güncellenir. Yeni bir sohbete başlarken
 > "durum dosyasını oku" demek yeterli.
 
@@ -72,15 +72,13 @@ böylece mağaza metinleri, reklam bayrağı ve hazır düzeltmeler tek sürümd
 çıkar. Cuma akşamına kadar onay gelmezse reklamlar 1.1.2'ye bırakılıp 1.1.1
 elimizdekilerle yayınlanacak.
 
-### SSV dağıtımı (kod hazır, dağıtım bekliyor)
+### SSV dağıtımı (tamamlandı — 1 Eyl)
 
-`supabase/functions/admob-ssv` yazıldı ama henüz dağıtılmadı. Reklamlar
-açılmadan önce yapılacaklar:
+`admob-ssv` Edge Function ve `admob_ssv_rewards` tablosu + kota koruma trigger'ı
+canlıya alındı. AdMob onayı gelince yalnızca konsol adımı kalır:
 
-1. `npx supabase functions deploy admob-ssv` (config'te `verify_jwt = false`)
-2. `npx supabase db push` — `admob_ssv_rewards` tablosu ve kota koruma trigger'ı
-3. AdMob konsolunda dört ödüllü reklam biriminin SSV alanına
-   `https://<proje-ref>.supabase.co/functions/v1/admob-ssv` adresini gir
+1. Dört ödüllü reklam biriminin SSV alanına şu adresi gir:
+   `https://tsxzukctomvnyzalgxap.supabase.co/functions/v1/admob-ssv`
 
 ### 1.1.1 sürümünde yapılacaklar
 

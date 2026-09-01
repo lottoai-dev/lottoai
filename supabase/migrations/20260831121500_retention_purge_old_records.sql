@@ -8,7 +8,7 @@ returns void
 language plpgsql
 security definer
 set search_path to 'public'
-    10|as $$
+as $$
 begin
   -- Okunmuş bildirimler 30, okunmamışlar 90 gün sonra silinir. Okunmamışı
   -- daha uzun tutuyoruz: uygulamayı seyrek açan kullanıcı bildirimini
@@ -18,7 +18,7 @@ begin
       or created_at < now() - interval '90 days';
 
   -- Sadece AI cevap kalitesini incelemek için tutulur, istemci hiç okumaz.
-    20|  delete from ai_conversations
+  delete from ai_conversations
    where created_at < now() - interval '90 days';
 
   delete from app_logs
@@ -28,7 +28,7 @@ $$;
 
 -- Eski, yalnızca app_logs'u temizleyen iş artık gereksiz.
 do $$
-    30|begin
+begin
   perform cron.unschedule('app_logs_retention_daily');
 exception
   when others then null;
@@ -38,7 +38,7 @@ end $$;
 do $$
 begin
   perform cron.schedule(
-    40|    'purge-old-records',
+    'purge-old-records',
     '30 3 * * *',
     $job$select public.purge_old_records()$job$
   );
