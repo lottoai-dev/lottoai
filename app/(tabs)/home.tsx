@@ -32,7 +32,6 @@ import {
 } from '../../lib/games';
 import { softHaptic } from '../../lib/haptics';
 import {
-    AIAssistantIcon,
     ArrowRightIcon,
     BellIcon,
     CalendarIcon,
@@ -398,9 +397,6 @@ export default function HomeScreen() {
             <Text style={s.brand}>LottoAI</Text>
           </View>
           <View style={s.headerActions}>
-            <PressableScale haptic={false} style={s.iconBtn} onPress={() => { softHaptic(); router.push('/(tabs)/ai-assistant' as any); }}>
-              <AIAssistantIcon color={c.brand} size={25} />
-            </PressableScale>
             <PressableScale haptic={false} style={s.iconBtn} onPress={() => { softHaptic(); router.push('/(tabs)/bildirimler' as any); }}>
               <BellIcon color={c.text2} size={19} />
               {unreadCount > 0 ? (

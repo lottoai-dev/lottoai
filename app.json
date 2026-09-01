@@ -7,7 +7,7 @@
     "icon": "./assets/images/LottoAI-AppStore-1024.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "description": "LottoAI, Türkiye'nin en akıllı loto asistanı! Çılgın Sayısal Loto, Süper Loto, Şans Topu ve On Numara için akıllı kuponlar üret, çekiliş sonuçlarını anında takip et, detaylı istatistikler ve AI analizi ile şansını artır. 18 yaş ve üzeri içindir. Şans oyunları bağımlılık yapabilir, sorumlu oynayın.",
+    "description": "LottoAI, Türkiye'nin sayısal loto oyunları için kupon üretme, çekiliş sonucu takibi ve istatistik uygulamasıdır. Çılgın Sayısal Loto, Süper Loto, Şans Topu ve On Numara. 18 yaş ve üzeri içindir. Şans oyunları bağımlılık yapabilir, sorumlu oynayın.",
     "primaryColor": "#1C9E73",
     "ios": {
       "supportsTablet": false,

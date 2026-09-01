@@ -7,13 +7,13 @@
 ## Uygulama hakkında
 
 Türkiye loto oyunları (Çılgın Sayısal Loto, Süper Loto, Şans Topu, On Numara)
-için AI destekli kupon üretme, çekiliş sonucu takibi, istatistik ve bildirim
-sunan React Native / Expo uygulaması.
+için kupon üretme, çekiliş sonucu takibi, istatistik ve bildirim sunan React
+Native / Expo uygulaması.
 
 | | |
 | --- | --- |
 | Backend | Supabase (Postgres + Auth + Edge Functions), proje ref `tsxzukctomvnyzalgxap` (panelde adı: LuckyPick) |
-| AI | DeepSeek `deepseek-v4-flash`, günlük 100.000 token kotası |
+| AI | **Kaldırıldı (1 Eyl)** — Lota sohbet asistanı tamamen söküldü; ileride dar kapsamlı "cümleyle kolon" düşünülebilir |
 | Reklam | Google AdMob (ödüllü), NPA modunda — **hesap onayı bekleniyor** |
 | Tasarım | "Calm Emerald" — koyu tema `#0A0C10`, marka yeşili koyu temada `#3DD68C` / açık temada `#1C9E73`, Plus Jakarta Sans |
 | Uygulama deposu | `C:\Dev\LottoAI` → github.com/lottoai-dev/lottoai |
@@ -82,29 +82,37 @@ canlıya alındı. AdMob onayı gelince yalnızca konsol adımı kalır:
 
 ### 1.1.1 sürümünde yapılacaklar
 
-Kod tarafı hazır ve commit edilmiş durumda (çıkışta push token temizliği,
-değerlendirme istemi). Sürümle birlikte App Store Connect'te girilecekler:
+Kod tarafı hazır (çıkışta push token temizliği, değerlendirme istemi, **Lota
+kaldırıldı**). Yayın öncesi:
+
+1. `app.json` sürümünü `1.1.1` yap, production build al (iOS + Android aynı commit)
+2. Supabase'ten canlı `ai-chat` fonksiyonunu sil: `npx supabase functions delete ai-chat`
+3. Mağaza metinlerinden Lota / AI asistan bölümlerini çıkar (aşağıdaki tablo)
+
+**App Store Connect (1.1.1):**
 
 | Alan | Değer |
 | --- | --- |
 | Uygulama adı | `LottoAI: Sayısal Loto Kupon` |
-| Alt başlık | `Sayısal Loto Kupon & Sonuçlar` |
+| Alt başlık | `Kupon, sonuç, istatistik — 4 oyun` |
 | Anahtar kelimeler | `şans topu,on numara,süper,çekiliş,istatistik,tahmin,rastgele,numara,şans,oyun` |
-| Marketing URL | `https://getlottoai.app` (şu an boş — AdMob iOS doğrulaması buna bağlı) |
+| Marketing URL | `https://getlottoai.app` |
+| Description | LOTA / AI asistan paragrafını kaldır |
+| What's New | Lota kaldırıldı + diğer 1.1.1 maddeleri |
+| Review Notes | DeepSeek / Lota maddesini kaldır |
 
-Not: iOS'ta ad, alt başlık ve Marketing URL yayındaki sürümde kilitli; yalnızca
-yeni sürüm taslağında düzenlenebiliyor. Anahtar kelimelerden `piyango` ve
-`milli piyango` bilinçli olarak çıkarıldı (marka adı → inceleme riski).
+**Google Play:** Kısa/tam açıklamada değişiklik zorunlu değil (Lota zaten
+ayrı blok değil); sürüm notlarına Lota kaldırma ekle.
 
 ### Açık maddeler
 
 | Öncelik | Madde |
 | --- | --- |
-| Düşük | `ai-chat` kota yarış durumu — paralel istekler kotayı aşabilir. Öneri: kullanıcı başına advisory lock |
 | Düşük | `push_tokens` varsayılanı `true`→`false` (tek satır ALTER) |
 | Düşük | `push_tokens` unique constraint hatası (arka planda, UX'i etkilemiyor) |
 | Düşük | Offline kota kartının gecikmeli görünmesi (UX pürüzü) |
 | Düşük | App Store'da büyük harf "IBRAHIM KAYA" görünmesi |
+| İleride | Dar kapsamlı AI: Kupon üret ekranında tek turluk "cümleyle kolon" (sohbet değil) |
 | İleride | Çekiliş girişinin otomatikleştirilmesi — aşağıya bakınız |
 
 ### Çekiliş verisi (bilinçli karar)
@@ -135,6 +143,14 @@ Rakip adına benzer bir isim kullanmama kararı alındı — karışıklık risk
 politikaları nedeniyle; ayrıca taklit edilecek özgün bir kalıp yok.
 
 ## Tamamlananlar
+
+### 1 Eylül 2026
+
+- **Lota tamamen kaldırıldı:** `ai-assistant` ekranı, ana sayfa AI ikonu,
+  `deepseek.ts`, `aiAppContext.ts`, `ai-chat` Edge Function (repodan), ilgili
+  ikon ve bileşenler. Kota sıfırlama yardımcıları `featureQuota.ts`'e taşındı.
+- SSV canlıya alındı (`admob-ssv` + migration)
+- Fazladan AdMob Android kaydı gizlendi (konsol)
 
 ### 31 Ağustos 2026
 

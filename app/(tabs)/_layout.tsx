@@ -120,7 +120,6 @@ export default function TabLayout() {
       <Tabs.Screen name="saved" />
       <Tabs.Screen name="profile" />
 
-      <Tabs.Screen name="ai-assistant" options={{ href: null }} />
       <Tabs.Screen name="bildirimler" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="legal" options={{ href: null }} />

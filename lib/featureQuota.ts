@@ -1,10 +1,7 @@
 // lib/featureQuota.ts
 // Filtreli kupon üretimi ve "Geçmiş" (rapor) görüntüleme için günlük,
-// kullanıcı bazlı kullanım kotası. ai_usage_daily / ai-chat Edge Function
-// ile aynı desen: sunucuda (Supabase) tutulur, istemci sıfırlayamaz;
-// "gün" Türkiye saatine göre hesaplanır (kalıcı UTC+3, yaz saati yok) —
-// bu değer ai-chat'teki todayInTurkey() ile TUTARLI olmalı, aksi halde
-// AI kotası bir günde sıfırlanırken bu kota başka bir anda sıfırlanır.
+// kullanıcı bazlı kullanım kotası. Sunucuda (Supabase) tutulur, istemci
+// sıfırlayamaz; "gün" Türkiye saatine göre hesaplanır (kalıcı UTC+3).
 //
 /**
  * Kota sistemi: sunucu öncelikli, cache yedek.
@@ -41,6 +38,28 @@ type QuotaCacheEntry = {
 /** Türkiye takvim günü (YYYY-MM-DD). Kota ve yerel "bugün görüldü" listesi için ortak. */
 export function todayInTurkey(): string {
   return new Date(Date.now() + 3 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+const TR_OFFSET_MS = 3 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Günlük kotanın yenilenmesine kalan süre (ms). Gün dönümünde 0'a iner. */
+export function msUntilQuotaReset(now: number = Date.now()): number {
+  const trNow = now + TR_OFFSET_MS;
+  return Math.ceil(trNow / DAY_MS) * DAY_MS - trNow;
+}
+
+/** Kalan süreyi kısa metne çevirir: "7 sa 23 dk". */
+export function formatQuotaResetIn(ms: number): string {
+  if (ms <= 60_000) return '1 dakikadan az';
+
+  const totalMinutes = Math.floor(ms / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours === 0) return `${minutes} dk`;
+  if (minutes === 0) return `${hours} sa`;
+  return `${hours} sa ${minutes} dk`;
 }
 
 export type FeatureQuotaStatus = {

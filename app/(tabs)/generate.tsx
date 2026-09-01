@@ -29,12 +29,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { showRewardedAd } from '../../lib/adMob';
 import { markCouponsDirty } from '../../lib/couponsStore';
 import { GameEmblem } from '../../lib/emblems';
-import { formatQuotaResetIn, msUntilQuotaReset } from '../../lib/aiQuota';
 import {
   ADS_REWARDS_ENABLED,
   FEATURE_FREE_DAILY_LIMIT,
   FEATURE_REWARD_AMOUNT,
+  formatQuotaResetIn,
   getFeatureQuotaStatus,
+  msUntilQuotaReset,
   recordFeatureUsage,
   waitForRewardGrant,
 } from '../../lib/featureQuota';

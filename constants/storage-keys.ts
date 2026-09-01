@@ -8,8 +8,6 @@ export const STORAGE_KEYS = {
     THEME_PREF: 'themePref',
     BILDIRIMLER: 'bildirimler',
     LAST_DRAWS_CACHE: 'lastDrawsCache',
-    /** Kullanıcı kimliğine göre günlük AI kota kilitleri ({ userId: YYYY-MM-DD }). */
-    AI_QUOTA_EXHAUSTED_DAY: 'aiQuotaExhaustedDay',
     /** Bugün Geçmiş'i açılmış kupon ID'leri ({ date, couponIds }) — userId ile birleştirilir. */
     VIEWED_HISTORY_TODAY: 'viewedHistoryToday',
     /**
