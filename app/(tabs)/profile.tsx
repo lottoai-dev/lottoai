@@ -188,7 +188,7 @@ export default function ProfileScreen() {
           >
             <View style={{ flex: 1 }}>
               <Text style={[s.loginBannerTitle, { color: c.brand }]}>Hesabına giriş yap</Text>
-              <Text style={[s.loginBannerSub, { color: c.text2 }]}>Kuponlarını kaydet ve AI Asistan'ı kullan</Text>
+              <Text style={[s.loginBannerSub, { color: c.text2 }]}>Kolonlarını kaydet ve Lota AI&apos;ı kullan</Text>
             </View>
             <ChevronRightIcon color={c.brand} size={20} />
           </Pressable>
@@ -237,7 +237,7 @@ export default function ProfileScreen() {
               <TicketIcon color={c.brand} size={19} />
             </View>
             <Text style={s.statValue}>{totalCoupons}</Text>
-            <Text style={s.statLabel}>Kupon</Text>
+            <Text style={s.statLabel}>Kolon</Text>
           </Surface>
           <Surface style={s.statCard}>
             <View style={[s.statIcon, { backgroundColor: c.surfaceAlt }]}>

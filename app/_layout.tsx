@@ -271,6 +271,7 @@ function RootContent() {
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="ai-studio" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="login" />
         <Stack.Screen name="auth/callback" />

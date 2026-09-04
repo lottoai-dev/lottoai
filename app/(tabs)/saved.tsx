@@ -173,7 +173,7 @@ export default function SavedScreen() {
   const [isLoading, setIsLoading] = useState(true);
   // "Geçmiş" (rapor) görüntüleme günlük ücretsiz hakkı doldurduğunda bu
   // kart açılır. pendingHistoryId, reklam izlenip ödül kazanıldığında
-  // hangi kuponun geçmişinin otomatik açılacağını tutar.
+  // hangi kolonun geçmişinin otomatik açılacağını tutar.
   const [reportQuotaVisible, setReportQuotaVisible] = useState(false);
   const [pendingHistoryId, setPendingHistoryId] = useState<number | null>(null);
   const [watchingAd, setWatchingAd] = useState(false);
@@ -342,7 +342,7 @@ export default function SavedScreen() {
 
       if (showNotification && newlyCheckedCount > 0) {
         const gameList = [...new Set(pending.map((cp) => cp.game))].join(', ');
-        const body = `${newlyCheckedCount} kuponun kontrol edildi${bestNewRank > 0 ? `, en iyi: ${bestNewLabel}` : ''}.`;
+        const body = `${newlyCheckedCount} kolonun kontrol edildi${bestNewRank > 0 ? `, en iyi: ${bestNewLabel}` : ''}.`;
         await Notifications.scheduleNotificationAsync({
           content: {
             title: 'Çekiliş Sonuçları Açıklandı!',
@@ -462,7 +462,7 @@ export default function SavedScreen() {
 
   const handleDelete = useCallback(
     (id: number) => {
-      showAlert('Kuponu sil', 'Bu kupon kalıcı olarak silinecek.', [
+      showAlert('Kolonu sil', 'Bu kolon kalıcı olarak silinecek.', [
         { text: 'Vazgeç', style: 'cancel' },
         {
           text: 'Sil',
@@ -479,7 +479,7 @@ export default function SavedScreen() {
 
   const handleDeleteAll = useCallback(() => {
     softHaptic();
-    showAlert('Tümünü sil', 'Tüm kayıtlı kuponlar silinecek.', [
+    showAlert('Tümünü sil', 'Tüm kayıtlı kolonlar silinecek.', [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Sil',
@@ -508,7 +508,7 @@ export default function SavedScreen() {
             ? `\n🎯 Sonuç: ${getMatchDisplay(toMatchDisplayInput(coupon)).label}`
             : '';
         const message =
-          `🍀 LottoAI Kuponu\n` +
+          `🍀 LottoAI Kolonu\n` +
           `━━━━━━━━━━━━━━━\n` +
           `🎮 ${coupon.game}\n` +
           `📅 ${coupon.date}\n` +
@@ -549,7 +549,7 @@ export default function SavedScreen() {
    * "Geçmiş" butonuna basıldığında çağrılır. Önce günlük ücretsiz hak
    * kontrol edilir — hak varsa geçmiş direkt açılır, yoksa reklam kartı
    * gösterilir. pendingHistoryId, reklam izlenip ödül kazanılınca hangi
-   * kuponun geçmişinin açılacağını hatırlamak için tutulur.
+   * kolonun geçmişinin açılacağını hatırlamak için tutulur.
    */
   const openHistory = useCallback(async (id: number) => {
     const coupon = couponsRef.current.find((cp) => cp.id === id);
@@ -561,7 +561,7 @@ export default function SavedScreen() {
       return;
     }
 
-    // Aynı kupon aynı gün içinde daha önce açıldıysa kotadan düşme.
+    // Aynı kolon aynı gün içinde daha önce açıldıysa kotadan düşme.
     const viewedIds = await getViewedHistoryToday(user.id);
     if (viewedIds.includes(id)) {
       setHistoryModalCoupon(coupon);
@@ -586,7 +586,7 @@ export default function SavedScreen() {
   /**
    * Rapor kotası kartındaki "Reklam izle" butonuna basıldığında çağrılır.
    * Hak, Google'ın sunucumuza yaptığı SSV çağrısıyla eklenir; burada o
-   * çağrının kotaya yansımasını bekleriz. Yansıyınca bekleyen kuponun
+   * çağrının kotaya yansımasını bekleriz. Yansıyınca bekleyen kolonun
    * geçmişi otomatik açılır.
    */
   const handleWatchAd = useCallback(async () => {
@@ -647,14 +647,14 @@ export default function SavedScreen() {
         <SavedHeader styles={s} brand={c.brand} />
 
         {isLoading ? (
-          <LoadingState label="Kuponların yükleniyor…" />
+          <LoadingState label="Kolonların yükleniyor…" />
         ) : coupons.length === 0 ? (
           <View style={{ paddingTop: 40 }}>
             <EmptyState
               icon={<TicketIcon color={c.brand} size={30} />}
-              title="Henüz kuponun yok"
-              desc="Kupon üret ekranında sayılarını seç ve kaydet. Sonuçlar açıklanınca otomatik kontrol edip burada gösterelim."
-              action="İlk kuponunu üret"
+              title="Henüz kolonun yok"
+              desc="Kolon üret ekranında sayılarını seç ve kaydet. Sonuçlar açıklanınca otomatik kontrol edip burada gösterelim."
+              action="İlk kolonunu üret"
               onAction={goGenerate}
             />
           </View>
@@ -666,7 +666,7 @@ export default function SavedScreen() {
                   <TicketIcon color={c.brand} size={19} />
                 </View>
                 <Text style={s.statValue}>{coupons.length}</Text>
-                <Text style={s.statLabel}>Toplam kupon</Text>
+                <Text style={s.statLabel}>Toplam kolon</Text>
               </Surface>
               <Surface style={s.statCard}>
                 <View style={[s.statIcon, { backgroundColor: c.surfaceAlt }]}>
@@ -680,7 +680,7 @@ export default function SavedScreen() {
             <Segmented options={filterOptions} value={filterStatus} onChange={handleFilterChange} />
 
             <View style={s.topRow}>
-              <Text style={s.sectionTitle}>{totalCoupons} kupon</Text>
+              <Text style={s.sectionTitle}>{totalCoupons} kolon</Text>
               <Pressable onPress={handleDeleteAll} hitSlop={8}>
                 <Text style={[s.deleteAll, { color: c.danger }]}>Tümünü sil</Text>
               </Pressable>
@@ -691,12 +691,12 @@ export default function SavedScreen() {
                 icon={<TicketIcon color={c.brand} size={30} />}
                 title={
                   filterStatus === 'pending'
-                    ? 'Bekleyen kupon yok'
+                    ? 'Bekleyen kolon yok'
                     : filterStatus === 'checked'
-                      ? 'Kontrol edilmiş kupon yok'
-                      : 'Kupon bulunamadı'
+                      ? 'Kontrol edilmiş kolon yok'
+                      : 'Kolon bulunamadı'
                 }
-                desc={filterStatus === 'pending' ? 'Tüm kuponların kontrol edildi.' : 'Bu filtreye uygun kupon yok.'}
+                desc={filterStatus === 'pending' ? 'Tüm kolonların kontrol edildi.' : 'Bu filtreye uygun kolon yok.'}
               />
             ) : null}
 
@@ -765,7 +765,7 @@ export default function SavedScreen() {
             {ADS_REWARDS_ENABLED ? (
               <>
                 <Text style={s.quotaDesc}>
-                  Bugün için {FEATURE_FREE_DAILY_LIMIT} kupon geçmişi görüntüleme hakkını kullandın. Kısa bir reklam izleyip {FEATURE_REWARD_AMOUNT} hak daha kazanabilirsin.
+                  Bugün için {FEATURE_FREE_DAILY_LIMIT} kolon geçmişi görüntüleme hakkını kullandın. Kısa bir reklam izleyip {FEATURE_REWARD_AMOUNT} hak daha kazanabilirsin.
                 </Text>
                 <AppButton
                   haptic={false}
@@ -785,7 +785,7 @@ export default function SavedScreen() {
             ) : (
               <>
                 <Text style={s.quotaDesc}>
-                  Bugün için {FEATURE_FREE_DAILY_LIMIT} kupon geçmişi görüntüleme hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek.
+                  Bugün için {FEATURE_FREE_DAILY_LIMIT} kolon geçmişi görüntüleme hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek.
                 </Text>
                 <AppButton
                   haptic={false}
@@ -814,10 +814,10 @@ const SavedHeader = React.memo(function SavedHeader({
     <View style={s.header}>
       <View style={s.eyebrowRow}>
         <View style={[s.eyebrowDot, { backgroundColor: brand }]} />
-        <Text style={[s.eyebrow, { color: brand }]}>KUPON CÜZDANI</Text>
+        <Text style={[s.eyebrow, { color: brand }]}>KOLON CÜZDANI</Text>
       </View>
-      <Text style={s.title}>Kuponlarım</Text>
-      <Text style={s.subtitle}>Kayıtlı kuponların ve sonuçları</Text>
+      <Text style={s.title}>Kolonlarım</Text>
+      <Text style={s.subtitle}>Kayıtlı kolonların ve sonuçları</Text>
     </View>
   );
 });
@@ -844,7 +844,7 @@ function CheckResultBody({
     <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 540 }}>
       <View style={s.modalHead}>
         <View style={{ flex: 1 }}>
-          <Text style={s.modalTitle}>Kupon sonucu</Text>
+          <Text style={s.modalTitle}>Kolon sonucu</Text>
           <Text style={s.modalSubtitle}>
             {checkingCoupon.game} · {checkResult.draw.draw_date}
           </Text>

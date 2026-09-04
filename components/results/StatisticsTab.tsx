@@ -263,7 +263,7 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
           icon={<DiceIcon color={c.brand} size={28} />}
           title="Henüz veri yok"
           desc="Bu oyun için çekiliş verisi bulunamadı."
-          action="Kupon üret"
+          action="Kolon üret"
           onAction={() => router.push('/(tabs)/generate')}
         />
       ) : (
@@ -418,7 +418,7 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
                 </Text>
               </Surface>
               <Surface style={s.distCard}>
-                <Text style={s.distTitle}>Kaç kupon oynarsan?</Text>
+                <Text style={s.distTitle}>Kaç kolon oynarsan?</Text>
                 <View style={s.couponRow}>
                   <Pressable onPress={() => { softHaptic(); setCouponCount(String(Math.max(1, count - 1))); }} style={[s.couponBtn, { backgroundColor: mainColor + '18' }]}>
                     <Text style={[s.couponBtnText, { color: mainColor }]}>−</Text>
@@ -435,7 +435,7 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
                   </Pressable>
                 </View>
                 <View style={[s.adjusted, { backgroundColor: mainColor + '14' }]}>
-                  <Text style={s.adjustedLabel}>{count} kupon ile şansın</Text>
+                  <Text style={s.adjustedLabel}>{count} kolon ile şansın</Text>
                   <Text style={[s.adjustedValue, { color: mainColor }]}>{formatOdds(adjustedOdds)}</Text>
                 </View>
               </Surface>

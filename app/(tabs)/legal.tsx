@@ -12,18 +12,19 @@ import { BackIcon, ChevronDownIcon } from '../../lib/icons';
 import { useTheme } from '../../lib/theme';
 
 const FAQ = [
-  { q: 'LottoAI nedir?', a: "LottoAI, Türkiye'deki şans oyunları için kupon üretme, sonuç takibi, AI destekli analiz ve istatistik yapmanızı sağlayan ücretsiz bir yardımcı uygulamadır." },
-  { q: 'Uygulama ücretli mi?', a: 'Hayır, LottoAI tamamen ücretsizdir. Hiçbir uygulama içi satın alma veya abonelik içermez.' },
-  { q: 'AI Asistan nasıl çalışır?', a: 'AI Asistan ekranından loto hakkında sorular sorabilir, istatistiksel yorumlar alabilir ve size özel kupon üretmesini isteyebilirsiniz. Verdiği bilgiler tahmin amaçlıdır.' },
-  { q: 'AI kuponları kazanma garantisi verir mi?', a: 'Hayır. AI tarafından üretilen kuponlar rastgele veya istatistiksel verilere dayalıdır. Hiçbir şekilde kazanma garantisi vermez.' },
-  { q: 'Kupon nasıl üretilir?', a: 'Kupon Üret ekranından oyunu seçip "Kupon üret" butonuna basarak kupon oluşturabilir veya AI Asistan\'dan size özel kupon isteyebilirsiniz.' },
-  { q: 'Filtreleri nasıl kullanırım?', a: 'Kupon Üret ekranında filtre butonuna dokunarak çift/tek dengesi, ardışık sayı engelleme ve toplam aralığı gibi filtreleri kullanabilirsiniz.' },
+  { q: 'LottoAI nedir?', a: "LottoAI, Türkiye'deki şans oyunları için kolon üretme, sonuç takibi, istatistik, Lota AI analizi ve bildirim sunan ücretsiz bir yardımcı uygulamadır." },
+  { q: 'Uygulama ücretli mi?', a: 'Hayır, LottoAI ücretsizdir; uygulama içi satın alma veya abonelik yoktur. Bazı özelliklerde (filtreli üretim, geçmiş karşılaştırma vb.) günlük ücretsiz hak bittikten sonra isteğe bağlı ödüllü reklam izleyerek ek hak kazanabilirsiniz.' },
+  { q: 'Lota AI nedir?', a: 'Kolon Üret ekranındaki "Lota AI\'a geç" ile açılan ayrı moddur. Tek dokunuşla rastgele kolon üretir ve kısa bir istatistik analizi gösterir. Tahmin veya çekiliş öngörüsü sunmaz. Kullanmak için giriş yapmanız gerekir.' },
+  { q: 'Lota AI analizi neyi kapsar?', a: 'Çift/tek, düşük/yüksek, ardışık sayılar, kolon toplamının ortalamaya göre durumu ve (veri varsa) sıcak/soğuk sayılar gibi bilgilendirici özetler sunar. Sıcak/soğuk geçmiş çekilişlere göre hesaplanır; gelecek sonucu tahmin etmez. Kazanma garantisi vermez.' },
+  { q: 'Lota AI kolonları kazanma garantisi verir mi?', a: 'Hayır. Lota AI ile üretilen kolonlar adil rastgele algoritmayla oluşturulur. Analiz metinleri yalnızca bilgilendirme amaçlıdır.' },
+  { q: 'Kolon nasıl üretilir?', a: 'Kolon Üret ekranından oyunu seçip "Kolon üret" ile filtreli veya filtresiz kolon oluşturabilir; Lota AI modunda "Lota ile üret" ile tek dokunuşta kolon ve analiz alabilirsiniz.' },
+  { q: 'Filtreleri nasıl kullanırım?', a: 'Kolon Üret ekranında filtre butonuna dokunarak çift/tek dengesi, ardışık sayı engelleme ve toplam aralığı gibi filtreleri kullanabilirsiniz.' },
   { q: 'Çekiliş sonuçları nasıl güncellenir?', a: 'Çekiliş sonuçları, çekilişten sonra uygulama veritabanına girilir ve kısa süre sonra uygulamada görünür.' },
-  { q: 'Kuponlarım otomatik kontrol ediliyor mu?', a: 'Evet. Kaydettiğiniz kuponlar, çekiliş sonuçları girildiğinde otomatik kontrol edilir. Tutan sayılar kupon kartında renkli gösterilir.' },
+  { q: 'Kolonlarım otomatik kontrol ediliyor mu?', a: 'Evet. Kaydettiğiniz kolonlar, çekiliş sonuçları girildiğinde otomatik kontrol edilir. Tutan sayılar kolon kartında renkli gösterilir.' },
   { q: 'Hatırlatıcılar nasıl çalışır?', a: 'Profil > Hatırlatıcılar ekranından istediğiniz oyunlar için çekiliş öncesi ve sonrası bildirimleri açabilirsiniz.' },
-  { q: 'Uygulama internet gerektiriyor mu?', a: 'Sonuçlar, istatistikler ve AI Asistan için internet gerekir. Kupon üretme ve kaydetme çevrimdışı da çalışır.' },
-  { q: 'Verilerim güvende mi?', a: 'Evet. Hesap ve kupon verileriniz güvenli sunucularda saklanır. AI Asistan ile yaptığınız sohbetler, yanıtların kalitesini artırmak amacıyla hesabınızla ilişkilendirilerek kaydedilir; bu kayıtlara yalnızca LottoAI ekibi erişebilir, üçüncü şahıslarla paylaşılmaz veya satılmaz. Detaylar için Gizlilik Politikamıza göz atabilirsiniz.' },
-  { q: 'Hesabımı nasıl silerim?', a: 'Profil ekranındaki "Hesabımı sil" seçeneği ile hesabınızı, AI sohbet kayıtlarınızı ve bu cihazdaki verilerinizi kalıcı olarak silebilirsiniz. Bu işlem geri alınamaz.' },
+  { q: 'Uygulama internet gerektiriyor mu?', a: 'Sonuçlar, istatistikler, Lota AI, hesap işlemleri ve reklamlar için internet gerekir. Klasik kolon üretme ve kaydetme çevrimdışı da çalışabilir.' },
+  { q: 'Verilerim güvende mi?', a: 'Evet. Hesap bilgileriniz güvenli sunucularda saklanır; kayıtlı kolonlarınız cihazınızda tutulur. Detaylar için Gizlilik Politikamıza göz atabilirsiniz.' },
+  { q: 'Hesabımı nasıl silerim?', a: 'Profil ekranındaki "Hesabımı sil" seçeneği ile hesabınızı ve bu cihazdaki verilerinizi kalıcı olarak silebilirsiniz. Bu işlem geri alınamaz.' },
   { q: 'Bu uygulama kumar teşvik ediyor mu?', a: 'Hayır. LottoAI yalnızca bilgilendirme amaçlı bir araçtır. Şans oyunları bağımlılık yapabilir. Lütfen sorumlu oynayın. Yardım için: Yeşilay 115.' },
 ];
 

@@ -5,16 +5,16 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
+    ActivityIndicator,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -30,29 +30,31 @@ import { showRewardedAd } from '../../lib/adMob';
 import { markCouponsDirty } from '../../lib/couponsStore';
 import { GameEmblem } from '../../lib/emblems';
 import {
-  ADS_REWARDS_ENABLED,
-  FEATURE_FREE_DAILY_LIMIT,
-  FEATURE_REWARD_AMOUNT,
-  formatQuotaResetIn,
-  getFeatureQuotaStatus,
-  msUntilQuotaReset,
-  recordFeatureUsage,
-  waitForRewardGrant,
+    ADS_REWARDS_ENABLED,
+    FEATURE_FREE_DAILY_LIMIT,
+    FEATURE_REWARD_AMOUNT,
+    formatQuotaResetIn,
+    getFeatureQuotaStatus,
+    msUntilQuotaReset,
+    recordFeatureUsage,
+    waitForRewardGrant,
 } from '../../lib/featureQuota';
 import { GAMES, getGameAccentColor } from '../../lib/games';
 import GameSelector from '../../lib/GameSelector';
-import { recordGoodMoment } from '../../lib/review-prompt';
 import {
-  BookmarkIcon,
-  CheckIcon,
-  ClockIcon,
-  CloseIcon,
-  DiceIcon,
-  InfoIcon,
-  PlayIcon,
-  SlidersIcon,
-  TrashIcon,
+    BookmarkIcon,
+    CheckIcon,
+    ClockIcon,
+    CloseIcon,
+    DiceIcon,
+    InfoIcon,
+    PlayIcon,
+    SlidersIcon,
+    SparkIcon,
+    TrashIcon,
+    ChevronRightIcon,
 } from '../../lib/icons';
+import { recordGoodMoment } from '../../lib/review-prompt';
 import { useTheme } from '../../lib/theme';
 
 /**
@@ -301,7 +303,7 @@ export default function GenerateScreen() {
   const [savingAll, setSavingAll] = useState(false);
   const [savingCoupon, setSavingCoupon] = useState(false);
   const savingCouponRef = useRef(false);
-  // Filtreli kupon üretimi günlük ücretsiz hakkı doldurduğunda bu kart
+  // Filtreli kolon üretimi günlük ücretsiz hakkı doldurduğunda bu kart
   // açılır: kullanıcı ya reklam izleyip +3 hak kazanır ya da filtresiz
   // üretime geçer. generateAfterAd, "reklam izlendi" sonrası hangi
   // isteğin otomatik tekrar deneneceğini tutar.
@@ -454,7 +456,7 @@ export default function GenerateScreen() {
   };
 
   /**
-   * "Kupon üret" butonuna basıldığında çağrılır. Filtresiz üretim her
+   * "Kolon üret" butonuna basıldığında çağrılır. Filtresiz üretim her
    * zaman anında çalışır. Filtreli üretimde önce günlük hak kontrol
    * edilir — hak varsa direkt üretilir, yoksa reklam kartı açılır.
    * Kota await'i boyunca da kilidi tutar (çift tık → çift recordFeatureUsage önlenir).
@@ -572,7 +574,7 @@ export default function GenerateScreen() {
 
     showAlert(
       'Geçmişi temizle',
-      `${selectedGame.name} geçmişindeki ${count} kupon silinecek. Emin misin?`,
+      `${selectedGame.name} geçmişindeki ${count} kolon silinecek. Emin misin?`,
       [
         { text: 'İptal', style: 'cancel' },
         {
@@ -659,18 +661,18 @@ export default function GenerateScreen() {
       }
       setHistoryModal(false);
       if (savedCount > 0) {
-        showAlert('Kaydedildi', `${savedCount} kupon Kuponlarım'a eklendi.`, [
+        showAlert('Kaydedildi', `${savedCount} kolon Kolonlarım'a eklendi.`, [
           { text: 'Tamam' },
           {
-            text: 'Kuponlarıma git',
+            text: 'Kolonlarıma git',
             onPress: () => router.push('/(tabs)/saved'),
           },
         ]);
       } else {
-        showAlert('Bilgi', 'Geçmişteki tüm kuponlar zaten kayıtlı. Liste temizlendi.');
+        showAlert('Bilgi', 'Geçmişteki tüm kolonlar zaten kayıtlı. Liste temizlendi.');
       }
     } catch {
-      showAlert('Hata', 'Kuponlar kaydedilemedi.');
+      showAlert('Hata', 'Kolonlar kaydedilemedi.');
     } finally {
       setSavingAll(false);
     }
@@ -680,7 +682,7 @@ export default function GenerateScreen() {
     if (savingCouponRef.current || savingCoupon) return;
     softHaptic();
     if (generatedNumbers.length === 0) {
-      showAlert('Uyarı', 'Önce bir kupon üretin.');
+      showAlert('Uyarı', 'Önce bir kolon üretin.');
       return;
     }
     if (!user) {
@@ -702,14 +704,14 @@ export default function GenerateScreen() {
         coupons.unshift(buildCoupon(entry));
         await AsyncStorage.setItem(STORAGE_KEYS.SAVED_COUPONS, JSON.stringify(coupons));
         markCouponsDirty();
-        showAlert('Kaydedildi', "Kuponunuz Kuponlarım'a eklendi.", [
+        showAlert('Kaydedildi', "Kolonunuz Kolonlarım'a eklendi.", [
           { text: 'Tamam' },
-          { text: 'Kuponlarıma git', onPress: () => router.push('/(tabs)/saved') },
+          { text: 'Kolonlarıma git', onPress: () => router.push('/(tabs)/saved') },
         ]);
       };
       if (isDup(coupons, entry)) {
         showAlert(
-          'Aynı kupon zaten kayıtlı',
+          'Aynı kolon zaten kayıtlı',
           'Bu kombinasyon daha önce kaydedilmiş. Yine de kaydetmek ister misiniz?',
           [
             { text: 'Vazgeç', style: 'cancel' },
@@ -722,7 +724,7 @@ export default function GenerateScreen() {
                 try {
                   await persist();
                 } catch {
-                  showAlert('Hata', 'Kupon kaydedilemedi.');
+                  showAlert('Hata', 'Kolon kaydedilemedi.');
                 } finally {
                   savingCouponRef.current = false;
                   setSavingCoupon(false);
@@ -735,7 +737,7 @@ export default function GenerateScreen() {
       }
       await persist();
     } catch {
-      showAlert('Hata', 'Kupon kaydedilemedi.');
+      showAlert('Hata', 'Kolon kaydedilemedi.');
     } finally {
       savingCouponRef.current = false;
       setSavingCoupon(false);
@@ -769,9 +771,9 @@ export default function GenerateScreen() {
           <View style={s.headerText}>
             <View style={s.eyebrowRow}>
               <View style={[s.eyebrowDot, { backgroundColor: mainColor }]} />
-              <Text style={[s.eyebrow, { color: mainColor }]}>KUPON STÜDYOSU</Text>
+              <Text style={[s.eyebrow, { color: mainColor }]}>KOLON STÜDYOSU</Text>
             </View>
-            <Text style={s.title}>Kupon Üret</Text>
+            <Text style={s.title}>Kolon Üret</Text>
             <Text style={s.subtitle}>Sayılarını sistem senin için seçsin</Text>
           </View>
           <PressableScale
@@ -789,6 +791,24 @@ export default function GenerateScreen() {
           </PressableScale>
         </View>
 
+        <PressableScale
+          haptic={false}
+          onPress={() => {
+            softHaptic();
+            router.push({ pathname: '/ai-studio', params: { game: selectedGame.id } } as any);
+          }}
+          style={[s.aiEntry, { backgroundColor: c.surface }]}
+        >
+          <View style={[s.aiEntryIcon, { backgroundColor: c.brandSoft }]}>
+            <SparkIcon color={c.brand} size={18} />
+          </View>
+          <View style={s.aiEntryText}>
+            <Text style={s.aiEntryTitle}>Lota AI&apos;a geç</Text>
+            <Text style={s.aiEntryDesc}>Lota ile tek dokunuşta kolon üret</Text>
+          </View>
+          <ChevronRightIcon color={c.text3} size={18} />
+        </PressableScale>
+
         <Text style={s.sectionLabel}>OYUN SEÇ</Text>
         <GameSelector selectedGame={selectedGame} onSelect={handleGameSelect} />
 
@@ -798,12 +818,12 @@ export default function GenerateScreen() {
               <View style={[s.emptyIcon, { backgroundColor: `${mainColor}14` }]}>
                 <DiceIcon color={mainColor} size={30} />
               </View>
-              <Text style={s.emptyText}>Kupon üretmek için aşağıdaki butona dokun</Text>
+              <Text style={s.emptyText}>Kolon üretmek için aşağıdaki butona dokun</Text>
             </View>
           ) : (
             <>
               <View style={[s.resultAccent, { backgroundColor: mainColor }]} />
-              <Text style={s.resultEyebrow}>SENİN KUPONUN</Text>
+              <Text style={s.resultEyebrow}>SENİN KOLONUN</Text>
               <View
                 style={[
                   s.balls,
@@ -884,7 +904,7 @@ export default function GenerateScreen() {
                 ? 'Üretiliyor…'
                 : generatedNumbers.length > 0
                   ? 'Yeniden üret'
-                  : 'Kupon üret'
+                  : 'Kolon üret'
             }
             accent={mainColor}
             onPress={handleGenerate}
@@ -917,7 +937,7 @@ export default function GenerateScreen() {
         {generatedNumbers.length > 0 ? (
           <AppButton
             haptic={false}
-            label={savingCoupon ? 'Kaydediliyor…' : 'Kuponu kaydet'}
+            label={savingCoupon ? 'Kaydediliyor…' : 'Kolonu kaydet'}
             onPress={handleSave}
             disabled={savingCoupon}
             loading={savingCoupon}
@@ -1018,7 +1038,7 @@ export default function GenerateScreen() {
                 </Pressable>
               ) : null}
             </View>
-            <Text style={s.subDesc}>Mutlaka kuponda olacak sayılar (1–{selectedGame.max}, virgülle ayır)</Text>
+            <Text style={s.subDesc}>Mutlaka kolonda olacak sayılar (1–{selectedGame.max}, virgülle ayır)</Text>
             <TextInput style={[...inputStyle, s.fullInput]} value={includeText} onChangeText={setIncludeText} placeholder="Örn: 7, 19, 23" placeholderTextColor={c.text3} keyboardType="numeric" />
 
             <View style={s.divider} />
@@ -1031,7 +1051,7 @@ export default function GenerateScreen() {
                 </Pressable>
               ) : null}
             </View>
-            <Text style={s.subDesc}>Asla kuponda olmayacak sayılar (1–{selectedGame.max}, virgülle ayır)</Text>
+            <Text style={s.subDesc}>Asla kolonda olmayacak sayılar (1–{selectedGame.max}, virgülle ayır)</Text>
             <TextInput style={[...inputStyle, s.fullInput]} value={excludeText} onChangeText={setExcludeText} placeholder="Örn: 13, 42" placeholderTextColor={c.text3} keyboardType="numeric" />
           </Surface>
         ) : null}
@@ -1048,7 +1068,7 @@ export default function GenerateScreen() {
             <View style={s.modalGrabber} />
             <View style={s.modalHeader}>
               <View style={{ flex: 1 }}>
-                <Text style={s.modalTitle}>Kupon geçmişi</Text>
+                <Text style={s.modalTitle}>Kolon geçmişi</Text>
                 <Text style={s.modalSubtitle}>
                   {selectedGame.name}
                   {currentGameHistory.length > 0
@@ -1071,7 +1091,7 @@ export default function GenerateScreen() {
                   <ClockIcon color={c.brand} size={28} />
                 </View>
                 <Text style={s.historyEmptyTitle}>Henüz geçmiş yok</Text>
-                <Text style={s.historyEmptyText}>Ürettiğin son kuponlar burada görünür.</Text>
+                <Text style={s.historyEmptyText}>Ürettiğin son kolonlar burada görünür.</Text>
               </View>
             ) : (
               <>
@@ -1145,7 +1165,7 @@ export default function GenerateScreen() {
             {ADS_REWARDS_ENABLED ? (
               <>
                 <Text style={s.quotaDesc}>
-                  Bugün için {FEATURE_FREE_DAILY_LIMIT} filtreli kupon hakkını kullandın. Kısa bir reklam izleyip {FEATURE_REWARD_AMOUNT} hak daha kazanabilir, ya da filtresiz üretmeye devam edebilirsin.
+                  Bugün için {FEATURE_FREE_DAILY_LIMIT} filtreli kolon hakkını kullandın. Kısa bir reklam izleyip {FEATURE_REWARD_AMOUNT} hak daha kazanabilir, ya da filtresiz üretmeye devam edebilirsin.
                 </Text>
                 <AppButton
                   haptic={false}
@@ -1161,7 +1181,7 @@ export default function GenerateScreen() {
               </>
             ) : (
               <Text style={s.quotaDesc}>
-                Bugün için {FEATURE_FREE_DAILY_LIMIT} filtreli kupon hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek. İstersen filtresiz üretmeye devam edebilirsin.
+                Bugün için {FEATURE_FREE_DAILY_LIMIT} filtreli kolon hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek. İstersen filtresiz üretmeye devam edebilirsin.
               </Text>
             )}
 
@@ -1218,6 +1238,20 @@ function makeStyles(theme: AppTheme) {
       paddingHorizontal: 5,
     },
     historyBadgeText: { fontFamily: theme.font.semibold, fontSize: 11, color: '#fff' },
+    aiEntry: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginHorizontal: spacing.xl,
+      marginTop: spacing.sm,
+      marginBottom: 4,
+      padding: 14,
+      borderRadius: radius.lg,
+    },
+    aiEntryIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    aiEntryText: { flex: 1 },
+    aiEntryTitle: { ...ty.title, fontSize: 15, color: c.text },
+    aiEntryDesc: { ...ty.caption, color: c.text3, marginTop: 2 },
     sectionLabel: { ...ty.micro, color: c.text2, paddingHorizontal: spacing.xl, marginBottom: 10 },
 
     resultCard: {

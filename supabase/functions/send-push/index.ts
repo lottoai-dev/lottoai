@@ -34,7 +34,7 @@ serve(async (req) => {
     const gameName = record?.game || 'Bilinmeyen Oyun';
 
     const title = 'Çekiliş Sonuçları Açıklandı!';
-    const body = `${gameName} sonuçları belli oldu. Kuponlarını kontrol etmek için tıkla.`;
+    const body = `${gameName} sonuçları belli oldu. Kolonlarını kontrol etmek için tıkla.`;
     const screen = 'saved';
 
     const { data: tokens, error } = await supabase

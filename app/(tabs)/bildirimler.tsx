@@ -112,7 +112,7 @@ export default function BildirimlerScreen() {
             <BellIcon color={c.text3} size={36} />
           </View>
           <Text style={s.emptyTitle}>Henüz bildirim yok</Text>
-          <Text style={s.emptyDesc}>Çekiliş ve kupon bildirimlerin burada görünecek.</Text>
+          <Text style={s.emptyDesc}>Çekiliş ve kolon bildirimlerin burada görünecek.</Text>
         </View>
       ) : (
         <ScrollView

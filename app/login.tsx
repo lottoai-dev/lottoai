@@ -261,8 +261,8 @@ export default function LoginScreen() {
   };
 
   const subtitles: Record<Mode, string> = {
-    login: 'Kuponlarını kaydet ve AI Asistan\'ı kullan',
-    register: 'Ücretsiz hesap oluştur; kupon kaydet, AI kullan',
+    login: 'Kolonlarını kaydet ve Lota AI\'ı kullan',
+    register: 'Ücretsiz hesap oluştur; kolon kaydet, AI kullan',
     forgot: 'E-postanı gir, sıfırlama bağlantısı gönderelim',
   };
 

@@ -469,7 +469,7 @@ export default function HomeScreen() {
                 onPress={() => { softHaptic(); router.push(`/(tabs)/generate?game=${nextDraw.game.id}` as any); }}
                 style={s.heroCta}
               >
-                <Text style={[s.heroCtaText, { color: next.color }]}>Kupon üret</Text>
+                <Text style={[s.heroCtaText, { color: next.color }]}>Kolon üret</Text>
                 <ArrowRightIcon color={next.color} size={18} />
               </PressableScale>
             </LinearGradient>
@@ -487,7 +487,7 @@ export default function HomeScreen() {
                     <TicketIcon color={c.brand} size={19} />
                   </View>
                   <Text style={s.summaryValueSingle}>{pendingCoupons}</Text>
-                  <Text style={s.summaryLabelSingle}>kupon · Sonuç bekliyor</Text>
+                  <Text style={s.summaryLabelSingle}>kolon · Sonuç bekliyor</Text>
                   <ChevronRightIcon color={c.text3} size={16} />
                 </>
               ) : (
@@ -499,7 +499,7 @@ export default function HomeScreen() {
                     <ChevronRightIcon color={c.text3} size={16} />
                   </View>
                   <Text style={s.summaryValue}>{pendingCoupons}</Text>
-                  <Text style={s.summaryLabel}>kupon · Sonuç bekliyor</Text>
+                  <Text style={s.summaryLabel}>kolon · Sonuç bekliyor</Text>
                 </>
               )}
             </PressableScale>
@@ -630,10 +630,10 @@ export default function HomeScreen() {
               <SparkIcon color={c.brand} size={28} />
             </View>
             <Text style={s.emptyTitle}>Hoş geldin</Text>
-            <Text style={s.emptyDesc}>Henüz çekiliş verisi yok. İlk kuponunu üreterek başla.</Text>
+            <Text style={s.emptyDesc}>Henüz çekiliş verisi yok. İlk kolonunu üreterek başla.</Text>
             <AppButton
               haptic={false}
-              label="Kupon üret"
+              label="Kolon üret"
               onPress={() => { softHaptic(); router.push('/(tabs)/generate' as any); }}
               style={{ marginTop: 4 }}
             />

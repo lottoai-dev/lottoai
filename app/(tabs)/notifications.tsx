@@ -450,7 +450,7 @@ export default function NotificationsScreen() {
           <ClockIcon color={c.text3} size={15} />
           <Text style={s.noteText}>
             Çekiliş hatırlatıcıları kapanış saatinden seçtiğiniz süre kadar önce gelir.
-            Sonuç bildirimleri yalnızca çekiliş sonuçları uygulamaya girildiğinde gönderilir; Kuponlarım'a yönlendirir.
+            Sonuç bildirimleri yalnızca çekiliş sonuçları uygulamaya girildiğinde gönderilir; Kolonlarım'a yönlendirir.
           </Text>
         </View>
       </ScrollView>

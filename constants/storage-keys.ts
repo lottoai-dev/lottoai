@@ -2,6 +2,7 @@
 export const STORAGE_KEYS = {
     SAVED_COUPONS: 'savedCoupons',
     GENERATION_HISTORY: 'generationHistory',
+    AI_GENERATION_HISTORY: 'aiGenerationHistory',
     NOTIFICATION_SETTINGS: 'notificationSettings_v3',
     ONBOARDING_COMPLETED: 'onboardingCompleted',
     USER_NAME: 'userName',

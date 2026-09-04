@@ -427,3 +427,8 @@ enabled = true
 # Cagriyi Google yapar, Supabase oturumu yoktur; guvenlik ECDSA imzasindan gelir.
 verify_jwt = false
 entrypoint = "./functions/admob-ssv/index.ts"
+
+[functions.lota-generate]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/lota-generate/index.ts"
