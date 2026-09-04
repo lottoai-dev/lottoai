@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -28,13 +29,33 @@ import { STORAGE_KEYS } from '../constants/storage-keys';
 import { AppTheme } from '../constants/theme';
 import { useAlert } from '../contexts/AlertContext';
 import { useAuth } from '../contexts/AuthContext';
+import { showRewardedAd } from '../lib/adMob';
 import { mainBallLayout } from '../lib/ballLayout';
 import { markCouponsDirty } from '../lib/couponsStore';
 import { GameEmblem } from '../lib/emblems';
+import {
+  ADS_REWARDS_ENABLED,
+  FEATURE_FREE_DAILY_LIMIT,
+  FEATURE_REWARD_AMOUNT,
+  formatQuotaResetIn,
+  getFeatureQuotaStatus,
+  msUntilQuotaReset,
+  recordFeatureUsage,
+  waitForRewardGrant,
+} from '../lib/featureQuota';
 import { GAMES, getGameAccentColor } from '../lib/games';
 import GameSelector from '../lib/GameSelector';
 import { softHaptic } from '../lib/haptics';
-import { BackIcon, BookmarkIcon, CheckIcon, ClockIcon, CloseIcon, SparkIcon, TrashIcon } from '../lib/icons';
+import {
+  BackIcon,
+  BookmarkIcon,
+  CheckIcon,
+  ClockIcon,
+  CloseIcon,
+  PlayIcon,
+  SparkIcon,
+  TrashIcon,
+} from '../lib/icons';
 import { generateLotaCoupon, LotaGenerateError } from '../lib/lotaGenerate';
 import { recordGoodMoment } from '../lib/review-prompt';
 import { buildSavedCoupon, isDuplicateCoupon, loadSavedCoupons, persistSavedCoupon } from '../lib/saveCoupon';
@@ -74,6 +95,9 @@ export default function AiStudioScreen() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyModal, setHistoryModal] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
+  const [quotaCardVisible, setQuotaCardVisible] = useState(false);
+  const [watchingAd, setWatchingAd] = useState(false);
+  const [checkingQuota, setCheckingQuota] = useState(false);
   const generatingRef = useRef(false);
   const savingCouponRef = useRef(false);
 
@@ -125,19 +149,7 @@ export default function AiStudioScreen() {
     setLotaComment('');
   };
 
-  const handleGenerate = async () => {
-    if (generatingRef.current) return;
-    if (!user) {
-      showAlert('Giriş gerekli', 'Lota ile üretmek için giriş yapman gerekiyor.', [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Giriş yap', onPress: () => router.push('/login') },
-      ]);
-      return;
-    }
-
-    softHaptic();
-    generatingRef.current = true;
-    setGenerating(true);
+  const performGenerateCore = async () => {
     setGeneratedNumbers([]);
     setBonusNumbers([]);
     setSuperStarNumber(null);
@@ -156,6 +168,8 @@ export default function AiStudioScreen() {
       setSuperStarNumber(result.superStar ?? null);
       setLotaComment(result.comment);
       setGenId((g) => g + 1);
+
+      void recordFeatureUsage('lota');
 
       void saveToHistory({
         game: selectedGame.name,
@@ -188,9 +202,70 @@ export default function AiStudioScreen() {
             ]
           : [{ text: 'Tamam' }],
       );
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (generatingRef.current) return;
+    if (!user) {
+      showAlert('Giriş gerekli', 'Lota ile üretmek için giriş yapman gerekiyor.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Giriş yap', onPress: () => router.push('/login') },
+      ]);
+      return;
+    }
+
+    softHaptic();
+    generatingRef.current = true;
+    setGenerating(true);
+    setCheckingQuota(true);
+    try {
+      const status = await getFeatureQuotaStatus('lota');
+      if (status.exhausted) {
+        setQuotaCardVisible(true);
+        return;
+      }
+      await performGenerateCore();
     } finally {
+      setCheckingQuota(false);
       generatingRef.current = false;
       setGenerating(false);
+    }
+  };
+
+  const handleWatchAd = async () => {
+    if (!user) return;
+    softHaptic();
+    setWatchingAd(true);
+    try {
+      const before = await getFeatureQuotaStatus('lota');
+      const result = await showRewardedAd('lota', { userId: user.id });
+      if (result.status === 'earned') {
+        const granted = await waitForRewardGrant('lota', before.used);
+        if (!granted) {
+          showAlert(
+            'Ödülün yolda',
+            'Reklamı izledin ama hakkın henüz yansımadı. Birkaç saniye içinde eklenecek, sonra tekrar dener misin?',
+          );
+          return;
+        }
+        setQuotaCardVisible(false);
+        if (generatingRef.current) return;
+        generatingRef.current = true;
+        setGenerating(true);
+        try {
+          await performGenerateCore();
+        } finally {
+          generatingRef.current = false;
+          setGenerating(false);
+        }
+      } else if (result.status === 'closed_without_reward') {
+        showAlert('Tamamlanmadı', 'Ödül kazanmak için reklamı sonuna kadar izlemen gerekiyor.');
+      } else {
+        showAlert('Reklam yüklenemedi', 'Şu an reklam gösterilemiyor, birazdan tekrar dener misin?');
+      }
+    } finally {
+      setWatchingAd(false);
     }
   };
 
@@ -494,11 +569,17 @@ export default function AiStudioScreen() {
 
         <AppButton
           haptic={false}
-          label={generating ? 'Lota üretiyor…' : hasResult ? 'Yeniden üret' : 'Lota ile üret'}
+          label={
+            generating || checkingQuota
+              ? 'Lota üretiyor…'
+              : hasResult
+                ? 'Yeniden üret'
+                : 'Lota ile üret'
+          }
           accent={c.brand}
           onPress={handleGenerate}
-          disabled={generating}
-          loading={generating}
+          disabled={generating || checkingQuota}
+          loading={generating || checkingQuota}
           iconLeft={(color, size) => <SparkIcon color={color} size={size} />}
           fullWidth={false}
           style={s.generateBtn}
@@ -605,6 +686,60 @@ export default function AiStudioScreen() {
                     iconLeft={(color, size) => <TrashIcon color={color} size={size} />}
                   />
                 </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={quotaCardVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setQuotaCardVisible(false)}
+      >
+        <View style={[s.modalOverlay, { backgroundColor: c.overlay, justifyContent: 'center', paddingHorizontal: 24 }]}>
+          <View style={[s.quotaCard, { backgroundColor: c.surface }]}>
+            <View style={[s.quotaIcon, { backgroundColor: c.brandSoft }]}>
+              <SparkIcon color={c.brand} size={26} />
+            </View>
+            <Text style={s.quotaTitle}>Lota hakkın bitti</Text>
+            {ADS_REWARDS_ENABLED ? (
+              <>
+                <Text style={s.quotaDesc}>
+                  Bugün için {FEATURE_FREE_DAILY_LIMIT} Lota kolon hakkını kullandın. Kısa bir reklam izleyip {FEATURE_REWARD_AMOUNT} hak daha kazanabilirsin.
+                </Text>
+                <AppButton
+                  haptic={false}
+                  label={watchingAd ? 'Reklam yükleniyor…' : `Reklam izle, +${FEATURE_REWARD_AMOUNT} hak kazan`}
+                  accent={c.brand}
+                  onPress={handleWatchAd}
+                  disabled={watchingAd}
+                  iconLeft={(color, size) =>
+                    watchingAd ? <ActivityIndicator color={color} size="small" /> : <PlayIcon color={color} size={size} />
+                  }
+                  style={{ marginTop: 6 }}
+                />
+                <Pressable
+                  onPress={() => { softHaptic(); setQuotaCardVisible(false); }}
+                  style={{ marginTop: 16, alignItems: 'center' }}
+                  hitSlop={8}
+                >
+                  <Text style={[s.quotaCancel, { color: c.text3 }]}>Vazgeç</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={s.quotaDesc}>
+                  Bugün için {FEATURE_FREE_DAILY_LIMIT} Lota kolon hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek.
+                </Text>
+                <AppButton
+                  haptic={false}
+                  label="Tamam"
+                  variant="secondary"
+                  onPress={() => { softHaptic(); setQuotaCardVisible(false); }}
+                  style={{ marginTop: 10 }}
+                />
               </>
             )}
           </View>
@@ -737,5 +872,23 @@ function makeStyles(theme: AppTheme) {
       width: 4,
     },
     modalActions: { marginTop: sp.md, gap: sp.sm },
+    quotaCard: {
+      borderRadius: radius.xxl,
+      paddingHorizontal: 22,
+      paddingTop: 28,
+      paddingBottom: 22,
+      alignItems: 'center',
+    },
+    quotaIcon: {
+      width: 56,
+      height: 56,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 14,
+    },
+    quotaTitle: { ...ty.h2, color: c.text, textAlign: 'center' },
+    quotaDesc: { ...ty.bodyMedium, color: c.text2, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+    quotaCancel: { ...ty.label },
   });
 }

@@ -26,6 +26,7 @@ const REWARD_AMOUNT = 3;
 const FIELD_BY_FEATURE: Record<string, string> = {
   filtered_coupon: "filtered_coupon_count",
   report: "report_count",
+  lota: "lota_count",
 };
 
 /** Cok eski bildirimler kabul edilmez (kaydedilmis bir istegin tekrar oynatilmasi). */

@@ -1,5 +1,5 @@
 // lib/featureQuota.ts
-// Filtreli kupon üretimi ve "Geçmiş" (rapor) görüntüleme için günlük,
+// Filtreli kolon, Lota AI ve "Geçmiş" (rapor) görüntüleme için günlük,
 // kullanıcı bazlı kullanım kotası. Sunucuda (Supabase) tutulur, istemci
 // sıfırlayamaz; "gün" Türkiye saatine göre hesaplanır (kalıcı UTC+3).
 //
@@ -13,7 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storage-keys';
 import { supabase } from './supabase';
 
-export type FeatureKey = 'filtered_coupon' | 'report';
+export type FeatureKey = 'filtered_coupon' | 'report' | 'lota';
 
 const FREE_DAILY_LIMIT = 10; // GEÇİCİ: AdMob onayı bekleniyor, onaylanınca 3'e geri döndürülecek
 const REWARD_AMOUNT = 3;
@@ -25,9 +25,10 @@ const REWARD_AMOUNT = 3;
  */
 export const ADS_REWARDS_ENABLED = false;
 
-const FIELD_BY_FEATURE: Record<FeatureKey, 'filtered_coupon_count' | 'report_count'> = {
+const FIELD_BY_FEATURE: Record<FeatureKey, 'filtered_coupon_count' | 'report_count' | 'lota_count'> = {
   filtered_coupon: 'filtered_coupon_count',
   report: 'report_count',
+  lota: 'lota_count',
 };
 
 type QuotaCacheEntry = {

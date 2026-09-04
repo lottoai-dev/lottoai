@@ -32,6 +32,12 @@ const PROD_AD_UNIT_IDS: Record<FeatureKey, { ios: string; android: string }> = {
     android: 'ca-app-pub-6473293791186582/8907957039',
     ios: 'ca-app-pub-6473293791186582/3169331613',
   },
+  // GEÇİCİ: Lota için ayrı AdMob birimi yok; filtreli kolon birimleri paylaşılıyor.
+  // Ads açılmadan önce Lota'ya özel birimler oluşturup burayı güncelle.
+  lota: {
+    android: 'ca-app-pub-6473293791186582/2534120377',
+    ios: 'ca-app-pub-6473293791186582/4945447711',
+  },
 };
 
 function getAdUnitId(feature: FeatureKey): string {
