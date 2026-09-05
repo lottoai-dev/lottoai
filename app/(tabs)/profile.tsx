@@ -101,7 +101,7 @@ export default function ProfileScreen() {
   const handleDeleteAccount = () => {
     showAlert(
       'Hesabımı sil',
-      'Hesabın, AI sohbet kayıtların ve bu cihazdaki tüm verilerin kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+      'Hesabın ve bu cihazdaki tüm verilerin (kayıtlı kolonlar, Lota geçmişi, tercihler) kalıcı olarak silinecek. Bu işlem geri alınamaz.',
       [
         { text: 'Vazgeç', style: 'cancel' },
         {
