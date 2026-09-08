@@ -1,0 +1,21 @@
+---
+description: LottoAI kodlama, doğrulama ve git çalışma standartları
+alwaysApply: true
+---
+
+# Mühendislik Çalışma Biçimi
+
+- Onaylanan hedef için en küçük ama eksiksiz, production kalitesinde çözümü uygula.
+- Güvenli uygulama ayrıntılarını kendin çöz; ürün, mimari veya geri döndürülemez kararları kullanıcıya sor.
+- Mevcut mimariyi, bileşenleri ve kod desenlerini koru. Gerçek ihtiyaç olmadan bağımlılık veya soyutlama ekleme.
+- Yorumlarda kodun ne yaptığını değil, anlaşılması zor kararın nedenini açıkla.
+- Güvenliği varsayılan kabul et: kimlik, yetki, RLS, sunucu doğrulaması ve veri sınırlarını atlama.
+- Performansı ölçmeden optimize etme; yalnız kanıtlı veya bariz darboğazları ele al.
+- Doğrulamayı riske göre seç: lint, typecheck, test, build ve/veya gerçek cihaz kontrolü.
+- Görsel değişikliklerin gerçek cihazdaki dev client ile kontrol edilmesini iste.
+- İlgisiz mevcut sorunları bildir; izin almadan düzeltme veya kapsam genişletme.
+- Kullanıcının mevcut değişikliklerini koru. Çakışma riski varsa dur ve açıkça bildir.
+- Davranış, kurulum veya operasyon değiştiğinde ilgili dokümantasyonu güncelle.
+- İş ancak uygulanmış, uygun ölçüde doğrulanmış ve kapsam içi hata kalmamışsa tamamdır.
+- Tamamlanan işi otomatik commit ve push et; yalnızca o işin kapsamındaki dosyaları dahil et.
+- Commit/push başarısızsa nedeni bildir; kullanıcı değişikliklerini karıştırarak çözmeye çalışma.

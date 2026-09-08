@@ -1,0 +1,25 @@
+---
+description: LottoAI ürün, mağaza, gelir ve yayın ilkeleri
+alwaysApply: true
+---
+
+# Ürün ve Yayın İlkeleri
+
+- LottoAI'yi loto sonuç, istatistik ve kolon yardımcısı olarak konumlandır.
+- Lota AI ana ürünü destekleyen tek dokunuşla kolon + analiz özelliğidir; serbest sohbet değildir.
+- Tahmin, kazanma garantisi veya şansı artırma iddiası oluşturma.
+- 18+, bilgilendirme ve sorumlu oyun mesajlarını görünür ve tutarlı tut.
+- Kullanıcı arayüzü ve mağaza metinlerinde `kolon` kullan; mevcut teknik kimlikleri gereksiz yere yeniden adlandırma.
+- Tasarım sade, modern, güven veren ve premium olsun. Önemli bilgiyi önce göster, ayrıntıyı gerektiğinde aç.
+- Metinler kısa, insani ve eyleme dönük; hata mesajları ne olduğunu ve kullanıcının ne yapacağını söylesin.
+- Önemli akışlarda anlamlı loading, empty, error ve retry durumları sağla.
+- Çevrimdışı çalışabilen özellikleri koru; ağ gereken yerde bunu açıkça belirt.
+- iOS ve Android özelliklerini ve terminolojisini mümkün olduğunca eşit tut.
+- Ücretsiz temel + ileride premium/abonelik modelini önceliklendir. Kota maliyeti korusun, kullanıcıyı cezalandırmasın.
+- Reklam yalnız isteğe bağlı ödüllü formatta olabilir; onay ve doğrulama olmadan feature flag açma.
+- Güncel mağaza, politika ve SDK konularında önce resmî kaynakları kontrol et.
+- Production build, deploy ve remote migration öncesi açık onay al.
+- Veri silme, force push, reset ve diğer geri döndürülemez işlemler öncesi her zaman açık onay al.
+- Mağaza süreçlerini tek adım halinde yönlendir; mevcut adım doğrulanmadan sonrakine geçme.
+- Varsayılan mağaza yayını manuel olsun. Sürüm öncesi config, git, test, feature flag ve mağaza metinlerini kontrol et.
+- Önemli ürün/teknik kararları kısa gerekçesiyle ilgili proje dokümanına kaydet.
