@@ -32,6 +32,13 @@ const SUBTABS = [
 ] as const;
 type SubKey = (typeof SUBTABS)[number]['key'];
 
+const TAB_EXPLANATIONS: Record<SubKey, string> = {
+  most: 'Seçilen çekiliş aralığında en sık çıkan sayılar.',
+  least: 'Seçilen çekiliş aralığında en az çıkan veya hiç çıkmayan sayılar.',
+  hot: 'Seçilen aralıkta yakın çekilişlerde görülmüş sayılar.',
+  cold: 'Seçilen aralıkta daha uzun süredir görülmeyen sayılar.',
+};
+
 function parseNumbers(str: string): number[] {
   return str.split(' - ').map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
 }
@@ -99,14 +106,22 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
           });
         });
 
-        const stats: NumberStat[] = Object.entries(countMap).map(([num, count]) => ({
-          number: parseInt(num, 10),
-          count,
-          percentage: Math.round((count / data.length) * 100),
-        }));
+        const stats: NumberStat[] = Array.from({ length: game.max }, (_, index) => {
+          const number = index + 1;
+          const count = countMap[number] ?? 0;
+          return {
+            number,
+            count,
+            percentage: Math.round((count / data.length) * 100),
+          };
+        });
         stats.sort((a, b) => b.count - a.count);
         setMostCommon(stats.slice(0, 10));
-        setLeastCommon([...stats].sort((a, b) => a.count - b.count).slice(0, 10));
+        setLeastCommon(
+          [...stats]
+            .sort((a, b) => (a.count !== b.count ? a.count - b.count : a.number - b.number))
+            .slice(0, 10),
+        );
 
         const ranked: RecencyStat[] = [];
         for (let num = 1; num <= game.max; num++) {
@@ -208,6 +223,13 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
             <View style={{ width: 8 }} />
           </ScrollView>
 
+          <Surface style={s.explanation}>
+            <Text style={s.explanationText}>{TAB_EXPLANATIONS[activeTab]}</Text>
+            <Text style={s.explanationNote}>
+              Geçmiş sonuçlar gelecek çekiliş olasılığını değiştirmez.
+            </Text>
+          </Surface>
+
           {isFrequency
             ? frequencyStats.map((stat, i) => (
                 <View key={stat.number} style={s.barRow}>
@@ -278,6 +300,14 @@ function makeStyles(theme: AppTheme) {
     subtabRow: { paddingHorizontal: 20, gap: 8, marginBottom: spacing.lg },
     subtab: { paddingHorizontal: 15, paddingVertical: 9, borderRadius: radius.pill },
     subtabText: { ...ty.caption, fontFamily: theme.font.semibold },
+    explanation: {
+      marginHorizontal: 20,
+      marginBottom: spacing.lg,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+    },
+    explanationText: { ...ty.bodyMedium, color: c.text },
+    explanationNote: { ...ty.caption, color: c.text3, marginTop: 4, lineHeight: 17 },
     barRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, marginBottom: 11 },
     rank: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     rankText: { ...ty.caption, fontFamily: theme.font.semibold, color: c.text3, fontSize: 11 },
