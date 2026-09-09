@@ -225,9 +225,6 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
 
           <Surface style={s.explanation}>
             <Text style={s.explanationText}>{TAB_EXPLANATIONS[activeTab]}</Text>
-            <Text style={s.explanationNote}>
-              Geçmiş sonuçlar gelecek çekiliş olasılığını değiştirmez.
-            </Text>
           </Surface>
 
           {isFrequency
@@ -307,7 +304,6 @@ function makeStyles(theme: AppTheme) {
       paddingVertical: spacing.md,
     },
     explanationText: { ...ty.bodyMedium, color: c.text },
-    explanationNote: { ...ty.caption, color: c.text3, marginTop: 4, lineHeight: 17 },
     barRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, marginBottom: 11 },
     rank: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     rankText: { ...ty.caption, fontFamily: theme.font.semibold, color: c.text3, fontSize: 11 },
