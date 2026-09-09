@@ -1,0 +1,41 @@
+---
+description: App Store / Play Store kullanıcı yorumlarına yanıt ilkeleri
+alwaysApply: true
+---
+
+# Mağaza Yorum Yanıtları
+
+Kullanıcı App Store veya Google Play yorumu paylaştığında (ekran görüntüsü veya metin) birlikte yanıtlanır.
+
+## Akış
+
+- Önce 1–2 kısa yanıt taslağı ver; tercih edileni işaretle.
+- Kullanıcı onaylar ve mağazaya kendisi yapıştırır / gönderir. Agent mağaza konsoluna göndermez.
+- Aynı yorum için istenirse daha kısa veya daha samimi alternatif üret.
+
+## Ton ve biçim
+
+- Türkçe, kısa, samimi, saygılı; abartılı pazarlama dili yok.
+- Play yanıtı ~350 karakteri aşmasın; App Store için de kısa tut.
+- Teşekkür / empati önce; gerekirse düzeltme veya net bilgi sonra.
+- Gerektiğinde kısaca `18+` veya sorumlu oyun notu ekle.
+
+## Ürün dili (zorunlu)
+
+- LottoAI = sonuç, istatistik, kolon yardımcısı. Lota = tek dokunuşla kolon + analiz.
+- Tahmin, kazanma garantisi, şansı artırma veya “en güçlü algoritma” iddiası kurma / vaat etme.
+- Teknik yanlışları (ör. CSPRNG = tahmin) nazikçe düzelt; tartışmaya ve uzun ders anlatımına girme.
+- “Yapacağız / entegre edeceğiz” yalnız gerçekten planlı ve onaylıysa; aksi halde “notunu aldık” yeterli.
+
+## İçerik kuralları
+
+- Hakaret veya tehditte sakin kal; kişisel tartışmaya girme. Gerekirse mağaza politikasına yönlendir.
+- Hata / bug şikayetinde özür + mümkünse bilinen durum veya destek yolu; uydurma çözüm yazma.
+- Olumlu yorumda kısa teşekkür; gereksiz özellik vaadi ekleme.
+- Rakipleri kötüleme, yasal/finansal tavsiye, kişisel veri isteme yok.
+
+## Örnek yön
+
+```
+Teşekkürler! CSPRNG tahmin değil, rastgele üretim. LottoAI kazanma vaadi vermez; kolon ve istatistik yardımcısı. Notunu aldık. 18+.
+```
