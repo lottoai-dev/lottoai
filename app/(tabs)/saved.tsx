@@ -223,12 +223,17 @@ export default function SavedScreen() {
       }
 
       const pending = allCoupons.filter(isPendingCoupon);
-      if (pending.length === 0) return;
+      // Eski kontrollerde joker boyası yalnız 5+1'deydi; görseli güncellemek için rematch.
+      const refreshVisual = allCoupons.filter(
+        (cp) => !isPendingCoupon(cp) && cp.game === 'Çılgın Sayısal Loto',
+      );
+      const toMatch = [...pending, ...refreshVisual];
+      if (toMatch.length === 0) return;
 
       setCoupons(allCoupons);
 
       let oldestDateStr = '';
-      for (const coupon of pending) {
+      for (const coupon of toMatch) {
         if (!coupon.date) continue;
         if (!oldestDateStr || coupon.date < oldestDateStr) {
           oldestDateStr = coupon.date;
@@ -256,7 +261,7 @@ export default function SavedScreen() {
           const [d, m, y] = oldestDateStr.split('.').map(Number);
           const oldestIso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
-          const gameNames = [...new Set(pending.map((cp) => cp.game))];
+          const gameNames = [...new Set(toMatch.map((cp) => cp.game))];
           const { data: allDraws } = await supabase
             .from('draws')
             .select('game, numbers, bonus, superstar, draw_date, draw_no, draw_date_parsed')
@@ -272,7 +277,7 @@ export default function SavedScreen() {
               else drawsByGame.set(draw.game, [draw]);
             }
 
-            for (const coupon of pending) {
+            for (const coupon of toMatch) {
               const relevantDraws = drawsByGame.get(coupon.game);
               if (!relevantDraws || relevantDraws.length === 0) continue;
 
@@ -302,25 +307,39 @@ export default function SavedScreen() {
                 draw,
               );
 
-              patches.set(coupon.id, {
+              const wasPending = isPendingCoupon(coupon);
+              const nextPatch = {
                 matchedCount: match.mainMatchCount,
                 matchedNumbers: match.matchedNumbers,
                 matchedBonus: match.matchedBonus,
                 matchedJoker: match.matchedJoker,
                 jokerHitNumber: match.jokerHitNumber,
                 matchedSuperStar: match.matchedSuperStar,
-              });
-              newlyCheckedCount++;
-              if (match.rank > bestNewRank) {
-                bestNewRank = match.rank;
-                bestNewLabel = getMatchDisplay({
-                  game: coupon.game,
-                  mainMatchCount: match.mainMatchCount,
-                  matchedJoker: match.matchedJoker,
-                  matchedSuperStar: match.matchedSuperStar,
-                  matchedBonusCount: match.matchedBonus.length,
-                  playedSuperStar: coupon.superStar != null,
-                }).label;
+              };
+
+              if (
+                !wasPending &&
+                coupon.jokerHitNumber === nextPatch.jokerHitNumber &&
+                !!coupon.matchedJoker === nextPatch.matchedJoker &&
+                coupon.matchedCount === nextPatch.matchedCount
+              ) {
+                continue;
+              }
+
+              patches.set(coupon.id, nextPatch);
+              if (wasPending) {
+                newlyCheckedCount++;
+                if (match.rank > bestNewRank) {
+                  bestNewRank = match.rank;
+                  bestNewLabel = getMatchDisplay({
+                    game: coupon.game,
+                    mainMatchCount: match.mainMatchCount,
+                    matchedJoker: match.matchedJoker,
+                    matchedSuperStar: match.matchedSuperStar,
+                    matchedBonusCount: match.matchedBonus.length,
+                    playedSuperStar: coupon.superStar != null,
+                  }).label;
+                }
               }
             }
           }

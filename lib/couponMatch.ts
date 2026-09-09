@@ -259,11 +259,17 @@ export function matchCouponToDraw(
 
   if (coupon.game === 'Çılgın Sayısal Loto') {
     const joker = drawnBonus[0] ?? null;
-    if (mainMatchCount === 5 && joker != null) {
-      const missed = coupon.numbers.filter((n) => !drawnNumbers.includes(n));
-      if (missed.length === 1 && missed[0] === joker) {
-        matchedJoker = true;
+    if (joker != null) {
+      // Görsel: Joker'e eşit kolon sayısı (ana tutuş değilse) boyansın — ödül şartı değil.
+      if (coupon.numbers.includes(joker) && !matchedNumbers.includes(joker)) {
         jokerHitNumber = joker;
+      }
+      // Ödül: yalnız resmi 5+1
+      if (mainMatchCount === 5) {
+        const missed = coupon.numbers.filter((n) => !drawnNumbers.includes(n));
+        if (missed.length === 1 && missed[0] === joker) {
+          matchedJoker = true;
+        }
       }
     }
   }
