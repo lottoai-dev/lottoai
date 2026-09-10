@@ -124,10 +124,22 @@ function gameMeta(name: string) {
   return { game, id, color: getGameAccentColor(id) };
 }
 
+/** Deneme: yalnız ana sayfa. Beğenilmezse bu lift kalkar. */
+const HOME_LIFT = {
+  bg: '#12151C',
+  surface: '#1A1E26',
+  surfaceAlt: '#222732',
+  elevated: '#262C36',
+} as const;
+
+function withHomeLift(theme: AppTheme): AppTheme {
+  return { ...theme, colors: { ...theme.colors, ...HOME_LIFT } };
+}
+
 /* ----------------------------- section ----------------------------- */
 function SectionHeader({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   const theme = useTheme();
-  const s = useMemo(() => makeStyles(theme), [theme]);
+  const s = useMemo(() => makeStyles(withHomeLift(theme)), [theme]);
   return (
     <View style={s.sectionHeader}>
       <Text style={s.sectionTitle}>{title}</Text>
@@ -144,7 +156,8 @@ function SectionHeader({ title, action, onAction }: { title: string; action?: st
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
+  const baseTheme = useTheme();
+  const theme = useMemo(() => withHomeLift(baseTheme), [baseTheme]);
   const c = theme.colors;
   const s = useMemo(() => makeStyles(theme), [theme]);
   const { unreadCount } = useBildirim();
@@ -791,6 +804,7 @@ function makeStyles(theme: AppTheme) {
       padding: spacing.xxl,
       alignItems: 'center',
       gap: spacing.md,
+      backgroundColor: c.surface,
     },
     errorText: { ...ty.bodyMedium, color: c.text2, textAlign: 'center' },
 
@@ -1039,7 +1053,14 @@ function makeStyles(theme: AppTheme) {
       justifyContent: 'center',
     },
 
-    emptyCard: { marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: spacing.xxl, alignItems: 'center', gap: spacing.md },
+    emptyCard: {
+      marginHorizontal: spacing.xl,
+      marginTop: spacing.lg,
+      padding: spacing.xxl,
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: c.surface,
+    },
     emptyIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
     emptyTitle: { ...ty.h2, color: c.text },
     emptyDesc: { ...ty.body, color: c.text2, textAlign: 'center', maxWidth: 260 },
@@ -1067,6 +1088,7 @@ function makeStyles(theme: AppTheme) {
       marginHorizontal: spacing.xl,
       marginBottom: spacing.xxl,
       overflow: 'hidden',
+      backgroundColor: c.surface,
     },
     scheduleDetailHead: {
       flexDirection: 'row',
