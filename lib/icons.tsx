@@ -64,6 +64,18 @@ export function SparkIcon({ color, size = 24 }: IconProps) {
   );
 }
 
+/** Lota: üç top L biçiminde + ince halka. Generic yıldız değil. */
+export function LotaMark({ color, size = 24 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Circle cx={12} cy={12} r={9.1} stroke={color} strokeWidth={1.6} />
+      <Circle cx={8.6} cy={8.4} r={2.15} fill={color} />
+      <Circle cx={8.6} cy={15.6} r={2.15} fill={color} />
+      <Circle cx={15.6} cy={15.6} r={2.15} fill={color} />
+    </Svg>
+  );
+}
+
 export function BellIcon({ color, size = 24, strokeWidth = 1.7 }: IconProps) {
   return (
     <Svg {...base(size)}>

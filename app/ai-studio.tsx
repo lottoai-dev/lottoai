@@ -53,7 +53,7 @@ import {
   ClockIcon,
   CloseIcon,
   PlayIcon,
-  SparkIcon,
+  LotaMark,
   TrashIcon,
 } from '../lib/icons';
 import { generateLotaCoupon, LotaGenerateError } from '../lib/lotaGenerate';
@@ -446,7 +446,7 @@ export default function AiStudioScreen() {
           </PressableScale>
           <View style={s.headerText}>
             <View style={s.eyebrowRow}>
-              <SparkIcon color={c.brand} size={14} />
+              <LotaMark color={c.brand} size={14} />
               <Text style={[s.eyebrow, { color: c.brand }]}>LOTA AI</Text>
             </View>
             <Text style={s.title}>Lota ile Üret</Text>
@@ -480,7 +480,7 @@ export default function AiStudioScreen() {
           ) : !hasResult ? (
             <View style={s.empty}>
               <View style={[s.emptyIcon, { backgroundColor: c.brandSoft }]}>
-                <SparkIcon color={c.brand} size={30} />
+                <LotaMark color={c.brand} size={30} />
               </View>
               <Text style={s.emptyTitle}>Hazır mısın?</Text>
               <Text style={s.emptyText}>
@@ -580,7 +580,7 @@ export default function AiStudioScreen() {
           onPress={handleGenerate}
           disabled={generating || checkingQuota}
           loading={generating || checkingQuota}
-          iconLeft={(color, size) => <SparkIcon color={color} size={size} />}
+          iconLeft={(color, size) => <LotaMark color={color} size={size} />}
           fullWidth={false}
           style={s.generateBtn}
         />
@@ -701,7 +701,7 @@ export default function AiStudioScreen() {
         <View style={[s.modalOverlay, { backgroundColor: c.overlay, justifyContent: 'center', paddingHorizontal: 24 }]}>
           <View style={[s.quotaCard, { backgroundColor: c.surface }]}>
             <View style={[s.quotaIcon, { backgroundColor: c.brandSoft }]}>
-              <SparkIcon color={c.brand} size={26} />
+              <LotaMark color={c.brand} size={26} />
             </View>
             <Text style={s.quotaTitle}>Lota hakkın bitti</Text>
             {ADS_REWARDS_ENABLED ? (

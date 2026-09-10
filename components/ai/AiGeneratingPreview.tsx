@@ -12,7 +12,7 @@ import Animated, {
 
 import { AppTheme } from '../../constants/theme';
 import type { Game } from '../../lib/games';
-import { SparkIcon } from '../../lib/icons';
+import { LotaMark } from '../../lib/icons';
 import { useTheme } from '../../lib/theme';
 
 type BallLayout = { size: number; gap: number; nowrap: boolean };
@@ -39,7 +39,6 @@ export function AiGeneratingPreview({
   );
 
   const pulse = useSharedValue(0.55);
-  const spin = useSharedValue(0);
 
   useEffect(() => {
     pulse.value = withRepeat(
@@ -50,8 +49,7 @@ export function AiGeneratingPreview({
       -1,
       false,
     );
-    spin.value = withRepeat(withTiming(360, { duration: 2400, easing: Easing.linear }), -1, false);
-  }, [pulse, spin]);
+  }, [pulse]);
 
   useEffect(() => {
     const tick = setInterval(() => {
@@ -72,18 +70,12 @@ export function AiGeneratingPreview({
     transform: [{ scale: 0.94 + pulse.value * 0.08 }],
   }));
 
-  const iconSpinStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${spin.value}deg` }],
-  }));
-
   const fontSize = Math.round(ballLayout.size * 0.38);
 
   return (
     <View style={s.wrap}>
       <Animated.View style={[s.iconRing, { borderColor: `${accentColor}33` }, glowStyle]}>
-        <Animated.View style={iconSpinStyle}>
-          <SparkIcon color={accentColor} size={28} />
-        </Animated.View>
+        <LotaMark color={accentColor} size={28} />
       </Animated.View>
       <Text style={[s.status, { color: c.brand }]}>Lota üretiyor…</Text>
       <Text style={s.hint}>Kolon hazırlanıyor</Text>

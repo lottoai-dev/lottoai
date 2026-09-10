@@ -50,7 +50,7 @@ import {
     InfoIcon,
     PlayIcon,
     SlidersIcon,
-    SparkIcon,
+    LotaMark,
     TrashIcon,
     ChevronRightIcon,
 } from '../../lib/icons';
@@ -800,7 +800,7 @@ export default function GenerateScreen() {
           style={[s.aiEntry, { backgroundColor: c.surface }]}
         >
           <View style={[s.aiEntryIcon, { backgroundColor: c.brandSoft }]}>
-            <SparkIcon color={c.brand} size={18} />
+            <LotaMark color={c.brand} size={18} />
           </View>
           <View style={s.aiEntryText}>
             <Text style={s.aiEntryTitle}>Lota AI&apos;a geç</Text>
