@@ -1,6 +1,6 @@
 # LottoAI — Proje Durumu
 
-> Son güncelleme: 1 Eylül 2026
+> Son güncelleme: 11 Eylül 2026
 > Bu dosya her tamamlanan işten sonra güncellenir. Yeni bir sohbete başlarken
 > "durum dosyasını oku" demek yeterli.
 
@@ -14,7 +14,7 @@ Native / Expo uygulaması.
 | --- | --- |
 | Backend | Supabase (Postgres + Auth + Edge Functions), proje ref `tsxzukctomvnyzalgxap` (panelde adı: LuckyPick) |
 | AI | **Kaldırıldı (1 Eyl)** — Lota sohbet asistanı tamamen söküldü; ileride dar kapsamlı "cümleyle kolon" düşünülebilir |
-| Reklam | Google AdMob (ödüllü), NPA modunda — **hesap onayı bekleniyor** |
+| Reklam | **İptal (11 Eyl 2026)** — AdMob gelir yolu kapatıldı. `ADS_REWARDS_ENABLED` kapalı kalır; yeniden başvuru yok. Kod şimdilik durur, ayrı sürümde sökülmez. |
 | Tasarım | "Calm Emerald" — koyu tema `#0A0C10`, marka yeşili koyu temada `#3DD68C` / açık temada `#1C9E73`, Plus Jakarta Sans |
 | Uygulama deposu | `C:\Dev\LottoAI` → github.com/lottoai-dev/lottoai |
 | Web sitesi deposu | `C:\Users\vatan\lottoai-web` → github.com/lottoai-dev/lottoai-web (Vercel'e bağlı, otomatik deploy) |
@@ -38,7 +38,7 @@ Native / Expo uygulaması.
 | Android | 1.1.0 | Google Play'de yayında (30 Ağu 2026, build 7) |
 | Website | — | getlottoai.app yayında, git + otomatik deploy kurulu |
 | Apple Search Ads | — | Aktif ($25/ay, $0.64 max CPI) |
-| AdMob | — | Android uygulaması doğrulandı (31 Ağu); reklam sunumu incelemesi sürüyor (2–3 gün) |
+| AdMob | — | Hesap 4 kez reddedildi. **Reklam gelir yolu iptal** (11 Eyl 2026). Flag açılmaz, yeni başvuru yok. |
 
 ### Mağaza hesapları
 
@@ -49,36 +49,20 @@ kalıyor, kendi güncellemelerini önce orada test ediyor.
 
 ## Bekleyen işler
 
-### Google onayı bekliyor
+### Reklam / AdMob — iptal (11 Eyl 2026)
 
-Android uygulaması 31 Ağustos akşamı `app-ads.txt` ile başarıyla doğrulandı.
-Şimdi reklam gösterimine hazır olup olmadığına dair ayrı bir inceleme sürüyor;
-2–3 gün sürmesi bekleniyor, o bitene kadar reklam sunumu sınırlı. Sonuç
-e-postayla bildirilecek.
+AdMob hesap onayı 4 kez reddedildi. **Ödüllü reklam gelir yolu tamamen iptal.**
+Yeniden başvuru yok. `ADS_REWARDS_ENABLED` `false` kalır; onay beklenmez, flag
+açılmaz. Kota ücretsiz günlük hak olarak durur.
 
-iOS uygulaması hâlâ doğrulanmadı — App Store'daki Marketing URL boş olduğu için
-AdMob tarayacak alan adı bulamıyor. 1.1.1 ile çözülecek.
-
-AEA / CMP uyarısı bizi ilgilendirmiyor: uygulama yalnızca Türkiye'de yayında ve
-reklamlar NPA modunda planlanıyor.
-
-İnceleme olumlu sonuçlanınca: fazladan AdMob kaydını (`ca-app-pub-...~4015509427`) sil,
-`ADS_REWARDS_ENABLED` değerini `true` yap, `FREE_DAILY_LIMIT` değerini 3'e
-döndür, `admob-ssv` fonksiyonunu dağıt ve dört reklam biriminin SSV alanına
-adresini gir.
-
-**Karar (31 Ağu):** 1.1.1 sürümü AdMob incelemesi bitene kadar bekletiliyor;
-böylece mağaza metinleri, reklam bayrağı ve hazır düzeltmeler tek sürümde
-çıkar. Cuma akşamına kadar onay gelmezse reklamlar 1.1.2'ye bırakılıp 1.1.1
-elimizdekilerle yayınlanacak.
+SDK, SSV ve kota dalları şimdilik kodda kalır — sırf temizlik için mağaza
+sürümü çıkarılmaz. Abonelik bu kararla öne çekilmez; ücretsiz temel + ileride
+premium ayrı karardır.
 
 ### SSV dağıtımı (tamamlandı — 1 Eyl)
 
 `admob-ssv` Edge Function ve `admob_ssv_rewards` tablosu + kota koruma trigger'ı
-canlıya alındı. AdMob onayı gelince yalnızca konsol adımı kalır:
-
-1. Dört ödüllü reklam biriminin SSV alanına şu adresi gir:
-   `https://tsxzukctomvnyzalgxap.supabase.co/functions/v1/admob-ssv`
+canlıya alındı. Reklam yolu iptal olduğu için konsolda SSV birimi tanımlanmaz.
 
 ### 1.1.1 sürümünde yapılacaklar
 
@@ -143,6 +127,11 @@ Rakip adına benzer bir isim kullanmama kararı alındı — karışıklık risk
 politikaları nedeniyle; ayrıca taklit edilecek özgün bir kalıp yok.
 
 ## Tamamlananlar
+
+### 11 Eylül 2026
+
+- **Reklam gelir yolu iptal:** AdMob 4 ret sonrası gelir planından çıkarıldı.
+  Flag kapalı, yeniden başvuru yok; kod şimdilik durur.
 
 ### 1 Eylül 2026
 

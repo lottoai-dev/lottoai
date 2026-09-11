@@ -16,7 +16,7 @@ alwaysApply: true
 - Çevrimdışı çalışabilen özellikleri koru; ağ gereken yerde bunu açıkça belirt.
 - iOS ve Android özelliklerini ve terminolojisini mümkün olduğunca eşit tut.
 - Ücretsiz temel + ileride premium/abonelik modelini önceliklendir. Kota maliyeti korusun, kullanıcıyı cezalandırmasın.
-- Reklam yalnız isteğe bağlı ödüllü formatta olabilir; onay ve doğrulama olmadan feature flag açma.
+- Reklam gelir yolu iptal (AdMob 4 ret, 11 Eyl 2026). `ADS_REWARDS_ENABLED` açma; AdMob’a yeniden başvurma. SDK sökümü ayrı, bilinçli sürüm işidir.
 - Güncel mağaza, politika ve SDK konularında önce resmî kaynakları kontrol et.
 - Production build, deploy ve remote migration öncesi açık onay al.
 - Veri silme, force push, reset ve diğer geri döndürülemez işlemler öncesi her zaman açık onay al.
