@@ -72,7 +72,14 @@ export type FeatureQuotaStatus = {
   exhausted: boolean;
 };
 
+/**
+ * Metro / dev client'ta kota kilidi yok. Production ve mağaza build'inde
+ * (__DEV__ false) günlük limit aynen uygulanır.
+ */
 function statusFromUsed(used: number): FeatureQuotaStatus {
+  if (__DEV__) {
+    return { used: Math.max(used, 0), remaining: 999, exhausted: false };
+  }
   const safeUsed = Math.max(used, 0);
   return {
     used: safeUsed,
