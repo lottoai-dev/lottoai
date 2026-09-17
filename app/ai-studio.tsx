@@ -445,11 +445,10 @@ export default function AiStudioScreen() {
             <BackIcon color={c.text} size={20} />
           </PressableScale>
           <View style={s.headerText}>
-            <View style={s.eyebrowRow}>
-              <LotaMark color={c.brand} size={14} />
-              <Text style={[s.eyebrow, { color: c.brand }]}>LOTA AI</Text>
+            <View style={s.titleRow}>
+              <LotaMark color={c.brand} size={22} />
+              <Text style={s.title}>Lota ile Üret</Text>
             </View>
-            <Text style={s.title}>Lota ile Üret</Text>
             <Text style={s.subtitle}>Tek dokunuşla kolon + analiz</Text>
           </View>
           <PressableScale
@@ -770,9 +769,8 @@ function makeStyles(theme: AppTheme) {
       justifyContent: 'center',
     },
     headerText: { flex: 1, minWidth: 0 },
-    eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 },
-    eyebrow: { ...ty.micro, fontFamily: theme.font.extrabold, letterSpacing: 1 },
-    title: { ...ty.h1, color: c.text },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    title: { ...ty.h1, color: c.text, flexShrink: 1 },
     subtitle: { ...ty.bodyMedium, color: c.text2, marginTop: 3 },
     historyHeaderBtn: {
       flexDirection: 'row',

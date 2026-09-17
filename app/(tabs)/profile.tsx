@@ -174,10 +174,6 @@ export default function ProfileScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}
       >
         <View style={s.header}>
-          <View style={s.eyebrowRow}>
-            <View style={[s.eyebrowDot, { backgroundColor: c.brand }]} />
-            <Text style={[s.eyebrow, { color: c.brand }]}>HESAP</Text>
-          </View>
           <Text style={s.title}>Profil</Text>
         </View>
 
@@ -262,7 +258,7 @@ export default function ProfileScreen() {
             Icon={StatsIcon}
             color={c.brand}
             title="İstatistikler"
-            sub="Sıcak/soğuk sayılar, dağılım"
+            sub="En çok, en az, sıcak ve soğuk"
             onPress={() => router.push('/(tabs)/results?tab=stats')}
           />
           <MenuRow
@@ -343,9 +339,6 @@ function makeStyles(theme: AppTheme) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
     header: { paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
-    eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 5 },
-    eyebrowDot: { width: 7, height: 7, borderRadius: 4 },
-    eyebrow: { ...ty.micro, fontFamily: theme.font.extrabold, letterSpacing: 1 },
     title: { ...ty.h1, color: c.text },
 
     loginBanner: {

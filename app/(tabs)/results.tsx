@@ -165,10 +165,6 @@ export default function ResultsHub() {
         }
       >
         <View style={s.header}>
-          <View style={s.eyebrowRow}>
-            <View style={[s.eyebrowDot, { backgroundColor: selectedAccent }]} />
-            <Text style={[s.eyebrow, { color: selectedAccent }]}>ÇEKİLİŞ MERKEZİ</Text>
-          </View>
           <Text style={s.title}>Sonuçlar</Text>
           <Text style={s.subtitle}>Çekiliş sonuçları ve istatistikler</Text>
         </View>
@@ -205,13 +201,6 @@ function makeStyles(theme: AppTheme) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
     header: { paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 18 },
-    eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 5 },
-    eyebrowDot: { width: 7, height: 7, borderRadius: 4 },
-    eyebrow: {
-      ...ty.micro,
-      fontFamily: theme.font.extrabold,
-      letterSpacing: 1,
-    },
     title: { ...ty.h1, color: c.text },
     subtitle: { ...ty.bodyMedium, color: c.text2, marginTop: 3 },
     segmentWrap: { marginTop: 14 },

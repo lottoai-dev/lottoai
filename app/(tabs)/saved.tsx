@@ -663,7 +663,7 @@ export default function SavedScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}
       >
-        <SavedHeader styles={s} brand={c.brand} />
+        <SavedHeader styles={s} />
 
         {isLoading ? (
           <LoadingState label="Kolonların yükleniyor…" />
@@ -824,17 +824,11 @@ export default function SavedScreen() {
 
 const SavedHeader = React.memo(function SavedHeader({
   styles: s,
-  brand,
 }: {
   styles: TicketStyles;
-  brand: string;
 }) {
   return (
     <View style={s.header}>
-      <View style={s.eyebrowRow}>
-        <View style={[s.eyebrowDot, { backgroundColor: brand }]} />
-        <Text style={[s.eyebrow, { color: brand }]}>KOLON CÜZDANI</Text>
-      </View>
       <Text style={s.title}>Kolonlarım</Text>
       <Text style={s.subtitle}>Kayıtlı kolonların ve sonuçları</Text>
     </View>
@@ -1058,9 +1052,6 @@ function makeStyles(theme: AppTheme) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
     header: { paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
-    eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 5 },
-    eyebrowDot: { width: 7, height: 7, borderRadius: 4 },
-    eyebrow: { ...ty.micro, fontFamily: theme.font.extrabold, letterSpacing: 1 },
     title: { ...ty.h1, color: c.text },
     subtitle: { ...ty.bodyMedium, color: c.text2, marginTop: 3 },
 

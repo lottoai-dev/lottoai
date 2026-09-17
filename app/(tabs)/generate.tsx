@@ -769,10 +769,6 @@ export default function GenerateScreen() {
       >
         <View style={s.header}>
           <View style={s.headerText}>
-            <View style={s.eyebrowRow}>
-              <View style={[s.eyebrowDot, { backgroundColor: mainColor }]} />
-              <Text style={[s.eyebrow, { color: mainColor }]}>KOLON STÜDYOSU</Text>
-            </View>
             <Text style={s.title}>Kolon Üret</Text>
             <Text style={s.subtitle}>Sayılarını sistem senin için seçsin</Text>
           </View>
@@ -1215,9 +1211,6 @@ function makeStyles(theme: AppTheme) {
     container: { flex: 1, backgroundColor: c.bg },
     header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
     headerText: { flex: 1 },
-    eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 5 },
-    eyebrowDot: { width: 7, height: 7, borderRadius: 4 },
-    eyebrow: { ...ty.micro, fontFamily: theme.font.extrabold, letterSpacing: 1 },
     title: { ...ty.h1, color: c.text },
     subtitle: { ...ty.bodyMedium, color: c.text2, marginTop: 3 },
     historyHeaderBtn: {
