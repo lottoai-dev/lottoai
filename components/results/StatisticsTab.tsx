@@ -32,13 +32,6 @@ const SUBTABS = [
 ] as const;
 type SubKey = (typeof SUBTABS)[number]['key'];
 
-const TAB_EXPLANATIONS: Record<SubKey, string> = {
-  most: 'Seçilen çekiliş aralığında en sık çıkan sayılar.',
-  least: 'Seçilen çekiliş aralığında en az çıkan veya hiç çıkmayan sayılar.',
-  hot: 'Seçilen aralıkta yakın çekilişlerde görülmüş sayılar.',
-  cold: 'Seçilen aralıkta daha uzun süredir görülmeyen sayılar.',
-};
-
 function parseNumbers(str: string): number[] {
   return str.split(' - ').map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
 }
@@ -223,10 +216,6 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
             <View style={{ width: 8 }} />
           </ScrollView>
 
-          <Surface style={s.explanation}>
-            <Text style={s.explanationText}>{TAB_EXPLANATIONS[activeTab]}</Text>
-          </Surface>
-
           {isFrequency
             ? frequencyStats.map((stat, i) => (
                 <View key={stat.number} style={s.barRow}>
@@ -297,13 +286,6 @@ function makeStyles(theme: AppTheme) {
     subtabRow: { paddingHorizontal: 20, gap: 8, marginBottom: spacing.lg },
     subtab: { paddingHorizontal: 15, paddingVertical: 9, borderRadius: radius.pill },
     subtabText: { ...ty.caption, fontFamily: theme.font.semibold },
-    explanation: {
-      marginHorizontal: 20,
-      marginBottom: spacing.lg,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-    },
-    explanationText: { ...ty.bodyMedium, color: c.text },
     barRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, marginBottom: 11 },
     rank: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     rankText: { ...ty.caption, fontFamily: theme.font.semibold, color: c.text3, fontSize: 11 },
