@@ -47,7 +47,6 @@ import {
     ClockIcon,
     CloseIcon,
     DiceIcon,
-    InfoIcon,
     PlayIcon,
     SlidersIcon,
     LotaMark,
@@ -1051,11 +1050,6 @@ export default function GenerateScreen() {
             <TextInput style={[...inputStyle, s.fullInput]} value={excludeText} onChangeText={setExcludeText} placeholder="Örn: 13, 42" placeholderTextColor={c.text3} keyboardType="numeric" />
           </Surface>
         ) : null}
-
-        <View style={[s.note, { backgroundColor: c.surfaceAlt }]}>
-          <InfoIcon color={c.text3} size={15} />
-          <Text style={s.noteText}>Sayılar tamamen rastgele üretilir. Eğlence amaçlıdır, kazanç garantisi yoktur.</Text>
-        </View>
       </ScrollView>
 
       <Modal visible={historyModal} transparent animationType="none" onRequestClose={() => setHistoryModal(false)}>
@@ -1311,9 +1305,6 @@ function makeStyles(theme: AppTheme) {
     sumDash: { fontFamily: theme.font.semibold, fontSize: 16 },
     input: { flex: 1, height: 48, borderRadius: radius.lg, textAlign: 'center', fontFamily: theme.font.semibold, fontSize: 14 },
     fullInput: { flex: 0, width: '100%', textAlign: 'left', paddingHorizontal: 14 },
-
-    note: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginHorizontal: spacing.xl, marginTop: spacing.lg, padding: 13, borderRadius: radius.lg },
-    noteText: { ...ty.caption, color: c.text2, flex: 1, lineHeight: 17 },
 
     modalOverlay: { flex: 1, justifyContent: 'flex-end' },
     modalSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing.xl },

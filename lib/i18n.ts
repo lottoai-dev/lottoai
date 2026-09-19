@@ -18,7 +18,6 @@ export const t = (key: string, params?: Record<string, string | number>): string
     profile: 'Profil',
     selectGame: 'Oyun seç',
     saveBtn: 'Kolonu kaydet',
-    luckyInfo: 'Sayılar tamamen rastgele üretilir. Eğlence amaçlıdır, kazanç garantisi yoktur.',
     bonusLabel: 'Şans Topu',
     savedSuccess: 'Kaydedildi',
     savedSuccessMsg: 'Kolonunuz başarıyla kaydedildi.',
