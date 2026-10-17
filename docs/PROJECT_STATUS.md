@@ -1,6 +1,6 @@
 # LottoAI — Proje Durumu
 
-> Son güncelleme: 11 Eylül 2026
+> Son güncelleme: 17 Ekim 2026
 > Bu dosya her tamamlanan işten sonra güncellenir. Yeni bir sohbete başlarken
 > "durum dosyasını oku" demek yeterli.
 
@@ -185,6 +185,10 @@ Canlı veritabanı ve dağıtılmış fonksiyonlar üzerinden doğrulandı:
 
 Üç tabloda da RLS açık. Servis anahtarı rotasyonu ve legacy API key geçişi
 kullanıcı kararıyla iptal edildi — tekrar gündeme getirilmeyecek.
+
+### 17 Ekim 2026
+
+- Kolon üretiminde isteğe bağlı **önceki kolonlarla çakışmasın** filtresi: bu oturumda üretilen ana sayılar yeni kolona girmez (oyun başına, bellekte). Joker / şans topu / SuperStar serbest. Havuz bitince mesaj; oturum sıfırlanabilir. Lota ve kayıtlı geçmişe dokunulmadı. Filtre açıkken kota diğer filtreler gibi işler.
 
 ### Notlar
 
