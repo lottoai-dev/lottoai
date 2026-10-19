@@ -323,6 +323,8 @@ export default function GenerateScreen() {
   const includeNumbers = parseNumberList(includeText, selectedGame.max);
   const excludeNumbers = parseNumberList(excludeText, selectedGame.max);
   const sessionUsedNumbers = sessionUsedByGame[selectedGame.id] ?? [];
+  const overlapPoolLeft = selectedGame.max - new Set([...sessionUsedNumbers, ...excludeNumbers]).size;
+  const overlapKolonLeft = Math.max(0, Math.floor(overlapPoolLeft / selectedGame.count));
   const theoreticalMin = calcMinSum(selectedGame.count);
   const theoreticalMax = calcMaxSum(selectedGame.count, selectedGame.max);
 
@@ -1108,9 +1110,11 @@ export default function GenerateScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[s.toggleTitle, noOverlap && { color: c.brand }]}>Önceki kolonlarla çakışmasın</Text>
                 <Text style={s.toggleDesc}>
-                  {sessionUsedNumbers.length > 0
-                    ? `Bu oturumda ${sessionUsedNumbers.length} ana sayı kullanıldı. Kalan havuz: ${selectedGame.max - sessionUsedNumbers.length}. Joker ve SuperStar çakışabilir.`
-                    : 'Bu oturumda ürettiğin kolonların ana sayıları yeni kolona girmez. Joker ve SuperStar çakışabilir.'}
+                  {sessionUsedNumbers.length > 0 || excludeNumbers.length > 0
+                    ? overlapKolonLeft > 0
+                      ? `Kalan: ${overlapKolonLeft} kolon · ${overlapPoolLeft} sayı. Joker ve SuperStar çakışabilir.`
+                      : 'Kalan: 0 kolon. Filtreyi kapatın veya oturumu sıfırlayın.'
+                    : `Bu oturumda ürettiğin kolonların ana sayıları yeni kolona girmez. En fazla ${overlapKolonLeft} kolon. Joker ve SuperStar çakışabilir.`}
                 </Text>
               </View>
               <View pointerEvents="none">
