@@ -44,14 +44,14 @@ import GameSelector from '../../lib/GameSelector';
 import {
     BookmarkIcon,
     CheckIcon,
+    ChevronRightIcon,
     ClockIcon,
     CloseIcon,
     DiceIcon,
+    LotaMark,
     PlayIcon,
     SlidersIcon,
-    LotaMark,
     TrashIcon,
-    ChevronRightIcon,
 } from '../../lib/icons';
 import { recordGoodMoment } from '../../lib/review-prompt';
 import { useTheme } from '../../lib/theme';
@@ -297,8 +297,6 @@ export default function GenerateScreen() {
   const [sumMax, setSumMax] = useState('');
   const [includeText, setIncludeText] = useState('');
   const [excludeText, setExcludeText] = useState('');
-  const [noOverlap, setNoOverlap] = useState(false);
-  const [sessionUsedByGame, setSessionUsedByGame] = useState<Record<string, number[]>>({});
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyModal, setHistoryModal] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
@@ -322,9 +320,6 @@ export default function GenerateScreen() {
 
   const includeNumbers = parseNumberList(includeText, selectedGame.max);
   const excludeNumbers = parseNumberList(excludeText, selectedGame.max);
-  const sessionUsedNumbers = sessionUsedByGame[selectedGame.id] ?? [];
-  const overlapPoolLeft = selectedGame.max - new Set([...sessionUsedNumbers, ...excludeNumbers]).size;
-  const overlapKolonLeft = Math.max(0, Math.floor(overlapPoolLeft / selectedGame.count));
   const theoreticalMin = calcMinSum(selectedGame.count);
   const theoreticalMax = calcMaxSum(selectedGame.count, selectedGame.max);
 
@@ -332,7 +327,6 @@ export default function GenerateScreen() {
     evenCount !== null ||
     balanced ||
     noConsecutive ||
-    noOverlap ||
     (sumMin.trim() !== '' && !isNaN(parseInt(sumMin, 10))) ||
     (sumMax.trim() !== '' && !isNaN(parseInt(sumMax, 10))) ||
     includeNumbers.length > 0 ||
@@ -395,25 +389,6 @@ export default function GenerateScreen() {
       return;
     }
 
-    const overlapExclude = noOverlap ? sessionUsedNumbers : [];
-    const overlapSet = new Set(overlapExclude);
-    if (noOverlap && includeNumbers.some((n) => overlapSet.has(n))) {
-      showAlert(
-        'Filtre hatası',
-        'Zorunlu sayılardan bazıları bu oturumda zaten kullanıldı. Zorunlu sayıları değiştirin veya oturumu sıfırlayın.',
-      );
-      return;
-    }
-
-    const mergedExclude = Array.from(new Set([...excludeNumbers, ...overlapExclude]));
-    if (noOverlap && selectedGame.max - mergedExclude.length < selectedGame.count) {
-      showAlert(
-        'Havuz doldu',
-        'Bu oyunda çakışmasız kolon kalmadı. Filtreyi kapatın veya oturumu sıfırlayın.',
-      );
-      return;
-    }
-
     const nums = generateWithConstraints(selectedGame.count, selectedGame.max, {
       noConsecutive,
       sumMin: sumMinNum,
@@ -421,16 +396,11 @@ export default function GenerateScreen() {
       evenCount,
       balanced,
       includeNumbers,
-      excludeNumbers: mergedExclude,
+      excludeNumbers,
     });
 
     if (nums === null) {
-      showAlert(
-        'Üretim başarısız',
-        noOverlap
-          ? 'Seçili filtrelerle çakışmasız kolon bulunamadı. Filtreleri gevşetin veya oturumu sıfırlayın.'
-          : 'Seçili filtrelerle uygun bir kombinasyon bulunamadı. Filtreleri gevşetmeyi deneyin.',
-      );
+      showAlert('Üretim başarısız', 'Seçili filtrelerle uygun bir kombinasyon bulunamadı. Filtreleri gevşetmeyi deneyin.');
       return;
     }
     if (nums.length === 0) {
@@ -448,11 +418,6 @@ export default function GenerateScreen() {
     setBonusNumbers(bonus);
     setSuperStarNumber(ss ?? null);
     setGenId((g) => g + 1);
-    setSessionUsedByGame((prev) => {
-      const seen = new Set(prev[selectedGame.id] ?? []);
-      for (const n of nums) seen.add(n);
-      return { ...prev, [selectedGame.id]: Array.from(seen) };
-    });
 
     saveToHistory({
       game: selectedGame.name,
@@ -572,7 +537,6 @@ export default function GenerateScreen() {
     setSumMax('');
     setIncludeText('');
     setExcludeText('');
-    setNoOverlap(false);
     performGeneration();
   };
 
@@ -588,7 +552,6 @@ export default function GenerateScreen() {
     setSumMax('');
     setIncludeText('');
     setExcludeText('');
-    setNoOverlap(false);
     setShowFilter(false);
   };
 
@@ -790,7 +753,6 @@ export default function GenerateScreen() {
     else if (sumMax.trim() !== '') parts.push(`∑ ≤ ${sumMax}`);
     if (includeNumbers.length > 0) parts.push(`Zorunlu: ${includeNumbers.join(',')}`);
     if (excludeNumbers.length > 0) parts.push(`Hariç: ${excludeNumbers.join(',')}`);
-    if (noOverlap) parts.push('Çakışmasın');
     return parts;
   };
 
@@ -909,12 +871,14 @@ export default function GenerateScreen() {
                 </View>
               ) : null}
 
-              <View style={s.resultFooter}>
-                <Text style={s.resultFooterLabel}>TOPLAM</Text>
-                <Text style={s.resultFooterValue}>
-                  {total} · {evensInResult} çift / {generatedNumbers.length - evensInResult} tek
-                </Text>
-              </View>
+              {filterActive ? (
+                <View style={s.resultFooter}>
+                  <Text style={s.resultFooterLabel}>TOPLAM</Text>
+                  <Text style={s.resultFooterValue}>
+                    {total} · {evensInResult} çift / {generatedNumbers.length - evensInResult} tek
+                  </Text>
+                </View>
+              ) : null}
 
               {filterActive ? (
                 <View style={s.chipRow}>
@@ -1086,41 +1050,6 @@ export default function GenerateScreen() {
             </View>
             <Text style={s.subDesc}>Asla kolonda olmayacak sayılar (1–{selectedGame.max}, virgülle ayır)</Text>
             <TextInput style={[...inputStyle, s.fullInput]} value={excludeText} onChangeText={setExcludeText} placeholder="Örn: 13, 42" placeholderTextColor={c.text3} keyboardType="numeric" />
-
-            <View style={s.divider} />
-
-            <View style={s.subHeader}>
-              <Text style={s.subTitle}>Çakışma</Text>
-              {sessionUsedNumbers.length > 0 ? (
-                <Pressable
-                  onPress={() => {
-                    softHaptic();
-                    setSessionUsedByGame((prev) => ({ ...prev, [selectedGame.id]: [] }));
-                  }}
-                  hitSlop={8}
-                >
-                  <Text style={[s.clearBtn, { color: c.brand }]}>Oturumu sıfırla</Text>
-                </Pressable>
-              ) : null}
-            </View>
-            <Pressable
-              onPress={() => { softHaptic(); setNoOverlap((v) => !v); }}
-              style={[s.toggleRow, { backgroundColor: noOverlap ? c.brandSoft : c.surfaceAlt }]}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={[s.toggleTitle, noOverlap && { color: c.brand }]}>Önceki kolonlarla çakışmasın</Text>
-                <Text style={s.toggleDesc}>
-                  {sessionUsedNumbers.length > 0 || excludeNumbers.length > 0
-                    ? overlapKolonLeft > 0
-                      ? `Kalan: ${overlapKolonLeft} kolon · ${overlapPoolLeft} sayı. Joker ve SuperStar çakışabilir.`
-                      : 'Kalan: 0 kolon. Filtreyi kapatın veya oturumu sıfırlayın.'
-                    : `Bu oturumda ürettiğin kolonların ana sayıları yeni kolona girmez. En fazla ${overlapKolonLeft} kolon. Joker ve SuperStar çakışabilir.`}
-                </Text>
-              </View>
-              <View pointerEvents="none">
-                <Toggle value={noOverlap} onChange={(v) => { setNoOverlap(v); }} />
-              </View>
-            </Pressable>
           </Surface>
         ) : null}
       </ScrollView>
