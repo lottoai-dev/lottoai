@@ -209,6 +209,27 @@ kullanıcı kararıyla iptal edildi — tekrar gündeme getirilmeyecek.
 - Zorunlu tutulan sayılar sonuç kartında topun içinde ince bir halkayla işaretlenir (`NumberBall` `ring` prop'u; top boyutu ve aralıklar değişmez, varsayılan kapalı).
 - Filtre özeti bilinçli olarak yalnızca Kolon Üret sonuç kartında; geçmiş ve Kaydedilenler'e taşınması denendi, kart kalabalığı nedeniyle geri alındı (8 Kas).
 
+### 8 Kasım 2026 — İstatistik: Tek/Çift
+
+- İstatistik sekmesine beşinci alt sekme **Tek/Çift**: seçili dönemde (Son 10/50/100/Tümü) her tek/çift bileşiminde kaç çekiliş çıktığı, yüzde ve çubukla. Tüm bileşimler listelenir (görülmeyenler 0); en sık olan oyun renginde vurgulanır.
+- Yalnızca ana sayılar (Şans Topu +1, SuperStar dahil değil). On Numara'da gösterilmez (çekilişte 22 sayı, kolon 10 sayı) — kısa not çıkar.
+- Hesap `lib/drawStats.ts` (`parityDistribution`); Toplam ve Ardışık istatistikleri de aynı dosyada.
+- Ücretsiz: Pro planına göre yeni istatistiklerden ilki ücretsiz tanıtım olarak kalır; sonrakiler Pro adayı.
+
+### 8 Kasım 2026 — İstatistik: Toplam
+
+- Altıncı alt sekme **Toplam**: seçili dönemde ana sayı toplamlarının aralıklara göre dağılımı + üstte ortalama toplam. Tek/Çift ile aynı satır görünümü (`DistributionList`).
+- Aralıklar oyun başına sabit, tüm geçmiş verisine göre seçildi (her oyunda 9 satır, uçlar birleşik): Çılgın ≤170 / 171–200 … 351–380 / ≥381 (30'luk), Süper Loto ≤120 / 121–140 … 241–260 / ≥261 (20'lik), Şans Topu ≤50 / 51–60 … 111–120 / ≥121 (10'luk). On Numara'da yok.
+- Hesap `lib/drawStats.ts` (`sumDistribution`).
+- Pro adayı; Pro altyapısı gelene kadar herkese açık.
+
+### 8 Kasım 2026 — İstatistik: Ardışık
+
+- Yedinci alt sekme **Ardışık**: seçili dönemde çekilişlerin kaçında ardışık çift olmadığı / 1 / 2 / 3+ ardışık çift olduğu (5-6 → 1 çift, 5-6-7 → 2 çift; Kolon Üret filtresiyle aynı kural ve dil). Aynı satır görünümü; On Numara'da yok.
+- Hesap `lib/drawStats.ts` (`consecutiveDistribution`, `countConsecutivePairs` ortak).
+- Pro adayı; Pro altyapısı gelene kadar herkese açık.
+- Karar: İstatistiklerden Kolon Üret'e "bu aralıkla kolon üret" bağlantısı **yapılmayacak** — kullanıcı filtreyi Kolon Üret'ten kendisi ayarlar.
+
 ### Notlar
 
 Kota davranışı **fail-closed**: sunucu okunamaz ve bugüne ait geçerli cache

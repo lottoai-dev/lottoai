@@ -4,6 +4,16 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppTheme } from '../../constants/theme';
+import {
+  consecutiveDistribution,
+  parityDistribution,
+  sumDistribution,
+  supportsParityStats,
+  supportsSumStats,
+  type ConsecutiveDistribution,
+  type ParityDistribution,
+  type SumDistribution,
+} from '../../lib/drawStats';
 import { GameEmblem } from '../../lib/emblems';
 import { getGameAccentColor, type Game } from '../../lib/games';
 import { softHaptic } from '../../lib/haptics';
@@ -29,8 +39,59 @@ const SUBTABS = [
   { key: 'least', label: 'En Az' },
   { key: 'hot', label: 'Sıcak' },
   { key: 'cold', label: 'Soğuk' },
+  { key: 'parity', label: 'Tek/Çift' },
+  { key: 'sum', label: 'Toplam' },
+  { key: 'consecutive', label: 'Ardışık' },
 ] as const;
 type SubKey = (typeof SUBTABS)[number]['key'];
+
+/** Tek/Çift ve Toplam sekmelerinin ortak satırı: etiket · çubuk · adet + yüzde. */
+type DistRow = { key: string | number; label: string; count: number; percentage: number };
+
+function DistributionList({
+  rows,
+  maxCount,
+  accent,
+  styles: s,
+  theme,
+}: {
+  rows: DistRow[];
+  maxCount: number;
+  accent: string;
+  styles: ReturnType<typeof makeStyles>;
+  theme: AppTheme;
+}) {
+  const c = theme.colors;
+  return (
+    <>
+      {rows.map((row) => {
+        const top = row.count > 0 && row.count === maxCount;
+        return (
+          <View key={row.key} style={s.barRow}>
+            <Text style={[s.distLabel, top && { color: accent, fontFamily: theme.font.bold }]} numberOfLines={1}>
+              {row.label}
+            </Text>
+            <View style={[s.track, { backgroundColor: c.hairline }]}>
+              <View
+                style={[
+                  s.fill,
+                  {
+                    width: `${maxCount > 0 ? (row.count / maxCount) * 100 : 0}%`,
+                    backgroundColor: top ? accent : `${accent}59`,
+                  },
+                ]}
+              />
+            </View>
+            <View style={s.barVal}>
+              <Text style={[s.barCount, top && { color: accent }]}>{row.count}</Text>
+              <Text style={s.barPct}>%{row.percentage}</Text>
+            </View>
+          </View>
+        );
+      })}
+    </>
+  );
+}
 
 function parseNumbers(str: string): number[] {
   return str.split(' - ').map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
@@ -50,6 +111,9 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
   const [leastCommon, setLeastCommon] = useState<NumberStat[]>([]);
   const [hotNumbers, setHotNumbers] = useState<RecencyStat[]>([]);
   const [coldNumbers, setColdNumbers] = useState<RecencyStat[]>([]);
+  const [parity, setParity] = useState<ParityDistribution | null>(null);
+  const [sums, setSums] = useState<SumDistribution | null>(null);
+  const [consecutive, setConsecutive] = useState<ConsecutiveDistribution | null>(null);
   const [activeTab, setActiveTab] = useState<SubKey>('most');
   const [filterValue, setFilterValue] = useState(0);
 
@@ -74,6 +138,9 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
           setLeastCommon([]);
           setHotNumbers([]);
           setColdNumbers([]);
+          setParity(null);
+          setSums(null);
+          setConsecutive(null);
           return;
         }
 
@@ -83,6 +150,9 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
           setLeastCommon([]);
           setHotNumbers([]);
           setColdNumbers([]);
+          setParity(null);
+          setSums(null);
+          setConsecutive(null);
           return;
         }
 
@@ -90,9 +160,11 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
 
         const countMap: Record<number, number> = {};
         const missingMap: Record<number, number> = {};
+        const drawNumbers: number[][] = [];
 
         data.forEach((row, idx) => {
           const nums = parseNumbers(row.numbers).filter((n) => n >= 1 && n <= game.max);
+          drawNumbers.push(nums);
           nums.forEach((num) => {
             countMap[num] = (countMap[num] || 0) + 1;
             if (missingMap[num] === undefined) missingMap[num] = idx;
@@ -129,11 +201,14 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
         });
         setHotNumbers(ranked.slice(0, 10));
         setColdNumbers([...ranked].reverse().slice(0, 10));
+        setParity(supportsParityStats(game.id) ? parityDistribution(drawNumbers, game.count) : null);
+        setSums(sumDistribution(drawNumbers, game.count, game.id));
+        setConsecutive(supportsParityStats(game.id) ? consecutiveDistribution(drawNumbers, game.count) : null);
       } finally {
         setLoading(false);
       }
     },
-    [game.name, game.max],
+    [game.name, game.max, game.id, game.count],
   );
 
   useEffect(() => {
@@ -216,7 +291,62 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
             <View style={{ width: 8 }} />
           </ScrollView>
 
-          {isFrequency
+          {activeTab === 'parity' || activeTab === 'sum' || activeTab === 'consecutive' ? (
+            game.id === 'onnumara' ? (
+              <Text style={s.note}>
+                On Numara{"'"}da çekilişte 22 sayı çıktığı için bu istatistik gösterilmiyor.
+              </Text>
+            ) : activeTab === 'parity' ? (
+              parity && parity.total > 0 ? (
+                <DistributionList
+                  rows={parity.rows.map((r) => ({
+                    key: r.odd,
+                    label: `${r.odd} tek – ${r.even} çift`,
+                    count: r.count,
+                    percentage: r.percentage,
+                  }))}
+                  maxCount={parity.maxCount}
+                  accent={mainColor}
+                  styles={s}
+                  theme={theme}
+                />
+              ) : (
+                <Text style={s.note}>Bu dönem için tek/çift verisi bulunamadı.</Text>
+              )
+            ) : activeTab === 'consecutive' ? (
+              consecutive && consecutive.total > 0 ? (
+                <DistributionList
+                  rows={consecutive.rows.map((r) => ({
+                    key: r.pairs,
+                    label: r.label,
+                    count: r.count,
+                    percentage: r.percentage,
+                  }))}
+                  maxCount={consecutive.maxCount}
+                  accent={mainColor}
+                  styles={s}
+                  theme={theme}
+                />
+              ) : (
+                <Text style={s.note}>Bu dönem için ardışık sayı verisi bulunamadı.</Text>
+              )
+            ) : sums && sums.total > 0 && supportsSumStats(game.id) ? (
+              <>
+                <Text style={s.distHeader}>
+                  Ortalama toplam: <Text style={{ color: mainColor }}>{sums.average}</Text>
+                </Text>
+                <DistributionList
+                  rows={sums.rows.map((r) => ({ key: r.label, label: r.label, count: r.count, percentage: r.percentage }))}
+                  maxCount={sums.maxCount}
+                  accent={mainColor}
+                  styles={s}
+                  theme={theme}
+                />
+              </>
+            ) : (
+              <Text style={s.note}>Bu dönem için toplam verisi bulunamadı.</Text>
+            )
+          ) : isFrequency
             ? frequencyStats.map((stat, i) => (
                 <View key={stat.number} style={s.barRow}>
                   <View style={[s.rank, { backgroundColor: c.surfaceAlt }]}>
@@ -294,5 +424,8 @@ function makeStyles(theme: AppTheme) {
     barVal: { width: 50, alignItems: 'flex-end' },
     barCount: { ...ty.bodySemibold, color: c.text, fontVariant: ['tabular-nums'], fontSize: 13 },
     barPct: { ...ty.caption, color: c.text3, fontSize: 11 },
+    distLabel: { ...ty.bodySemibold, color: c.text, fontSize: 13, width: 116, fontVariant: ['tabular-nums'] },
+    distHeader: { ...ty.bodySemibold, color: c.text2, fontSize: 13, marginHorizontal: 20, marginBottom: spacing.md, fontVariant: ['tabular-nums'] },
+    note: { ...ty.caption, color: c.text3, textAlign: 'center', marginHorizontal: 20, marginTop: spacing.md },
   });
 }
