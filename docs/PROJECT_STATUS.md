@@ -70,14 +70,24 @@ premium ayrı karardır.
 `admob-ssv` Edge Function ve `admob_ssv_rewards` tablosu + kota koruma trigger'ı
 canlıya alındı. Reklam yolu iptal olduğu için konsolda SSV birimi tanımlanmaz.
 
-### 1.1.1 sürümünde yapılacaklar
+### 1.1.2 — hazırlanıyor (8 Kas 2026)
 
-Kod tarafı hazır (çıkışta push token temizliği, değerlendirme istemi, **Lota
-kaldırıldı**). Yayın öncesi:
+`app.json` sürümü `1.1.2` (build numarası EAS `autoIncrement`). İçerik: filtre
+özeti + zorunlu sayı halkası, "filtresiz devam et" düzeltmesi, çakışma
+filtresinin kaldırılması, İstatistik'e **Tek/Çift** sekmesi.
 
-1. `app.json` sürümünü `1.1.1` yap, production build al (iOS + Android aynı commit)
-2. Supabase'ten canlı `ai-chat` fonksiyonunu sil: `npx supabase functions delete ai-chat`
-3. Mağaza metinlerinden Lota / AI asistan bölümlerini çıkar (aşağıdaki tablo)
+**Toplam** ve **Ardışık** sekmeleri kodda hazır ama `PRO_STATS_ENABLED = false`
+(`lib/drawStats.ts`) ile gizli — Pro'ya ayrıldılar; önce ücretsiz verip sonra
+kilitlememek için 1.2.0'da Pro ile açılır.
+
+Yayın: telefonda test → iOS + Android production build (aynı commit) →
+mağaza sürüm notları.
+
+### 1.1.1 — yayında
+
+Kullanıcı 8 Kas 2026'da yayında olduğunu bildirdi. Canlı `ai-chat` fonksiyonu
+silinmiş (8 Kas 2026 kontrol: `functions/v1/ai-chat` → 404 NOT_FOUND).
+Aşağıdaki tablo 1.1.1 için hazırlanan mağaza metinleridir.
 
 **App Store Connect (1.1.1):**
 
@@ -221,13 +231,13 @@ kullanıcı kararıyla iptal edildi — tekrar gündeme getirilmeyecek.
 - Altıncı alt sekme **Toplam**: seçili dönemde ana sayı toplamlarının aralıklara göre dağılımı + üstte ortalama toplam. Tek/Çift ile aynı satır görünümü (`DistributionList`).
 - Aralıklar oyun başına sabit, tüm geçmiş verisine göre seçildi (her oyunda 9 satır, uçlar birleşik): Çılgın ≤170 / 171–200 … 351–380 / ≥381 (30'luk), Süper Loto ≤120 / 121–140 … 241–260 / ≥261 (20'lik), Şans Topu ≤50 / 51–60 … 111–120 / ≥121 (10'luk). On Numara'da yok.
 - Hesap `lib/drawStats.ts` (`sumDistribution`).
-- Pro adayı; Pro altyapısı gelene kadar herkese açık.
+- Pro'ya ait; 1.2.0'a kadar `PRO_STATS_ENABLED = false` ile gizli (bkz. 1.1.2).
 
 ### 8 Kasım 2026 — İstatistik: Ardışık
 
 - Yedinci alt sekme **Ardışık**: seçili dönemde çekilişlerin kaçında ardışık çift olmadığı / 1 / 2 / 3+ ardışık çift olduğu (5-6 → 1 çift, 5-6-7 → 2 çift; Kolon Üret filtresiyle aynı kural ve dil). Aynı satır görünümü; On Numara'da yok.
 - Hesap `lib/drawStats.ts` (`consecutiveDistribution`, `countConsecutivePairs` ortak).
-- Pro adayı; Pro altyapısı gelene kadar herkese açık.
+- Pro'ya ait; 1.2.0'a kadar `PRO_STATS_ENABLED = false` ile gizli (bkz. 1.1.2).
 - Karar: İstatistiklerden Kolon Üret'e "bu aralıkla kolon üret" bağlantısı **yapılmayacak** — kullanıcı filtreyi Kolon Üret'ten kendisi ayarlar.
 
 ### Notlar

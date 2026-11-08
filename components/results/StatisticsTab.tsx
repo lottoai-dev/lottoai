@@ -7,6 +7,7 @@ import { AppTheme } from '../../constants/theme';
 import {
   consecutiveDistribution,
   parityDistribution,
+  PRO_STATS_ENABLED,
   sumDistribution,
   supportsParityStats,
   supportsSumStats,
@@ -40,10 +41,12 @@ const SUBTABS = [
   { key: 'hot', label: 'Sıcak' },
   { key: 'cold', label: 'Soğuk' },
   { key: 'parity', label: 'Tek/Çift' },
-  { key: 'sum', label: 'Toplam' },
-  { key: 'consecutive', label: 'Ardışık' },
+  { key: 'sum', label: 'Toplam', pro: true },
+  { key: 'consecutive', label: 'Ardışık', pro: true },
 ] as const;
 type SubKey = (typeof SUBTABS)[number]['key'];
+/** Pro'ya ayrılan sekmeler PRO_STATS_ENABLED açılana kadar listelenmez. */
+const VISIBLE_SUBTABS = SUBTABS.filter((tab) => !('pro' in tab) || PRO_STATS_ENABLED);
 
 /** Tek/Çift ve Toplam sekmelerinin ortak satırı: etiket · çubuk · adet + yüzde. */
 type DistRow = { key: string | number; label: string; count: number; percentage: number };
@@ -273,7 +276,7 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
       ) : (
         <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.subtabRow}>
-            {SUBTABS.map((tab) => {
+            {VISIBLE_SUBTABS.map((tab) => {
               const active = activeTab === tab.key;
               return (
                 <Pressable

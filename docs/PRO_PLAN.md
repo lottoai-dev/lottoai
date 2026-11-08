@@ -1,11 +1,11 @@
 # LottoAI Pro — Uygulama Planı
 
 > Hazırlandı: 8 Kasım 2026
-> Durum: Plan aşamasında, kod yazılmadı. Hedef sürüm **1.2.0** (1.1.1 yayınlandıktan sonra).
+> Durum: Plan aşamasında, kod yazılmadı. Hedef sürüm **1.2.0** (1.1.1 yayında; arada 1.1.2 çıkıyor).
 
 ## Kararlar
 
-- **Pro = sınırsız kullanım:** filtreli kolon, kolon geçmişi (rapor) görüntüleme, Lota kolon.
+- **Pro = sınırsız kullanım:** filtreli kolon, kolon geçmişi (rapor) görüntüleme, Lota kolon; ayrıca İstatistik'te **Toplam** ve **Ardışık** sekmeleri.
 - **Filtresiz kolon** herkese ücretsiz ve sınırsız kalır.
 - **Ücretsiz kullanıcı:** üç özelliğin her biri için günde **5** hak (şu anki geçici 10'un yerine).
 - 10 → 5 düşüşü **Pro ile aynı sürümde** yapılır, önce değil.
@@ -59,6 +59,7 @@
 - **Paywall (`app/pro.tsx`):** Aylık/yıllık (fiyatlar mağazadan, yerel para birimiyle), "Satın alımları geri yükle" (Apple zorunlu), otomatik yenileme açıklaması, Kullanım Şartları ve Gizlilik bağlantıları.
 - **Giriş noktaları:** `generate.tsx`, `saved.tsx`, `ai-studio.tsx` içindeki "hakkın bitti" kartlarında reklam butonu yerine "Pro'ya geç". Profil ekranında Pro satırı/rozeti; Pro kullanıcıya "Aboneliği yönet" bağlantısı.
 - Pro kullanıcıda kota kartları hiç görünmez.
+- **İstatistik:** Toplam ve Ardışık sekmeleri (`components/results/StatisticsTab.tsx`) Pro'ya ait. 1.1.2'de `PRO_STATS_ENABLED = false` ile gizli; 1.2.0'da bayrak yerine `isPro` kontrolü: ücretsiz kullanıcıya kilitli sekme + "Pro ile aç". Tek/Çift ücretsiz kalır.
 
 ### 6. Hesap silme
 
