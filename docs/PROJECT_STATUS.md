@@ -1,6 +1,6 @@
 # LottoAI — Proje Durumu
 
-> Son güncelleme: 7 Kasım 2026
+> Son güncelleme: 8 Kasım 2026
 > Bu dosya her tamamlanan işten sonra güncellenir. Yeni bir sohbete başlarken
 > "durum dosyasını oku" demek yeterli.
 
@@ -48,6 +48,12 @@ Apple Developer Program kurulu ve doğrulanmış; Small Business Program onaylı
 kalıyor, kendi güncellemelerini önce orada test ediyor.
 
 ## Bekleyen işler
+
+### Pro abonelik (planlandı — 8 Kas 2026)
+
+Hedef 1.2.0. Filtreli kolon, geçmiş ve Lota Pro'da sınırsız; ücretsiz kullanıcıya
+her biri için günde 5 hak, sınır Supabase'e taşınacak. Ayrıntılı plan ve açık
+kararlar: [PRO_PLAN.md](PRO_PLAN.md).
 
 ### Reklam / AdMob — iptal (11 Eyl 2026)
 

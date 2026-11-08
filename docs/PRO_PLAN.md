@@ -1,0 +1,95 @@
+# LottoAI Pro — Uygulama Planı
+
+> Hazırlandı: 8 Kasım 2026
+> Durum: Plan aşamasında, kod yazılmadı. Hedef sürüm **1.2.0** (1.1.1 yayınlandıktan sonra).
+
+## Kararlar
+
+- **Pro = sınırsız kullanım:** filtreli kolon, kolon geçmişi (rapor) görüntüleme, Lota kolon.
+- **Filtresiz kolon** herkese ücretsiz ve sınırsız kalır.
+- **Ücretsiz kullanıcı:** üç özelliğin her biri için günde **5** hak (şu anki geçici 10'un yerine).
+- 10 → 5 düşüşü **Pro ile aynı sürümde** yapılır, önce değil.
+- Günlük sınır uygulama kodundan çıkar, **Supabase'de** tutulur; yeni sürüm çıkarmadan ayarlanabilir (projede `expo-updates` / OTA yok).
+- Pro **"sınırsız kullanım / daha fazla kontrol"** olarak anlatılır; kazanma şansını artırdığı izlenimi verilmez (mağaza incelemesi ve yasal açıdan).
+
+## Mevcut durum (plan yazılırken)
+
+- Üç özellik de giriş yapmış kullanıcıya açık; kota `feature_usage_daily` tablosunda sayılıyor.
+- Sınır (`FREE_DAILY_LIMIT`) yalnızca istemcide, `lib/featureQuota.ts` içinde. Sunucu sayıyor ama sınırı bilmiyor; `lota-generate` de kota kontrolü yapmıyor.
+- Abonelik / Pro durumu tutan bir tablo yok.
+- AdMob iptal; `ADS_REWARDS_ENABLED = false`, reklam kodu ve `admob-ssv` hâlâ kodda.
+- `feature_usage_daily` tablosunun şeması migration'larda yok (muhtemelen panelden oluşturuldu).
+
+## Adımlar
+
+### 0. Hesap ve mağaza hazırlığı (kullanıcı)
+
+1. **App Store Connect:** Paid Apps sözleşmesi, banka ve vergi bilgileri. Bir abonelik grubu altında iki ürün: `lottoai_pro_monthly`, `lottoai_pro_yearly`.
+2. **Google Play Console:** Ödeme profili ve aynı iki abonelik ürünü.
+3. **RevenueCat:** Hesap; iOS için App Store Connect API anahtarı, Android için Google service account. Tek bir `pro` entitlement ve iki ürünü içeren bir offering.
+
+### 1. Veritabanı (Supabase migration)
+
+- **`app_config`:** Özellik başına günlük sınır (`filtered_coupon`, `report`, `lota` = 5). Herkes okuyabilir, yalnızca service_role yazar.
+- **`user_entitlements`:** `user_id` (PK), `is_pro`, `expires_at`, `product_id`, `store`, `updated_at`. RLS: kullanıcı yalnızca kendi satırını okur; yazma yalnızca service_role.
+- `feature_usage_daily` şemasını da bir migration'a almak.
+
+### 2. Sunucu: `revenuecat-webhook` Edge Function
+
+- RevenueCat olaylarını (satın alma, yenileme, iptal, süre bitimi, ödeme sorunu, ürün değişikliği, transfer) işleyip `user_entitlements`'ı günceller.
+- İstek gizli anahtarla (Authorization başlığı) doğrulanır.
+- Olay kimliğiyle idempotent: aynı olay iki kez işlenmez (`admob_ssv_rewards` deseni).
+- RevenueCat `app_user_id` = Supabase `user.id`.
+
+### 3. Uygulama: SDK ve Pro durumu
+
+- `react-native-purchases` eklenir → **native modül, yeni build gerekir.**
+- `app/_layout.tsx` içinde SDK yapılandırması (platform anahtarları `app.config.js` / env üzerinden).
+- Giriş/çıkışta `Purchases.logIn(user.id)` / `Purchases.logOut()` (`contexts/AuthContext.tsx`'teki push token mantığının yanında).
+- Yeni **`ProContext`**: `isPro` RevenueCat `customerInfo`'dan; yedek kaynak `user_entitlements`. Abonelik değişince dinleyiciyle güncellenir.
+
+### 4. Kota: `lib/featureQuota.ts`
+
+- Sınır `app_config`'ten okunur; son değer AsyncStorage'da cache'lenir; o da yoksa varsayılan 5.
+- Pro kullanıcıda `exhausted` her zaman false. Kullanım yine kaydedilir (analiz için).
+- Reklam kodu temizliği: `ADS_REWARDS_ENABLED`, `waitForRewardGrant`, `REWARD_AMOUNT`, `lib/adMob.ts`, `react-native-google-mobile-ads`, `admob-ssv` fonksiyonu.
+
+### 5. Ekranlar
+
+- **Paywall (`app/pro.tsx`):** Aylık/yıllık (fiyatlar mağazadan, yerel para birimiyle), "Satın alımları geri yükle" (Apple zorunlu), otomatik yenileme açıklaması, Kullanım Şartları ve Gizlilik bağlantıları.
+- **Giriş noktaları:** `generate.tsx`, `saved.tsx`, `ai-studio.tsx` içindeki "hakkın bitti" kartlarında reklam butonu yerine "Pro'ya geç". Profil ekranında Pro satırı/rozeti; Pro kullanıcıya "Aboneliği yönet" bağlantısı.
+- Pro kullanıcıda kota kartları hiç görünmez.
+
+### 6. Hesap silme
+
+- `delete-account` fonksiyonu `user_entitlements` satırını da siler.
+- Silme ekranında uyarı: hesap silmek mağaza aboneliğini iptal etmez; App Store / Google Play'den iptal edilmeli.
+
+### 7. Metinler ve yasal
+
+- `app/(tabs)/legal.tsx` SSS: "abonelik yoktur" maddesi güncellenir, Pro soruları eklenir.
+- Kullanım şartları, gizlilik politikası (RevenueCat veri işleyen olarak), KVKK metni.
+- Mağaza açıklamaları ve review notları.
+
+### 8. Test
+
+- **Dev'de kota kapalı (`__DEV__`).** Sınır ve Pro'yu dev build'de test edebilmek için bu atlamayı geçici açıp kapatan bir ayar eklenir.
+- iOS sandbox test hesabı; Android lisans test kullanıcısı + internal/alpha kanal.
+- Senaryolar: satın alma, geri yükleme, iptal, süre bitimi, ödeme sorunu, aynı hesap farklı cihaz, Pro iken çıkış ve başka hesapla giriş, çevrimdışı.
+
+### 9. Yayın (1.2.0)
+
+- iOS ve Android production build, aynı commit'ten.
+- Apple'da abonelik ürünleri ilk kez **build ile birlikte** incelemeye gönderilir.
+- Eski sürümler sınırı koddan okuduğu için güncelleyene kadar 10 hak kullanır; kabul edilebilir. İleride sınır sunucuda da zorlanabilir (`increment_feature_usage` / `lota-generate`).
+
+## Açık kararlar
+
+1. Aylık ve yıllık fiyat.
+2. Ücretsiz deneme olacak mı, kaç gün?
+3. RevenueCat mi, yoksa mağaza API'lerini doğrudan bağlamak mı? (Öneri: RevenueCat.)
+
+## İş bölümü
+
+- **Kod (Claude):** adımlar 1–5 ve 8.
+- **Kullanıcı:** adım 0, mağaza metinleri ve inceleme gönderimi; 7. adımın yasal metinlerinin son onayı.
