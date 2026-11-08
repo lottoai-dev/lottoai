@@ -29,9 +29,9 @@
 - Family Sharing kapalı; "Monthly with a 12-Month Commitment" kullanılmıyor.
 - **Kalan:** her iki ürüne paywall ekran görüntüsü (Review Information → Screenshot). İlk abonelik grubu **1.2.0 ile birlikte** incelemeye gönderilmeli — o zamana kadar "Add for Review"a basılmaz ve 1.1.2'ye eklenmez.
 
-### Google Play Console — sırada
+### Google Play Console — 1.2.0'ın ilk test build'inden sonra
 
-- Abonelik oluşturmak için Play'e `com.android.vending.BILLING` izinli bir sürüm yüklenmiş olmalı. İzin 1.1.2'ye eklendi (`app.json`); 1.1.2 en az dahili test kanalına yüklenince devam edilir.
+- Abonelik oluşturmak için Play'e **Play Billing Library (≥ 8.0.0) içeren** bir paket yüklenmiş olmalı. Yalnızca `com.android.vending.BILLING` izni yetmez: Play bunu eski AIDL faturalandırma sayıp paketi yayından engelliyor (1.1.2'de denendi, geri alındı). Sıra: 1.2.0'ın RevenueCat'li ilk build'i dahili teste → Play'de ürünleri oluştur → test.
 - Yapı: tek abonelik (`lottoai_pro`), içinde iki temel plan (aylık ₺79,99, yıllık ₺599,99); yıllık plana 7 günlük ücretsiz deneme teklifi. Ödeme profili gerekiyorsa o adımda bağlanır.
 
 ## Mevcut durum (plan yazılırken)

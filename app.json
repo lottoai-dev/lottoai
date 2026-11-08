@@ -38,8 +38,7 @@
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "POST_NOTIFICATIONS",
-        "SCHEDULE_EXACT_ALARM",
-        "com.android.vending.BILLING"
+        "SCHEDULE_EXACT_ALARM"
       ],
       "jsEngine": "hermes"
     },

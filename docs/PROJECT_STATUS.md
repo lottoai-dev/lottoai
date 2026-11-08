@@ -83,10 +83,11 @@ kilitlememek için 1.2.0'da Pro ile açılır.
 Yayın: telefonda test → iOS + Android production build (aynı commit) →
 mağaza sürüm notları.
 
-Android'e `com.android.vending.BILLING` izni eklendi (yalnızca bildirim amaçlı,
-satın alma kodu yok): Play Console abonelik ürünü oluşturmak için bu izni
-içeren bir sürümün yüklenmiş olmasını şart koşuyor. 1.1.2 en az dahili test
-kanalına yüklenince Play'de Pro ürünleri oluşturulabilir.
+Android'de `com.android.vending.BILLING` izni denendi ve **geri alındı**: Play,
+izni olup Play Billing Library içermeyen paketi "AIDL faturalandırma kullanıyor,
+8.0.0'a geçin" hatasıyla yayından engelliyor (versionCode 9 bu yüzden
+kullanılamaz). Android 1.1.2 izinsiz yeniden build alındı (versionCode 10).
+iOS 1.1.2 (build 8) etkilenmedi. Play abonelikleri 1.2.0'a kaldı.
 
 ### 1.1.1 — yayında
 
