@@ -83,6 +83,11 @@ kilitlememek için 1.2.0'da Pro ile açılır.
 Yayın: telefonda test → iOS + Android production build (aynı commit) →
 mağaza sürüm notları.
 
+Android'e `com.android.vending.BILLING` izni eklendi (yalnızca bildirim amaçlı,
+satın alma kodu yok): Play Console abonelik ürünü oluşturmak için bu izni
+içeren bir sürümün yüklenmiş olmasını şart koşuyor. 1.1.2 en az dahili test
+kanalına yüklenince Play'de Pro ürünleri oluşturulabilir.
+
 ### 1.1.1 — yayında
 
 Kullanıcı 8 Kas 2026'da yayında olduğunu bildirdi. Canlı `ai-chat` fonksiyonu

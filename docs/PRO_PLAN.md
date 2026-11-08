@@ -12,6 +12,28 @@
 - Günlük sınır uygulama kodundan çıkar, **Supabase'de** tutulur; yeni sürüm çıkarmadan ayarlanabilir (projede `expo-updates` / OTA yok).
 - Pro **"sınırsız kullanım / daha fazla kontrol"** olarak anlatılır; kazanma şansını artırdığı izlenimi verilmez (mağaza incelemesi ve yasal açıdan).
 
+## Mağaza kurulumu — ilerleme
+
+### App Store Connect (tamamlandı — 8 Kas 2026)
+
+- Developer Program License Agreement ve güncel **Paid Apps** sözleşmesi kabul edildi; banka (USD) ve vergi formları (W-8BEN) zaten aktifti.
+- Abonelik grubu **LottoAI Pro** (Group ID `22559002`), Türkçe görünen ad "LottoAI Pro", uygulama adı kullanılıyor.
+- Ürünler (yalnızca Türkiye'de satışta):
+
+| Seviye | Ürün | Product ID | Apple ID | Süre | Fiyat | Deneme |
+|---|---|---|---|---|---|---|
+| 1 | Pro Yıllık | `lottoai_pro_yearly` | 6832326156 | 1 yıl (peşin) | ₺599,99 | 7 gün ücretsiz |
+| 2 | Pro Aylık | `lottoai_pro_monthly` | 6832323045 | 1 ay | ₺79,99 | — |
+
+- Yıllık 1. seviyede: aylıktan yıllığa geçiş "yükseltme" sayılır, anında başlar.
+- Family Sharing kapalı; "Monthly with a 12-Month Commitment" kullanılmıyor.
+- **Kalan:** her iki ürüne paywall ekran görüntüsü (Review Information → Screenshot). İlk abonelik grubu **1.2.0 ile birlikte** incelemeye gönderilmeli — o zamana kadar "Add for Review"a basılmaz ve 1.1.2'ye eklenmez.
+
+### Google Play Console — sırada
+
+- Abonelik oluşturmak için Play'e `com.android.vending.BILLING` izinli bir sürüm yüklenmiş olmalı. İzin 1.1.2'ye eklendi (`app.json`); 1.1.2 en az dahili test kanalına yüklenince devam edilir.
+- Yapı: tek abonelik (`lottoai_pro`), içinde iki temel plan (aylık ₺79,99, yıllık ₺599,99); yıllık plana 7 günlük ücretsiz deneme teklifi. Ödeme profili gerekiyorsa o adımda bağlanır.
+
 ## Mevcut durum (plan yazılırken)
 
 - Üç özellik de giriş yapmış kullanıcıya açık; kota `feature_usage_daily` tablosunda sayılıyor.
@@ -84,11 +106,12 @@
 - Apple'da abonelik ürünleri ilk kez **build ile birlikte** incelemeye gönderilir.
 - Eski sürümler sınırı koddan okuduğu için güncelleyene kadar 10 hak kullanır; kabul edilebilir. İleride sınır sunucuda da zorlanabilir (`increment_feature_usage` / `lota-generate`).
 
-## Açık kararlar
+## Fiyat ve altyapı kararları (8 Kas 2026)
 
-1. Aylık ve yıllık fiyat.
-2. Ücretsiz deneme olacak mı, kaç gün?
-3. RevenueCat mi, yoksa mağaza API'lerini doğrudan bağlamak mı? (Öneri: RevenueCat.)
+- **Altyapı:** RevenueCat.
+- **Planlar:** aylık **₺79,99**, yıllık **₺599,99** (≈ 7,5 ay; yıllıkta ~%37 indirim). Mağazaların hazır fiyat listesinden en yakın değer seçilir.
+- **Ücretsiz deneme:** 7 gün, yalnızca yıllık planda.
+- Gerekçe: Türkiye mağazasında bu kategoride abonelik az; görülen örnekler ₺99,99–₺199,99/ay ve $1,99/ay. Tahmin iddiası olmadığı için alt-orta segment. Fiyat düşürmek kolay, mevcut abonelerde artırmak mağaza kurallarına tabi — ilk haftaların dönüşüm verisine göre gözden geçirilir.
 
 ## İş bölümü
 
