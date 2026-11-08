@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '../../components/ui/app-button';
+import { KolonFacts } from '../../components/ui/kolon-facts';
 import { NumberBall } from '../../components/ui/number-ball';
 import { PressableScale, Surface } from '../../components/ui/surface';
 import { Toggle } from '../../components/ui/toggle';
@@ -40,6 +41,14 @@ import {
     waitForRewardGrant,
 } from '../../lib/featureQuota';
 import { GAMES, getGameAccentColor } from '../../lib/games';
+import {
+    countConsecutivePairs,
+    EMPTY_KOLON_FILTERS,
+    hasActiveFilters,
+    kolonFacts,
+    KolonFilters,
+    MAX_CONSECUTIVE_PAIRS,
+} from '../../lib/kolonFacts';
 import GameSelector from '../../lib/GameSelector';
 import {
     BookmarkIcon,
@@ -99,12 +108,6 @@ function generateNumbers(count: number, max: number): number[] {
   for (let i = 0; i < max; i++) pool[i] = i + 1;
   shuffleInPlace(pool);
   return pool.slice(0, count).sort((a, b) => a - b);
-}
-
-function countConsecutivePairs(nums: number[]): number {
-  let pairs = 0;
-  for (let i = 0; i < nums.length - 1; i++) if (nums[i + 1] - nums[i] === 1) pairs++;
-  return pairs;
 }
 
 function parseNumberList(input: string, max: number): number[] {
@@ -251,7 +254,7 @@ function generateWithConstraints(
       nums = [...constraints.includeNumbers, ...picks].sort((a, b) => a - b);
     }
 
-    if (constraints.noConsecutive && countConsecutivePairs(nums) > 1) continue;
+    if (constraints.noConsecutive && countConsecutivePairs(nums) > MAX_CONSECUTIVE_PAIRS) continue;
     const total = nums.reduce((a, b) => a + b, 0);
     if (constraints.sumMin !== null && total < constraints.sumMin) continue;
     if (constraints.sumMax !== null && total > constraints.sumMax) continue;
@@ -289,6 +292,9 @@ export default function GenerateScreen() {
   const [bonusNumbers, setBonusNumbers] = useState<number[]>([]);
   const [superStarNumber, setSuperStarNumber] = useState<number | null>(null);
   const [genId, setGenId] = useState(0);
+  // Ekrandaki kolonun üretildiği filtreler. Üretimden sonra filtre değişse de
+  // özet, kolonun gerçekten hangi ayarlarla üretildiğini gösterir.
+  const [resultFilters, setResultFilters] = useState<KolonFilters>(EMPTY_KOLON_FILTERS);
   const [showFilter, setShowFilter] = useState(false);
   const [evenCount, setEvenCount] = useState<number | null>(null);
   const [balanced, setBalanced] = useState(false);
@@ -323,21 +329,24 @@ export default function GenerateScreen() {
   const theoreticalMin = calcMinSum(selectedGame.count);
   const theoreticalMax = calcMaxSum(selectedGame.count, selectedGame.max);
 
-  const filterActive =
-    evenCount !== null ||
-    balanced ||
-    noConsecutive ||
-    (sumMin.trim() !== '' && !isNaN(parseInt(sumMin, 10))) ||
-    (sumMax.trim() !== '' && !isNaN(parseInt(sumMax, 10))) ||
-    includeNumbers.length > 0 ||
-    excludeNumbers.length > 0;
+  const parseSum = (text: string): number | null => {
+    const n = parseInt(text.trim(), 10);
+    return isNaN(n) ? null : n;
+  };
+  const currentFilters: KolonFilters = {
+    balanced,
+    evenCount,
+    noConsecutive,
+    sumMin: parseSum(sumMin),
+    sumMax: parseSum(sumMax),
+    includeNumbers,
+    excludeNumbers,
+  };
+  const filterActive = hasActiveFilters(currentFilters);
+  const resultFacts = kolonFacts(generatedNumbers, selectedGame, resultFilters);
 
   const filterOptions = Array.from({ length: selectedGame.count + 1 }, (_, i) => i);
-  const oddCount = evenCount !== null ? selectedGame.count - evenCount : null;
   const currentGameHistory = history.filter((h) => h.gameId === selectedGame.id);
-
-  const total = generatedNumbers.reduce((a, b) => a + b, 0);
-  const evensInResult = generatedNumbers.filter((n) => n % 2 === 0).length;
 
   useEffect(() => {
     if (params.game) {
@@ -374,30 +383,23 @@ export default function GenerateScreen() {
    * Sayıları gerçekten üretip ekrana basan, geçmişe kaydeden asıl iş.
    * Kilit yönetmez — çağıran taraf (performGeneration veya handleGenerate
    * async yolu) generatingRef'i tutuyor olmalı.
+   *
+   * Filtreler açıkça parametre olarak gelir: setState aynı turda ekrana
+   * yansımadığı için "filtresiz devam et" gibi yollar, temizlenmiş
+   * filtreleri state'ten değil buradan geçirir.
    */
-  const performGenerationCore = () => {
-    const sumMinNum = sumMin.trim() !== '' ? parseInt(sumMin, 10) : null;
-    const sumMaxNum = sumMax.trim() !== '' ? parseInt(sumMax, 10) : null;
-
-    const sumError = validateSumRange(selectedGame.count, selectedGame.max, sumMinNum, sumMaxNum);
+  const performGenerationCore = (filters: KolonFilters = currentFilters) => {
+    const sumError = validateSumRange(selectedGame.count, selectedGame.max, filters.sumMin, filters.sumMax);
     if (sumError) {
       showAlert('Geçersiz toplam aralığı', `${sumError}\n\nGeçerli aralık: ${theoreticalMin} – ${theoreticalMax}`);
       return;
     }
-    if (includeNumbers.length > selectedGame.count) {
+    if (filters.includeNumbers.length > selectedGame.count) {
       showAlert('Filtre hatası', `En fazla ${selectedGame.count} zorunlu sayı belirleyebilirsiniz.`);
       return;
     }
 
-    const nums = generateWithConstraints(selectedGame.count, selectedGame.max, {
-      noConsecutive,
-      sumMin: sumMinNum,
-      sumMax: sumMaxNum,
-      evenCount,
-      balanced,
-      includeNumbers,
-      excludeNumbers,
-    });
+    const nums = generateWithConstraints(selectedGame.count, selectedGame.max, filters);
 
     if (nums === null) {
       showAlert('Üretim başarısız', 'Seçili filtrelerle uygun bir kombinasyon bulunamadı. Filtreleri gevşetmeyi deneyin.');
@@ -417,6 +419,7 @@ export default function GenerateScreen() {
     setGeneratedNumbers(nums);
     setBonusNumbers(bonus);
     setSuperStarNumber(ss ?? null);
+    setResultFilters(filters);
     setGenId((g) => g + 1);
 
     saveToHistory({
@@ -429,8 +432,8 @@ export default function GenerateScreen() {
     });
 
     // Filtreli üretim başarıyla tamamlandıysa günlük kullanımı işaretle.
-    // Filtresiz üretim (filterActive false) bu kotaya hiç dahil değil.
-    if (filterActive) {
+    // Filtresiz üretim bu kotaya hiç dahil değil.
+    if (hasActiveFilters(filters)) {
       void recordFeatureUsage('filtered_coupon');
     }
 
@@ -442,12 +445,12 @@ export default function GenerateScreen() {
    * handleUseWithoutFilter / filtresiz handleGenerate bu fonksiyonu çağırır;
    * yeni çağıranlar da otomatik korunur.
    */
-  const performGeneration = () => {
+  const performGeneration = (filters: KolonFilters = currentFilters) => {
     if (generatingRef.current) return;
     generatingRef.current = true;
     setGenerating(true);
     try {
-      performGenerationCore();
+      performGenerationCore(filters);
     } finally {
       generatingRef.current = false;
       setGenerating(false);
@@ -537,7 +540,8 @@ export default function GenerateScreen() {
     setSumMax('');
     setIncludeText('');
     setExcludeText('');
-    performGeneration();
+    // State temizliği bu turda yansımaz; filtresiz üretimi açıkça iste.
+    performGeneration(EMPTY_KOLON_FILTERS);
   };
 
   const handleGameSelect = (game: (typeof GAMES)[0]) => {
@@ -562,6 +566,8 @@ export default function GenerateScreen() {
     setGeneratedNumbers(entry.numbers);
     setBonusNumbers(entry.bonus);
     setSuperStarNumber(entry.superStar ?? null);
+    // Geçmiş kayıtları filtre bilgisini tutmuyor; özet gösterilmez.
+    setResultFilters(EMPTY_KOLON_FILTERS);
     setGenId((g) => g + 1);
     setHistoryModal(false);
   };
@@ -743,19 +749,6 @@ export default function GenerateScreen() {
     }
   };
 
-  const filterChips = (): string[] => {
-    const parts: string[] = [];
-    if (balanced) parts.push('Dengeli');
-    if (evenCount !== null) parts.push(`${evenCount} çift · ${oddCount} tek`);
-    if (noConsecutive) parts.push('Ardışık yok');
-    if (sumMin.trim() !== '' && sumMax.trim() !== '') parts.push(`∑ ${sumMin}–${sumMax}`);
-    else if (sumMin.trim() !== '') parts.push(`∑ ≥ ${sumMin}`);
-    else if (sumMax.trim() !== '') parts.push(`∑ ≤ ${sumMax}`);
-    if (includeNumbers.length > 0) parts.push(`Zorunlu: ${includeNumbers.join(',')}`);
-    if (excludeNumbers.length > 0) parts.push(`Hariç: ${excludeNumbers.join(',')}`);
-    return parts;
-  };
-
   const inputStyle = [s.input, { backgroundColor: c.surfaceAlt, color: c.text }];
 
   return (
@@ -835,6 +828,7 @@ export default function GenerateScreen() {
                     size={ballLayout.size}
                     variant="matched"
                     revealIndex={i}
+                    ring={resultFilters.includeNumbers.includes(num)}
                   />
                 ))}
               </View>
@@ -871,24 +865,7 @@ export default function GenerateScreen() {
                 </View>
               ) : null}
 
-              {filterActive ? (
-                <View style={s.resultFooter}>
-                  <Text style={s.resultFooterLabel}>TOPLAM</Text>
-                  <Text style={s.resultFooterValue}>
-                    {total} · {evensInResult} çift / {generatedNumbers.length - evensInResult} tek
-                  </Text>
-                </View>
-              ) : null}
-
-              {filterActive ? (
-                <View style={s.chipRow}>
-                  {filterChips().map((chip, i) => (
-                    <View key={i} style={[s.chip, { backgroundColor: mainColor + '14' }]}>
-                      <Text style={[s.chipText, { color: mainColor }]}>{chip}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
+              <KolonFacts facts={resultFacts} accent={mainColor} />
             </>
           )}
         </Surface>
@@ -1267,12 +1244,6 @@ function makeStyles(theme: AppTheme) {
     ballsNowrap: { flexWrap: 'nowrap' },
     bonusBlock: { alignItems: 'center', marginTop: spacing.lg },
     bonusLabel: { ...ty.micro, color: c.text3, marginBottom: 10 },
-    resultFooter: { alignItems: 'center', marginTop: spacing.lg, paddingTop: spacing.lg },
-    resultFooterLabel: { ...ty.micro, color: c.text3 },
-    resultFooterValue: { fontFamily: theme.font.bold, fontSize: 15, color: c.text, marginTop: 3, fontVariant: ['tabular-nums'] },
-    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginTop: spacing.md },
-    chip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill },
-    chipText: { ...ty.caption, fontFamily: theme.font.semibold },
 
     btnRow: { flexDirection: 'row', gap: 10, marginHorizontal: spacing.xl, marginTop: spacing.lg },
     filterBtn: { width: 52, height: 52, borderRadius: radius.lg, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' },

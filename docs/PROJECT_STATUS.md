@@ -199,7 +199,15 @@ kullanıcı kararıyla iptal edildi — tekrar gündeme getirilmeyecek.
 ### 7 Kasım 2026
 
 - **Çakışma filtresi kaldırıldı** (17 Ekim'de eklenen "önceki kolonlarla çakışmasın" ve "oturumu sıfırla"). Kolon Üret filtrelerinde artık yok.
-- Filtresiz kolon sonucunda alttaki "TOPLAM · çift / tek" satırı gizlendi; filtreli kolonlarda gösterilmeye devam ediyor.
+- Kolon sonucundaki eski "TOPLAM · çift / tek" satırı ve ayarları tekrar eden filtre etiketleri kaldırıldı (8 Kas).
+
+### 8 Kasım 2026 — Filtre özeti
+
+- Filtreli kolonda topların altında **yalnızca aktif filtreler** için sonuç etiketi: ✓ 3 çift · 3 tek, ✓ Toplam 143 (120–160), ✓ Ardışık sayı yok / 1 ardışık çift, ✓ 3 ve 40 dahil, ✓ 13 hariç, ✓ Dengeli dağılım. Filtresiz kolonda hiçbir şey yazmaz.
+- Hesap `lib/kolonFacts.ts` (`kolonFacts`), görünüm `components/ui/kolon-facts.tsx`. Özet, kolonun üretildiği andaki filtrelerden çıkar (sonradan filtre değişse de doğru kalır). Geçmişten geri yüklenen kolonda özet yok (geçmiş filtre tutmuyor).
+- Düzeltme: kota kartındaki "filtresiz devam et" eskiden temizlenmemiş filtrelerle üretip filtreli hak düşüyordu; artık gerçekten filtresiz üretir.
+- Zorunlu tutulan sayılar sonuç kartında topun içinde ince bir halkayla işaretlenir (`NumberBall` `ring` prop'u; top boyutu ve aralıklar değişmez, varsayılan kapalı).
+- Filtre özeti bilinçli olarak yalnızca Kolon Üret sonuç kartında; geçmiş ve Kaydedilenler'e taşınması denendi, kart kalabalığı nedeniyle geri alındı (8 Kas).
 
 ### Notlar
 

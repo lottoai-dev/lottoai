@@ -47,7 +47,33 @@ type NumberBallProps = {
   style?: ViewStyle;
   /** When set, plays a short stagger reveal on mount (coupon generate). */
   revealIndex?: number;
+  /**
+   * Topun içine ince bir halka çizer (ör. kullanıcının zorunlu tuttuğu sayı).
+   * Halka topun kendi alanında kalır; top boyutu ve aralıklar değişmez.
+   */
+  ring?: boolean;
 };
+
+/** Topun içindeki halka. Rengi yazı rengiyle aynı, her varyantta okunur. */
+function BallRing({ size, color }: { size: number; color: string }) {
+  const inset = Math.max(2, Math.round(size * 0.07));
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.ring,
+        {
+          top: inset,
+          left: inset,
+          right: inset,
+          bottom: inset,
+          borderRadius: size / 2 - inset,
+          borderColor: color,
+        },
+      ]}
+    />
+  );
+}
 
 function useBallColors(color: string | undefined, variant: Variant) {
   const theme = useTheme();
@@ -82,6 +108,7 @@ const StaticBall = React.memo(function StaticBall({
   size = 34,
   variant = 'game',
   style,
+  ring,
 }: Omit<NumberBallProps, 'revealIndex'>) {
   const { bg, fg } = useBallColors(color, variant);
   const fontSize = Math.round(size * 0.4);
@@ -94,6 +121,7 @@ const StaticBall = React.memo(function StaticBall({
         style,
       ]}
     >
+      {ring ? <BallRing size={size} color={fg} /> : null}
       <Text style={[styles.text, { color: fg, fontSize }]} allowFontScaling={false}>
         {value}
       </Text>
@@ -108,6 +136,7 @@ const RevealBall = React.memo(function RevealBall({
   variant = 'game',
   style,
   revealIndex,
+  ring,
 }: NumberBallProps & { revealIndex: number }) {
   const { bg, fg } = useBallColors(color, variant);
   const fontSize = Math.round(size * 0.4);
@@ -135,6 +164,7 @@ const RevealBall = React.memo(function RevealBall({
         revealStyle,
       ]}
     >
+      {ring ? <BallRing size={size} color={fg} /> : null}
       <Text style={[styles.text, { color: fg, fontSize }]} allowFontScaling={false}>
         {value}
       </Text>
@@ -154,6 +184,7 @@ export const NumberBall = React.memo(function NumberBall({
 
 const styles = StyleSheet.create({
   ball: { alignItems: 'center', justifyContent: 'center' },
+  ring: { position: 'absolute', borderWidth: 1.5, opacity: 0.85 },
   text: {
     fontFamily: FontFamily.bold,
     fontVariant: ['tabular-nums'],
