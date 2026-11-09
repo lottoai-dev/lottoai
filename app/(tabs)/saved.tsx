@@ -561,9 +561,8 @@ export default function SavedScreen() {
 
   /**
    * "Geçmiş" butonuna basıldığında çağrılır. Önce günlük ücretsiz hak
-   * kontrol edilir — hak varsa geçmiş direkt açılır, yoksa reklam kartı
-   * gösterilir. pendingHistoryId, reklam izlenip ödül kazanılınca hangi
-   * kolonun geçmişinin açılacağını hatırlamak için tutulur.
+   * kontrol edilir (Pro'da sınır yok) — hak varsa geçmiş direkt açılır,
+   * yoksa kota kartı (Pro'ya geç / Tamam) gösterilir.
    */
   const openHistory = useCallback(async (id: number) => {
     const coupon = couponsRef.current.find((cp) => cp.id === id);

@@ -140,6 +140,12 @@
 
 ### 7. Metinler ve yasal
 
+> **Durum (9 Kas 2026):**
+> - **Uygulama SSS** (`app/(tabs)/legal.tsx`, `pro` dalı): "abonelik yok / reklam izle" kaldırıldı; ücretsiz-sınırlı-Pro ayrımı, "reklam yoktur", Pro içeriği, "Pro kazanma şansını artırır mı? Hayır", deneme, iptal (iOS/Android adımları, hesap silmek iptal etmez), cihaz değiştirme soruları eklendi. Fiyat bilinçli olarak yazılmadı (Pro ekranı mağazadan gösterir).
+> - **Web sitesi** (`C:\Dev\lottoai-legal`, `lottoai-dev/lottoai-legal`, yerelde commit'li, **push edilmedi**): Gizlilik — kullanım sayıları + abonelik durumu verisi, RevenueCat ve App Store/Google Play üçüncü tarafları, DeepSeek'e yalnızca kolon istatistiği gittiği, reklam/reklam kimliği yok, hesap silmek aboneliği iptal etmez, bildirim kayıtları 180 gün; eski "AI Asistan sohbet geçmişi" ifadeleri kaldırıldı. Şartlar — Lota AI bölümü, yeni "LottoAI Pro Abonelikleri" bölümü (yenileme 24 saat kuralı, deneme, iptal, iade mağaza üzerinden + 6502 sayılı kanun hakları saklı, Apple standart EULA), numaralar kaydırıldı.
+> - **Yayın:** siteyi 1.2.0 incelemeye gönderilmeden hemen önce push et. Hukuki metin; bir hukukçunun özellikle iade/tüketici kısmına bakması önerildi.
+> - **Kalan (mağaza):** Play Veri güvenliği + Apple App Privacy güncellemesi (reklam/advertising ID beyanlarını kaldır, satın alma/abonelik ekle) — 1.2.0 gönderiminde.
+
 - `app/(tabs)/legal.tsx` SSS: "abonelik yoktur" maddesi güncellenir, Pro soruları eklenir.
 - Kullanım şartları, gizlilik politikası (RevenueCat veri işleyen olarak), KVKK metni.
 - Mağaza açıklamaları ve review notları.
