@@ -70,7 +70,15 @@ premium ayrı karardır.
 `admob-ssv` Edge Function ve `admob_ssv_rewards` tablosu + kota koruma trigger'ı
 canlıya alındı. Reklam yolu iptal olduğu için konsolda SSV birimi tanımlanmaz.
 
-### 1.1.2 — hazırlanıyor (8 Kas 2026)
+### 1.1.2 — Android yayında, iOS incelemede (9 Kas 2026)
+
+- **Android 1.1.2 (versionCode 11):** Google onayladı, 9 Kas 2026'da yayınlandı (%100, Türkiye).
+  Play'de **yönetilen yayınlama açık**: onaylanan değişiklikler "Yayınlanmaya hazır"da
+  bekler, elle yayınlanır. Uygulama düzeyinde satıcı (tacir) beyanı yapıldı; Hizmet
+  Şartları URL'si `https://getlottoai.app/legal#terms`.
+- **iOS 1.1.2 (build 8):** Apple incelemesinde, "Manually release" — onaylanınca
+  App Store Connect'te "Release This Version".
+
 
 `app.json` sürümü `1.1.2` (build numarası EAS `autoIncrement`). İçerik: filtre
 özeti + zorunlu sayı halkası, "filtresiz devam et" düzeltmesi, çakışma
@@ -80,13 +88,12 @@ filtresinin kaldırılması, İstatistik'e **Tek/Çift** sekmesi.
 (`lib/drawStats.ts`) ile gizli — Pro'ya ayrıldılar; önce ücretsiz verip sonra
 kilitlememek için 1.2.0'da Pro ile açılır.
 
-Yayın: telefonda test → iOS + Android production build (aynı commit) →
-mağaza sürüm notları.
+Her iki platform da `ecdba0b` commit'inden build alındı.
 
 Android'de `com.android.vending.BILLING` izni denendi ve **geri alındı**: Play,
 izni olup Play Billing Library içermeyen paketi "AIDL faturalandırma kullanıyor,
 8.0.0'a geçin" hatasıyla yayından engelliyor (versionCode 9 bu yüzden
-kullanılamaz). Android 1.1.2 izinsiz yeniden build alındı (versionCode 10).
+kullanılamaz). Android 1.1.2 izinsiz yeniden build alındı (versionCode 11; 10 numarası başarısız bir başlatma denemesinde harcandı).
 iOS 1.1.2 (build 8) etkilenmedi. Play abonelikleri 1.2.0'a kaldı.
 
 ### 1.1.1 — yayında
