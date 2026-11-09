@@ -16,6 +16,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useBildirim } from '../../contexts/BildirimContext';
 import { usePro } from '../../contexts/ProContext';
 import { deleteAccount } from '../../lib/delete-account';
+import { openSubscriptionManagement } from '../../lib/purchases';
 import { BrandMark } from '../../lib/emblems';
 import {
     BellIcon,
@@ -106,11 +107,26 @@ export default function ProfileScreen() {
   };
 
   const handleDeleteAccount = () => {
+    const storeName = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
+    // Apple: hesap silmek mağaza aboneliğini iptal etmez; kullanıcıya söylenmeli.
+    const subscriptionNote = isPro
+      ? `\n\nLottoAI Pro aboneliğin hesabını silince iptal olmaz ve ücretlendirme devam eder. Önce ${storeName} hesap ayarlarından aboneliği iptal etmelisin.`
+      : '';
     showAlert(
       'Hesabımı sil',
-      'Hesabın ve bu cihazdaki tüm verilerin (kayıtlı kolonlar, Lota geçmişi, tercihler) kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+      `Hesabın ve bu cihazdaki tüm verilerin (kayıtlı kolonlar, Lota geçmişi, tercihler) kalıcı olarak silinecek. Bu işlem geri alınamaz.${subscriptionNote}`,
       [
         { text: 'Vazgeç', style: 'cancel' },
+        ...(isPro
+          ? [
+              {
+                text: 'Aboneliği yönet',
+                onPress: () => {
+                  void openSubscriptionManagement();
+                },
+              },
+            ]
+          : []),
         {
           text: 'Hesabı sil',
           style: 'destructive',

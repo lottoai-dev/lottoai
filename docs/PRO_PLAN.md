@@ -130,6 +130,11 @@
 
 ### 6. Hesap silme
 
+> **Durum (9 Kas 2026, `pro` dalı):** tamam, build alınmadı.
+> - Sunucu: `user_entitlements.user_id` → `auth.users` **ON DELETE CASCADE**; hesap silinince Pro kaydı da silinir, `delete-account` fonksiyonunda ek kod gerekmedi. `revenuecat_events` kullanıcıya bağlı değil, 180 günde temizlenir.
+> - Uygulama: silme sonrası oturum kapanır → `ProContext` RevenueCat'te `logOut` yapar.
+> - Profil > Hesabımı sil: Pro kullanıcıda onay metnine "hesabı silmek aboneliği iptal etmez, önce App Store / Google Play'den iptal et" uyarısı ve **Aboneliği yönet** düğmesi eklendi (Apple'ın beklediği bilgilendirme).
+
 - `delete-account` fonksiyonu `user_entitlements` satırını da siler.
 - Silme ekranında uyarı: hesap silmek mağaza aboneliğini iptal etmez; App Store / Google Play'den iptal edilmeli.
 
