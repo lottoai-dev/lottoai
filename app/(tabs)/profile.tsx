@@ -361,7 +361,7 @@ export default function ProfileScreen() {
 
         <View style={s.footer}>
           <BrandMark size={38} />
-          <Text style={s.footerText}>LottoAI · v1.0.0</Text>
+          <Text style={s.footerText}>LottoAI · v{APP_VERSION}</Text>
           <Text style={s.footerSub}>18+ · Şans oyunları asistanı</Text>
         </View>
       </ScrollView>

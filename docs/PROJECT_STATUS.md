@@ -70,14 +70,13 @@ premium ayrı karardır.
 `admob-ssv` Edge Function ve `admob_ssv_rewards` tablosu + kota koruma trigger'ı
 canlıya alındı. Reklam yolu iptal olduğu için konsolda SSV birimi tanımlanmaz.
 
-### 1.1.2 — Android yayında, iOS incelemede (9 Kas 2026)
+### 1.1.2 — yayında (iOS + Android, 9 Kas 2026)
 
 - **Android 1.1.2 (versionCode 11):** Google onayladı, 9 Kas 2026'da yayınlandı (%100, Türkiye).
   Play'de **yönetilen yayınlama açık**: onaylanan değişiklikler "Yayınlanmaya hazır"da
   bekler, elle yayınlanır. Uygulama düzeyinde satıcı (tacir) beyanı yapıldı; Hizmet
   Şartları URL'si `https://getlottoai.app/legal#terms`.
-- **iOS 1.1.2 (build 8):** Apple incelemesinde, "Manually release" — onaylanınca
-  App Store Connect'te "Release This Version".
+- **iOS 1.1.2 (build 8):** Apple onayladı, kullanıcı 9 Kas 2026'da elle yayına aldı.
 
 
 `app.json` sürümü `1.1.2` (build numarası EAS `autoIncrement`). İçerik: filtre

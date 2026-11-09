@@ -152,6 +152,14 @@
 
 ### 8. Test
 
+> **iOS sandbox testi — 9 Kas 2026 (dev build 1.2.0, `react-native-purchases` 10.16.0):**
+> - Sandbox test hesabı: App Store Connect > Users and Access > Sandbox (Türkiye); iPhone'da Ayarlar > Geliştirici > Sandbox Apple Hesabı. Doğrulama e-postasındaki bağlantı sandbox hesapta "Invalid account" der — gerek yok, yok sayılır.
+> - Paywall fiyatları App Store'dan geldi (₺599,99/yıl, ~₺49,99/ay, %37, 7 gün deneme; ₺79,99/ay). Ürünler "Missing Metadata" iken sandbox'ta yükleniyor.
+> - Yıllık + deneme satın alındı → RevenueCat $0 işlem → webhook `INITIAL_PURCHASE` (20:43) ve 3 dk sonra `RENEWAL` (deneme bitti), ikisi de 200 → `user_entitlements`: is_pro=true, lottoai_pro_yearly, app_store, period_type=normal, will_renew=true, expires_at = yenileme + 1 saat. Uygulamada "LottoAI Pro aktif". **Uçtan uca doğrulandı.**
+> - **Bulunan hata:** satın alma sonrası uygulama dondu. Sebep: mağaza ödeme penceresi kapanırken açılan başarı uyarısı (RN `Modal`) iOS'ta görünmeyip dokunuşları kilitliyordu. Düzeltme: başarı paywall içinde kart olarak gösteriliyor; hata uyarıları 700 ms gecikmeyle. "Geri yükle" ile yeniden denenecek.
+> - Profil altbilgisindeki sabit "v1.0.0" de uygulama sürümüne bağlandı.
+> - Kalan: geri yükleme (donma düzeltmesi), sandbox süresinin dolması → `EXPIRATION` → is_pro=false, ücretsiz kullanıcıda kota 5 ve kilitli sekmeler, Android.
+
 - **Dev'de kota kapalı (`__DEV__`).** Sınır ve Pro'yu dev build'de test edebilmek için bu atlamayı geçici açıp kapatan bir ayar eklenir.
 - iOS sandbox test hesabı; Android lisans test kullanıcısı + internal/alpha kanal.
 - Senaryolar: satın alma, geri yükleme, iptal, süre bitimi, ödeme sorunu, aynı hesap farklı cihaz, Pro iken çıkış ve başka hesapla giriş, çevrimdışı.

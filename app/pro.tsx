@@ -72,6 +72,18 @@ export default function ProScreen() {
   const [selected, setSelected] = useState<ProPlan['kind']>('annual');
   const [busy, setBusy] = useState<'purchase' | 'restore' | null>(null);
   const [subInfo, setSubInfo] = useState<ProSubscriptionInfo | null>(null);
+  // Başarı mesajı açılır pencereyle değil ekranın içinde gösterilir: mağazanın
+  // ödeme penceresi kapanırken açılan iOS Modal'ı görünmeyip dokunuşları
+  // kilitleyebiliyor (uygulama donmuş gibi kalıyordu).
+  const [success, setSuccess] = useState<'purchased' | 'restored' | null>(null);
+
+  /** Mağaza penceresi tamamen kapandıktan sonra uyarı göster (bkz. yukarı). */
+  const alertAfterStoreSheet = useCallback(
+    (title: string, message: string) => {
+      setTimeout(() => showAlert(title, message), 700);
+    },
+    [showAlert],
+  );
 
   const loadOffer = useCallback(async () => {
     setLoading(true);
@@ -118,16 +130,14 @@ export default function ProScreen() {
       const result = await purchaseProPlan(plan);
       if (result.status === 'cancelled') return;
       if (result.status === 'error') {
-        showAlert('Satın alma tamamlanamadı', 'Ödeme alınmadı. Birazdan tekrar dener misin?');
+        alertAfterStoreSheet('Satın alma tamamlanamadı', 'Ödeme alınmadı. Birazdan tekrar dener misin?');
         return;
       }
       await refresh();
       if (result.isPro) {
-        showAlert('LottoAI Pro aktif', 'Teşekkürler! Artık tüm özellikleri sınırsız kullanabilirsin.', [
-          { text: 'Harika', onPress: () => router.back() },
-        ]);
+        setSuccess('purchased');
       } else {
-        showAlert('Satın alma alındı', 'Pro birkaç saniye içinde aktif olacak.');
+        alertAfterStoreSheet('Satın alma alındı', 'Pro birkaç saniye içinde aktif olacak.');
       }
     } finally {
       setBusy(null);
@@ -145,16 +155,14 @@ export default function ProScreen() {
     try {
       const result = await restoreProPurchases();
       if ('error' in result) {
-        showAlert('Geri yüklenemedi', 'Satın alımlar şu an kontrol edilemedi. Birazdan tekrar dener misin?');
+        alertAfterStoreSheet('Geri yüklenemedi', 'Satın alımlar şu an kontrol edilemedi. Birazdan tekrar dener misin?');
         return;
       }
       await refresh();
       if (result.isPro) {
-        showAlert('Geri yüklendi', 'LottoAI Pro aboneliğin bu hesapta aktif.', [
-          { text: 'Tamam', onPress: () => router.back() },
-        ]);
+        setSuccess('restored');
       } else {
-        showAlert('Abonelik bulunamadı', 'Bu mağaza hesabında aktif bir LottoAI Pro aboneliği yok.');
+        alertAfterStoreSheet('Abonelik bulunamadı', 'Bu mağaza hesabında aktif bir LottoAI Pro aboneliği yok.');
       }
     } finally {
       setBusy(null);
@@ -216,7 +224,22 @@ export default function ProScreen() {
           ))}
         </Surface>
 
-        {isPro ? (
+        {success ? (
+          <Surface style={[s.activeCard, { alignItems: 'center' }]}>
+            <View style={[s.successIcon, { backgroundColor: c.brandSoft }]}>
+              <CheckIcon color={c.brand} size={26} strokeWidth={2.6} />
+            </View>
+            <Text style={[s.activeTitle, { color: c.brand, textAlign: 'center' }]}>
+              {success === 'purchased' ? 'Hoş geldin, Pro aktif!' : 'Aboneliğin geri yüklendi'}
+            </Text>
+            <Text style={[s.activeText, { textAlign: 'center' }]}>
+              {success === 'purchased'
+                ? 'Teşekkürler! Artık tüm özellikleri sınırsız kullanabilirsin.'
+                : 'LottoAI Pro aboneliğin bu hesapta aktif.'}
+            </Text>
+            <AppButton label="Devam et" onPress={close} style={{ marginTop: 16, alignSelf: 'stretch' }} />
+          </Surface>
+        ) : isPro ? (
           <Surface style={s.activeCard}>
             <Text style={[s.activeTitle, { color: c.brand }]}>Pro aktif</Text>
             {subInfo ? (
@@ -429,6 +452,7 @@ function makeStyles(theme: AppTheme) {
     planNote: { ...ty.caption, fontFamily: theme.font.semibold, marginTop: 3 },
     trialNote: { ...ty.caption, color: c.text2, textAlign: 'center', marginTop: 10 },
     activeCard: { padding: 18, marginBottom: 6 },
+    successIcon: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
     activeTitle: { ...ty.h2 },
     activeText: { ...ty.body, color: c.text2, marginTop: 4 },
     center: { paddingVertical: 32, alignItems: 'center' },
