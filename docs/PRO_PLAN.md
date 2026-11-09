@@ -52,6 +52,12 @@
 
 ### 1. Veritabanı (Supabase migration)
 
+> **Durum (9 Kas 2026, `pro` dalı):** migration dosyaları yazıldı, canlıya uygulanmadı.
+> - `20260831190000_feature_usage_daily_baseline.sql` — paneldeki tablonun canlı tanımı (kayıt amaçlı). Canlıya göndermeden önce `npx supabase migration repair --status applied 20260831190000` ile "uygulandı" işaretlenir.
+> - `20261109120000_app_config.sql` — `feature_daily_limits` = 5/5/5.
+> - `20261109120100_user_entitlements.sql` — `user_entitlements`, `is_pro()`, `revenuecat_events` (+180 gün temizlik).
+> - Canlıya uygulama: webhook (adım 2) ile birlikte, kullanıcı onayıyla.
+
 - **`app_config`:** Özellik başına günlük sınır (`filtered_coupon`, `report`, `lota` = 5). Herkes okuyabilir, yalnızca service_role yazar.
 - **`user_entitlements`:** `user_id` (PK), `is_pro`, `expires_at`, `product_id`, `store`, `updated_at`. RLS: kullanıcı yalnızca kendi satırını okur; yazma yalnızca service_role.
 - `feature_usage_daily` şemasını da bir migration'a almak.
