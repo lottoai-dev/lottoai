@@ -87,6 +87,13 @@
 
 ### 3. Uygulama: SDK ve Pro durumu
 
+> **Durum (9 Kas 2026, `pro` dalı):** kod yazıldı, henüz build alınmadı.
+> - `react-native-purchases` **11.0.1** eklendi (`npm install --legacy-peer-deps`: projede önceden var olan `react-native@^0.81.5` ↔ `react@19.1.0` peer çakışması yüzünden; React/RN/Expo sürümleri değişmedi). Config plugin gerekmiyor.
+> - `lib/purchases.ts`: SDK kurulumu (yalnızca anahtarı olan platformda — şimdilik iOS), `identifyPurchasesUser` (giriş → `logIn(user.id)`, çıkış → `logOut`), `hasProEntitlement` (`lottoai_pro`).
+> - `contexts/ProContext.tsx` + `usePro()`: `isPro` = giriş var **ve** (SDK'da `lottoai_pro` aktif **veya** sunucuda `is_pro()`); SDK dinleyicisi, uygulama öne gelince sunucu tazeleme, `refresh()`. `app/_layout.tsx`'te `AuthProvider` içine sarıldı. `AuthContext` değişmedi.
+> - **Native modül:** yerelde denemek için yeni bir **development build** gerekir (`eas build --profile development`); eski dev build bu sürümle açılmaz.
+> - Android anahtarı (`goog_…`) Play abonelikleri + RevenueCat Play uygulaması kurulunca eklenecek.
+
 - `react-native-purchases` eklenir → **native modül, yeni build gerekir.**
 - `app/_layout.tsx` içinde SDK yapılandırması (platform anahtarları `app.config.js` / env üzerinden).
 - Giriş/çıkışta `Purchases.logIn(user.id)` / `Purchases.logOut()` (`contexts/AuthContext.tsx`'teki push token mantığının yanında).

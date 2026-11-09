@@ -12,6 +12,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { AlertProvider } from '../contexts/AlertContext';
 import { AuthProvider } from '../contexts/AuthContext';
 import { BildirimProvider, useBildirim, type AddBildirimInput } from '../contexts/BildirimContext';
+import { ProProvider } from '../contexts/ProContext';
 import { OfflineBanner } from '../lib/OfflineBanner';
 import { useAppFonts } from '../lib/fonts';
 import { cancelTimedResultNotifications, EXPO_PROJECT_ID, registerPushToken } from '../lib/push-token';
@@ -287,11 +288,13 @@ export default function RootLayout() {
       <ThemeProvider>
         <AlertProvider>
           <AuthProvider>
-            <BildirimProvider>
-              <ErrorBoundary>
-                <RootContent />
-              </ErrorBoundary>
-            </BildirimProvider>
+            <ProProvider>
+              <BildirimProvider>
+                <ErrorBoundary>
+                  <RootContent />
+                </ErrorBoundary>
+              </BildirimProvider>
+            </ProProvider>
           </AuthProvider>
         </AlertProvider>
       </ThemeProvider>
