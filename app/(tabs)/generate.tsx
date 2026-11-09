@@ -27,12 +27,13 @@ import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme, spacing } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePro } from '../../contexts/ProContext';
 import { showRewardedAd } from '../../lib/adMob';
 import { markCouponsDirty } from '../../lib/couponsStore';
 import { GameEmblem } from '../../lib/emblems';
 import {
     ADS_REWARDS_ENABLED,
-    FEATURE_FREE_DAILY_LIMIT,
+    featureDailyLimit,
     FEATURE_REWARD_AMOUNT,
     formatQuotaResetIn,
     getFeatureQuotaStatus,
@@ -286,6 +287,7 @@ export default function GenerateScreen() {
   const s = useMemo(() => makeStyles(theme), [theme]);
   const { showAlert } = useAlert();
   const { user } = useAuth();
+  const { isPro } = usePro();
 
   const [selectedGame, setSelectedGame] = useState(GAMES[0]);
   const [generatedNumbers, setGeneratedNumbers] = useState<number[]>([]);
@@ -481,7 +483,7 @@ export default function GenerateScreen() {
     setGenerating(true);
     setCheckingQuota(true);
     try {
-      const status = await getFeatureQuotaStatus('filtered_coupon');
+      const status = await getFeatureQuotaStatus('filtered_coupon', { isPro });
       if (status.exhausted) {
         setQuotaCardVisible(true);
         return;
@@ -507,7 +509,7 @@ export default function GenerateScreen() {
     softHaptic();
     setWatchingAd(true);
     try {
-      const before = await getFeatureQuotaStatus('filtered_coupon');
+      const before = await getFeatureQuotaStatus('filtered_coupon', { isPro });
       const result = await showRewardedAd('filtered_coupon', { userId: user.id });
       if (result.status === 'earned') {
         const granted = await waitForRewardGrant('filtered_coupon', before.used);
@@ -1134,7 +1136,7 @@ export default function GenerateScreen() {
             {ADS_REWARDS_ENABLED ? (
               <>
                 <Text style={s.quotaDesc}>
-                  Bugün için {FEATURE_FREE_DAILY_LIMIT} filtreli kolon hakkını kullandın. Kısa bir reklam izleyip {FEATURE_REWARD_AMOUNT} hak daha kazanabilir, ya da filtresiz üretmeye devam edebilirsin.
+                  Bugün için {featureDailyLimit('filtered_coupon')} filtreli kolon hakkını kullandın. Kısa bir reklam izleyip {FEATURE_REWARD_AMOUNT} hak daha kazanabilir, ya da filtresiz üretmeye devam edebilirsin.
                 </Text>
                 <AppButton
                   haptic={false}
@@ -1150,7 +1152,7 @@ export default function GenerateScreen() {
               </>
             ) : (
               <Text style={s.quotaDesc}>
-                Bugün için {FEATURE_FREE_DAILY_LIMIT} filtreli kolon hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek. İstersen filtresiz üretmeye devam edebilirsin.
+                Bugün için {featureDailyLimit('filtered_coupon')} filtreli kolon hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek. İstersen filtresiz üretmeye devam edebilirsin.
               </Text>
             )}
 

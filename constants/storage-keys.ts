@@ -16,4 +16,9 @@ export const STORAGE_KEYS = {
      * Değer: JSON `{ day: YYYY-MM-DD, used: number }`.
      */
     FEATURE_QUOTA_CACHE_PREFIX: 'featureQuotaCache',
+    /**
+     * Sunucudaki (app_config) günlük ücretsiz hak sınırlarının son bilinen hali.
+     * Değer: JSON `{ filtered_coupon: number, report: number, lota: number }`.
+     */
+    FEATURE_DAILY_LIMITS_CACHE: 'featureDailyLimitsCache',
   } as const;

@@ -101,6 +101,13 @@
 
 ### 4. Kota: `lib/featureQuota.ts`
 
+> **Durum (9 Kas 2026, `pro` dalı):** kod yazıldı, build alınmadı.
+> - Sınır artık sunucudan: `app_config.feature_daily_limits` (canlıda 5/5/5). Bellekte 10 dk tutulur; sunucu okunamazsa son bilinen değer (AsyncStorage `featureDailyLimitsCache`), o da yoksa 5. Bozuk/eksik alan 5'e düşer.
+> - `getFeatureQuotaStatus(feature, { isPro })`: Pro'da `exhausted` hep false (`unlimited: true`); kullanım yine sayılır. Durum nesnesine `limit` ve `unlimited` eklendi. Metinler `featureDailyLimit(feature)` ile güncel sınırı gösterir; `FEATURE_FREE_DAILY_LIMIT` kaldırıldı.
+> - Kolon Üret, Kaydedilenler (Geçmiş), Lota: `usePro()` ile `isPro` geçiliyor.
+> - **Dev'de kotayı denemek:** proje kökünde `.env` (gitignored) içine `EXPO_PUBLIC_ENFORCE_QUOTA_IN_DEV=1` yazıp Metro'yu `npx expo start -c` ile yeniden başlat. Yoksa dev'de kota eskisi gibi kapalı.
+> - Ödüllü reklam kodu (`ADS_REWARDS_ENABLED`, `FEATURE_REWARD_AMOUNT`, `waitForRewardGrant`) henüz duruyor; 5. adımda temizlenecek.
+
 - Sınır `app_config`'ten okunur; son değer AsyncStorage'da cache'lenir; o da yoksa varsayılan 5.
 - Pro kullanıcıda `exhausted` her zaman false. Kullanım yine kaydedilir (analiz için).
 - Reklam kodu temizliği: `ADS_REWARDS_ENABLED`, `waitForRewardGrant`, `REWARD_AMOUNT`, `lib/adMob.ts`, `react-native-google-mobile-ads`, `admob-ssv` fonksiyonu.

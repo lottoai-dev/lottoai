@@ -15,13 +15,28 @@ import { supabase } from './supabase';
 
 export type FeatureKey = 'filtered_coupon' | 'report' | 'lota';
 
-const FREE_DAILY_LIMIT = 10; // GEÇİCİ: AdMob onayı bekleniyor, onaylanınca 3'e geri döndürülecek
+/**
+ * Ücretsiz kullanıcının özellik başına günlük hakkı. Asıl değer sunucudan
+ * (app_config.feature_daily_limits) okunur; bu, hiç okunamadığında
+ * kullanılan varsayılandır. Pro kullanıcıda sınır yoktur.
+ */
+const DEFAULT_DAILY_LIMIT = 5;
 const REWARD_AMOUNT = 3;
 
+/** Sunucudaki sınırların bellekte tutulma süresi; sonra yeniden okunur. */
+const LIMITS_TTL_MS = 10 * 60 * 1000;
+
 /**
- * GEÇİCİ: AdMob uygulama/reklam birimleri onaylanana kadar ödüllü reklam
- * ile ek hak kapalı. Onay gelince true yap — kota kartlarında "Reklam izle"
- * butonu geri gelir. FREE_DAILY_LIMIT'i de tekrar 3'e çekmeyi unutma.
+ * Metro / dev client'ta kota normalde kapalıdır. .env içinde
+ * EXPO_PUBLIC_ENFORCE_QUOTA_IN_DEV=1 verilirse dev'de de uygulanır
+ * (sınırı ve Pro'yu telefonda denemek için). Mağaza build'inde her zaman açık.
+ */
+const QUOTA_BYPASSED = __DEV__ && process.env.EXPO_PUBLIC_ENFORCE_QUOTA_IN_DEV !== '1';
+
+/**
+ * Ödüllü reklamla ek hak kapalı: AdMob yolu iptal edildi (Eyl 2026).
+ * Reklam kodu ve bu bayrak Pro'nun 5. adımında (kota kartlarına "Pro'ya geç")
+ * temizlenecek.
  */
 export const ADS_REWARDS_ENABLED = false;
 
@@ -66,25 +81,106 @@ export function formatQuotaResetIn(ms: number): string {
 export type FeatureQuotaStatus = {
   /** Bugün bu özellik için kaç kez kullanıldı. */
   used: number;
-  /** Bugün kalan ücretsiz hak (0 olabilir, negatif olmaz). */
+  /** Bugünkü ücretsiz hak sınırı (Pro'da da bilgi amaçlı dolu). */
+  limit: number;
+  /** Bugün kalan ücretsiz hak (0 olabilir, negatif olmaz; sınırsızsa 999). */
   remaining: number;
-  /** used >= limit ise true — arayüz "reklam izle" kartını gösterir. */
+  /** used >= limit ise true — arayüz kota kartını gösterir. Pro'da hep false. */
   exhausted: boolean;
+  /** Pro (ya da dev'de kota kapalı): sınır uygulanmıyor. */
+  unlimited: boolean;
 };
 
-/**
- * Metro / dev client'ta kota kilidi yok. Production ve mağaza build'inde
- * (__DEV__ false) günlük limit aynen uygulanır.
- */
-function statusFromUsed(used: number): FeatureQuotaStatus {
-  if (__DEV__) {
-    return { used: Math.max(used, 0), remaining: 999, exhausted: false };
+export type FeatureQuotaOptions = {
+  /** Kullanıcı Pro mu (ProContext / usePro). Pro'da sınır uygulanmaz. */
+  isPro?: boolean;
+};
+
+type FeatureDailyLimits = Record<FeatureKey, number>;
+
+const DEFAULT_LIMITS: FeatureDailyLimits = {
+  filtered_coupon: DEFAULT_DAILY_LIMIT,
+  report: DEFAULT_DAILY_LIMIT,
+  lota: DEFAULT_DAILY_LIMIT,
+};
+
+let limitsMemory: { limits: FeatureDailyLimits; fetchedAt: number } | null = null;
+let limitsInFlight: Promise<FeatureDailyLimits> | null = null;
+
+/** Sunucudan gelen değeri doğrular; eksik/bozuk alan varsayılana düşer. */
+function sanitizeLimits(raw: unknown): FeatureDailyLimits {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const pick = (k: FeatureKey) => {
+    const v = r[k];
+    return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : DEFAULT_DAILY_LIMIT;
+  };
+  return { filtered_coupon: pick('filtered_coupon'), report: pick('report'), lota: pick('lota') };
+}
+
+async function readLimitsCache(): Promise<FeatureDailyLimits | null> {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEYS.FEATURE_DAILY_LIMITS_CACHE);
+    return raw ? sanitizeLimits(JSON.parse(raw)) : null;
+  } catch {
+    return null;
   }
+}
+
+/**
+ * Günlük sınırları getirir: bellekte tazeyse oradan, değilse app_config'ten.
+ * Sunucu okunamazsa son bilinen değer (AsyncStorage), o da yoksa varsayılan.
+ */
+export async function loadFeatureDailyLimits(): Promise<FeatureDailyLimits> {
+  if (limitsMemory && Date.now() - limitsMemory.fetchedAt < LIMITS_TTL_MS) return limitsMemory.limits;
+  if (limitsInFlight) return limitsInFlight;
+
+  limitsInFlight = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_config')
+        .select('value')
+        .eq('key', 'feature_daily_limits')
+        .maybeSingle();
+      if (error || !data) throw error ?? new Error('feature_daily_limits yok');
+      const limits = sanitizeLimits((data as { value: unknown }).value);
+      limitsMemory = { limits, fetchedAt: Date.now() };
+      try {
+        await AsyncStorage.setItem(STORAGE_KEYS.FEATURE_DAILY_LIMITS_CACHE, JSON.stringify(limits));
+      } catch {
+        // Cache yazılamazsa bir sonraki açılışta yine sunucudan okunur.
+      }
+      return limits;
+    } catch {
+      const cached = (await readLimitsCache()) ?? limitsMemory?.limits ?? DEFAULT_LIMITS;
+      // Bir dakika sonra sunucu yeniden denensin.
+      limitsMemory = { limits: cached, fetchedAt: Date.now() - LIMITS_TTL_MS + 60_000 };
+      return cached;
+    } finally {
+      limitsInFlight = null;
+    }
+  })();
+  return limitsInFlight;
+}
+
+/**
+ * Metinlerde göstermek için son bilinen günlük sınır (eşzamanlı).
+ * getFeatureQuotaStatus çağrıldıktan sonra sunucudaki değeri yansıtır.
+ */
+export function featureDailyLimit(feature: FeatureKey): number {
+  return (limitsMemory?.limits ?? DEFAULT_LIMITS)[feature];
+}
+
+function statusFromUsed(used: number, limit: number, unlimited: boolean): FeatureQuotaStatus {
   const safeUsed = Math.max(used, 0);
+  if (unlimited) {
+    return { used: safeUsed, limit, remaining: 999, exhausted: false, unlimited: true };
+  }
   return {
     used: safeUsed,
-    remaining: Math.max(FREE_DAILY_LIMIT - safeUsed, 0),
-    exhausted: safeUsed >= FREE_DAILY_LIMIT,
+    limit,
+    remaining: Math.max(limit - safeUsed, 0),
+    exhausted: safeUsed >= limit,
+    unlimited: false,
   };
 }
 
@@ -141,14 +237,16 @@ async function statusFromCacheOrFailClosed(
   feature: FeatureKey,
   userId: string,
   day: string,
+  limit: number,
+  unlimited: boolean,
 ): Promise<FeatureQuotaStatus> {
   const cached = await readQuotaCache(feature, userId);
   // Yalnızca bugüne ait cache güvenilir; yokluğunda veya gün eskidiğinde
   // kotayı sıfır varsaymak limiti atlatmaya izin verir (veri silme / uçak modu).
   if (cached && cached.day === day) {
-    return statusFromUsed(cached.used);
+    return statusFromUsed(cached.used, limit, unlimited);
   }
-  return statusFromUsed(FREE_DAILY_LIMIT);
+  return statusFromUsed(limit, limit, unlimited);
 }
 
 /**
@@ -156,10 +254,17 @@ async function statusFromCacheOrFailClosed(
  * Başarılı okumada sonuç AsyncStorage'a yazılır.
  * Okuma başarısız olursa bugünkü cache kullanılır; cache'de used >= limit
  * ise kilitli kalır. Cache yoksa / gün eskiyse fail-closed.
+ * Pro kullanıcıda (options.isPro) sınır uygulanmaz; kullanım yine sayılır.
  */
-export async function getFeatureQuotaStatus(feature: FeatureKey): Promise<FeatureQuotaStatus> {
+export async function getFeatureQuotaStatus(
+  feature: FeatureKey,
+  options: FeatureQuotaOptions = {},
+): Promise<FeatureQuotaStatus> {
+  const limit = (await loadFeatureDailyLimits())[feature];
+  const unlimited = QUOTA_BYPASSED || options.isPro === true;
+
   const userId = await getLocalUserId();
-  if (!userId) return statusFromUsed(0);
+  if (!userId) return statusFromUsed(0, limit, unlimited);
 
   const day = todayInTurkey();
   const field = FIELD_BY_FEATURE[feature];
@@ -172,12 +277,12 @@ export async function getFeatureQuotaStatus(feature: FeatureKey): Promise<Featur
     .maybeSingle();
 
   if (error) {
-    return statusFromCacheOrFailClosed(feature, userId, day);
+    return statusFromCacheOrFailClosed(feature, userId, day, limit, unlimited);
   }
 
   const used = (data as Record<string, number> | null)?.[field] ?? 0;
   await writeQuotaCache(feature, userId, { day, used });
-  return statusFromUsed(used);
+  return statusFromUsed(used, limit, unlimited);
 }
 
 /**
@@ -243,5 +348,4 @@ export async function waitForRewardGrant(
   return null;
 }
 
-export const FEATURE_FREE_DAILY_LIMIT = FREE_DAILY_LIMIT;
 export const FEATURE_REWARD_AMOUNT = REWARD_AMOUNT;

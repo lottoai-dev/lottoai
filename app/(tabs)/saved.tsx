@@ -27,6 +27,7 @@ import { STORAGE_KEYS } from '../../constants/storage-keys';
 import { AppTheme } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePro } from '../../contexts/ProContext';
 import { showRewardedAd } from '../../lib/adMob';
 import CouponHistory from '../../lib/CouponHistory';
 import {
@@ -40,7 +41,7 @@ import {
 import { consumeCouponsDirty } from '../../lib/couponsStore';
 import {
     ADS_REWARDS_ENABLED,
-    FEATURE_FREE_DAILY_LIMIT,
+    featureDailyLimit,
     FEATURE_REWARD_AMOUNT,
     formatQuotaResetIn,
     getFeatureQuotaStatus,
@@ -162,6 +163,7 @@ export default function SavedScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const { showAlert } = useAlert();
   const { user } = useAuth();
+  const { isPro } = usePro();
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [checkModal, setCheckModal] = useState(false);
@@ -588,7 +590,7 @@ export default function SavedScreen() {
     }
 
     setCheckingQuota(id);
-    const status = await getFeatureQuotaStatus('report');
+    const status = await getFeatureQuotaStatus('report', { isPro });
     setCheckingQuota(null);
 
     if (status.exhausted) {
@@ -600,7 +602,7 @@ export default function SavedScreen() {
     void recordFeatureUsage('report');
     void markHistoryViewedToday(user.id, id);
     setHistoryModalCoupon(coupon);
-  }, [router, user]);
+  }, [router, user, isPro]);
 
   /**
    * Rapor kotası kartındaki "Reklam izle" butonuna basıldığında çağrılır.
@@ -613,7 +615,7 @@ export default function SavedScreen() {
     softHaptic();
     setWatchingAd(true);
     try {
-      const before = await getFeatureQuotaStatus('report');
+      const before = await getFeatureQuotaStatus('report', { isPro });
       const result = await showRewardedAd('report', { userId: user.id });
       if (result.status === 'earned') {
         const granted = await waitForRewardGrant('report', before.used);
@@ -643,7 +645,7 @@ export default function SavedScreen() {
     } finally {
       setWatchingAd(false);
     }
-  }, [pendingHistoryId, showAlert, user]);
+  }, [pendingHistoryId, showAlert, user, isPro]);
 
   const handleCancelReportQuota = useCallback(() => {
     softHaptic();
@@ -784,7 +786,7 @@ export default function SavedScreen() {
             {ADS_REWARDS_ENABLED ? (
               <>
                 <Text style={s.quotaDesc}>
-                  Bugün için {FEATURE_FREE_DAILY_LIMIT} kolon geçmişi görüntüleme hakkını kullandın. Kısa bir reklam izleyip {FEATURE_REWARD_AMOUNT} hak daha kazanabilirsin.
+                  Bugün için {featureDailyLimit('report')} kolon geçmişi görüntüleme hakkını kullandın. Kısa bir reklam izleyip {FEATURE_REWARD_AMOUNT} hak daha kazanabilirsin.
                 </Text>
                 <AppButton
                   haptic={false}
@@ -804,7 +806,7 @@ export default function SavedScreen() {
             ) : (
               <>
                 <Text style={s.quotaDesc}>
-                  Bugün için {FEATURE_FREE_DAILY_LIMIT} kolon geçmişi görüntüleme hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek.
+                  Bugün için {featureDailyLimit('report')} kolon geçmişi görüntüleme hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek.
                 </Text>
                 <AppButton
                   haptic={false}
