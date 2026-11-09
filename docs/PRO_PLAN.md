@@ -88,7 +88,7 @@
 ### 3. Uygulama: SDK ve Pro durumu
 
 > **Durum (9 Kas 2026, `pro` dalı):** kod yazıldı, henüz build alınmadı.
-> - `react-native-purchases` **11.0.1** eklendi (`npm install --legacy-peer-deps`: projede önceden var olan `react-native@^0.81.5` ↔ `react@19.1.0` peer çakışması yüzünden; React/RN/Expo sürümleri değişmedi). Config plugin gerekmiyor.
+> - `react-native-purchases` eklendi; **10.16.0'a sabit** (11.x, iOS'ta CocoaPods'ta olmayan `PurchasesHybridCommon` 20.x istiyor — ilk iOS build bu yüzden düştü; 10.16.0 → PHC 19.17.0, Android çekirdeği 10.30.0 / Play Billing 8). İlk eklenen sürüm 11.0.1 idi (`npm install --legacy-peer-deps`: projede önceden var olan `react-native@^0.81.5` ↔ `react@19.1.0` peer çakışması yüzünden; React/RN/Expo sürümleri değişmedi). Config plugin gerekmiyor.
 > - `lib/purchases.ts`: SDK kurulumu (yalnızca anahtarı olan platformda — şimdilik iOS), `identifyPurchasesUser` (giriş → `logIn(user.id)`, çıkış → `logOut`), `hasProEntitlement` (`lottoai_pro`).
 > - `contexts/ProContext.tsx` + `usePro()`: `isPro` = giriş var **ve** (SDK'da `lottoai_pro` aktif **veya** sunucuda `is_pro()`); SDK dinleyicisi, uygulama öne gelince sunucu tazeleme, `refresh()`. `app/_layout.tsx`'te `AuthProvider` içine sarıldı. `AuthContext` değişmedi.
 > - **Native modül:** yerelde denemek için yeni bir **development build** gerekir (`eas build --profile development`); eski dev build bu sürümle açılmaz.
