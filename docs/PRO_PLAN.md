@@ -158,7 +158,10 @@
 > - Yıllık + deneme satın alındı → RevenueCat $0 işlem → webhook `INITIAL_PURCHASE` (20:43) ve 3 dk sonra `RENEWAL` (deneme bitti), ikisi de 200 → `user_entitlements`: is_pro=true, lottoai_pro_yearly, app_store, period_type=normal, will_renew=true, expires_at = yenileme + 1 saat. Uygulamada "LottoAI Pro aktif". **Uçtan uca doğrulandı.**
 > - **Bulunan hata:** satın alma sonrası uygulama dondu. Sebep: mağaza ödeme penceresi kapanırken açılan başarı uyarısı (RN `Modal`) iOS'ta görünmeyip dokunuşları kilitliyordu. Düzeltme: başarı paywall içinde kart olarak gösteriliyor; hata uyarıları 700 ms gecikmeyle. "Geri yükle" ile yeniden denenecek.
 > - Profil altbilgisindeki sabit "v1.0.0" de uygulama sürümüne bağlandı.
-> - Kalan: geri yükleme (donma düzeltmesi), sandbox süresinin dolması → `EXPIRATION` → is_pro=false, ücretsiz kullanıcıda kota 5 ve kilitli sekmeler, Android.
+> - **Geri yükleme:** donmadan "Aboneliğin geri yüklendi" kartı ✓ (donma düzeltmesi doğrulandı).
+> - **Platformlar arası:** iPhone'da alınan Pro, Android dev build'de aynı hesapla (Google girişi) "LottoAI Pro aktif" ve kilitsiz istatistik sekmeleri ✓ — Android'de SDK yokken sunucudaki `is_pro()` ile.
+> - Kalan: sandbox süresinin dolması → `EXPIRATION` → is_pro=false, ücretsiz kullanıcıda kota 5 ve kilitli sekmeler, Android satın alma.
+> - **Android satın alma yolu:** `eas.json`'a `submit.internal` (track internal, completed) eklendi; `pro` dalından production AAB → dahili test → Play abonelikleri → RevenueCat Play uygulaması → `goog_` anahtarı → test.
 
 - **Dev'de kota kapalı (`__DEV__`).** Sınır ve Pro'yu dev build'de test edebilmek için bu atlamayı geçici açıp kapatan bir ayar eklenir.
 - iOS sandbox test hesabı; Android lisans test kullanıcısı + internal/alpha kanal.
