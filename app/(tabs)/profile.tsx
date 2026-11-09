@@ -1,5 +1,6 @@
 // app/(tabs)/profile.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -13,6 +14,7 @@ import { AppTheme } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBildirim } from '../../contexts/BildirimContext';
+import { usePro } from '../../contexts/ProContext';
 import { deleteAccount } from '../../lib/delete-account';
 import { BrandMark } from '../../lib/emblems';
 import {
@@ -24,6 +26,7 @@ import {
     EditIcon,
     InfoIcon,
     LogOutIcon,
+    LotaMark,
     MailIcon,
     SearchIcon,
     ShieldIcon,
@@ -42,6 +45,9 @@ function softHaptic() {
   }
 }
 
+/** app.json'daki sürüm (ör. "1.1.2"); mağazada görünenle aynı. */
+const APP_VERSION = Constants.expoConfig?.version ?? '';
+
 const LEGAL_URL = 'https://getlottoai.app/legal';
 const PRIVACY_URL = `${LEGAL_URL}`;
 const TERMS_URL = `${LEGAL_URL}#terms`;
@@ -54,6 +60,7 @@ export default function ProfileScreen() {
   const s = useMemo(() => makeStyles(theme), [theme]);
   const { showAlert } = useAlert();
   const { user, signOut } = useAuth();
+  const { isPro } = usePro();
   const { clearAll: clearBildirimler } = useBildirim();
 
   const [name, setName] = useState('');
@@ -246,6 +253,19 @@ export default function ProfileScreen() {
 
         <Surface style={s.card}>
           <View style={[s.panelAccent, { backgroundColor: c.brand }]} />
+          <Text style={s.cardLabel}>ABONELİK</Text>
+          <MenuRow
+            Icon={LotaMark}
+            color={c.brand}
+            title={isPro ? 'LottoAI Pro aktif' : "LottoAI Pro'ya geç"}
+            sub={isPro ? 'Aboneliği görüntüle ve yönet' : 'Sınırsız kullanım, gelişmiş istatistik'}
+            onPress={() => router.push('/pro' as never)}
+            last
+          />
+        </Surface>
+
+        <Surface style={s.card}>
+          <View style={[s.panelAccent, { backgroundColor: c.brand }]} />
           <Text style={s.cardLabel}>ARAÇLAR</Text>
           <MenuRow
             Icon={BellIcon}
@@ -298,7 +318,7 @@ export default function ProfileScreen() {
           <MenuRow Icon={DocIcon} color={c.text2} title="Kullanım koşulları" sub="Uygulama kuralları" onPress={() => Linking.openURL(TERMS_URL)} />
           <MenuRow Icon={InfoIcon} color={c.text2} title="Sık sorulan sorular" sub="Uygulama hakkında" onPress={() => router.push('/legal')} />
           <MenuRow Icon={MailIcon} color={c.text2} title="Bize ulaş" sub="support@getlottoai.app" onPress={() => Linking.openURL('mailto:support@getlottoai.app')} />
-          <MenuRow Icon={InfoIcon} color={c.text3} title="Versiyon" sub="1.0.0" last />
+          <MenuRow Icon={InfoIcon} color={c.text3} title="Versiyon" sub={APP_VERSION} last />
         </Surface>
 
         {user && (

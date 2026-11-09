@@ -114,6 +114,15 @@
 
 ### 5. Ekranlar
 
+> **Durum (9 Kas 2026, `pro` dalı):** kod yazıldı, build alınmadı.
+> - **Paywall `app/pro.tsx`** (modal): faydalar (ücretsiz sınır `featureDailyLimit` ile), Yıllık (varsayılan, indirim % ve aylık karşılığı mağaza fiyatından) / Aylık kartları, deneme yalnızca hak varsa (iOS: `checkTrialOrIntroductoryPriceEligibility`, Android: `defaultOption.freePhase`), buton "N gün ücretsiz dene" / "Abone ol" / girişsizse "Giriş yap ve devam et". Satın alımları geri yükle, Kullanım Şartları, Gizlilik, otomatik yenileme açıklaması, "tahmin etmez" notu. Pro kullanıcıda "Pro aktif" + bitiş/yenileme tarihi + "Aboneliği yönet". Teklif yüklenemezse "Tekrar dene".
+> - `lib/purchases.ts`: `getProOffer`, `purchaseProPlan` (vazgeçme ayrı), `restoreProPurchases`, `getProSubscriptionInfo`, `openSubscriptionManagement`.
+> - **Kota kartları** (Kolon Üret, Kaydedilenler/Geçmiş, Lota): reklam bloğu yerine "Pro ile sınırsız kullan" → `/pro`; "Filtresiz üret" / "Tamam" kaldı. Kaydedilenler'deki `pendingHistoryId` (reklam sonrası otomatik açma) kaldırıldı.
+> - **Profil:** "ABONELİK" kartı — "LottoAI Pro'ya geç" / "LottoAI Pro aktif".
+> - **İstatistik:** Toplam ve Ardışık sekmeleri her zaman görünür; Pro değilse 🔒 ve sekme içeriği yerine açıklama + "Pro ile aç". `PRO_STATS_ENABLED` kaldırıldı (1.1.2'deki gizleme bu dalda yok).
+> - **AdMob tamamen kaldırıldı:** `lib/adMob.ts`, `ADS_REWARDS_ENABLED`, `waitForRewardGrant`, `FEATURE_REWARD_AMOUNT`, `react-native-google-mobile-ads` paketi ve `app.json` eklentisi. Sunucudaki `admob-ssv` fonksiyonu ve `admob_ssv_rewards` tablosu henüz duruyor (zararsız; ayrıca temizlenebilir).
+> - ⚠️ **Mağaza beyanları (adım 7):** reklam SDK'sı çıktığı için Play **Veri güvenliği** formundan reklam/advertising ID beyanları ve Apple **App Privacy** etiketlerindeki reklam amaçlı veri beyanları 1.2.0 ile güncellenmeli; abonelik eklendiği için "Satın alımlar" beyanı eklenmeli.
+
 - **Paywall (`app/pro.tsx`):** Aylık/yıllık (fiyatlar mağazadan, yerel para birimiyle), "Satın alımları geri yükle" (Apple zorunlu), otomatik yenileme açıklaması, Kullanım Şartları ve Gizlilik bağlantıları.
 - **Giriş noktaları:** `generate.tsx`, `saved.tsx`, `ai-studio.tsx` içindeki "hakkın bitti" kartlarında reklam butonu yerine "Pro'ya geç". Profil ekranında Pro satırı/rozeti; Pro kullanıcıya "Aboneliği yönet" bağlantısı.
 - Pro kullanıcıda kota kartları hiç görünmez.

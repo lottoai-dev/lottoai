@@ -28,7 +28,6 @@ import { AppTheme } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePro } from '../../contexts/ProContext';
-import { showRewardedAd } from '../../lib/adMob';
 import CouponHistory from '../../lib/CouponHistory';
 import {
     formatMatchCategory,
@@ -40,19 +39,16 @@ import {
 } from '../../lib/couponMatch';
 import { consumeCouponsDirty } from '../../lib/couponsStore';
 import {
-    ADS_REWARDS_ENABLED,
     featureDailyLimit,
-    FEATURE_REWARD_AMOUNT,
     formatQuotaResetIn,
     getFeatureQuotaStatus,
     msUntilQuotaReset,
     recordFeatureUsage,
-    waitForRewardGrant,
     todayInTurkey,
 } from '../../lib/featureQuota';
 import { GameEmblem } from '../../lib/emblems';
 import { getGameAccentColor, getGameByName } from '../../lib/games';
-import { CloseIcon, PlayIcon, ShareIcon, StatsIcon, TicketIcon, TrashIcon, TrophyIcon } from '../../lib/icons';
+import { CloseIcon, LotaMark, ShareIcon, StatsIcon, TicketIcon, TrashIcon, TrophyIcon } from '../../lib/icons';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
 
@@ -174,11 +170,8 @@ export default function SavedScreen() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [isLoading, setIsLoading] = useState(true);
   // "Geçmiş" (rapor) görüntüleme günlük ücretsiz hakkı doldurduğunda bu
-  // kart açılır. pendingHistoryId, reklam izlenip ödül kazanıldığında
-  // hangi kolonun geçmişinin otomatik açılacağını tutar.
+  // kart açılır: kullanıcı Pro'ya geçebilir ya da yarını bekler.
   const [reportQuotaVisible, setReportQuotaVisible] = useState(false);
-  const [pendingHistoryId, setPendingHistoryId] = useState<number | null>(null);
-  const [watchingAd, setWatchingAd] = useState(false);
   const [checkingQuota, setCheckingQuota] = useState<number | null>(null);
 
   const couponsRef = useRef(coupons);
@@ -594,7 +587,6 @@ export default function SavedScreen() {
     setCheckingQuota(null);
 
     if (status.exhausted) {
-      setPendingHistoryId(id);
       setReportQuotaVisible(true);
       return;
     }
@@ -604,54 +596,16 @@ export default function SavedScreen() {
     setHistoryModalCoupon(coupon);
   }, [router, user, isPro]);
 
-  /**
-   * Rapor kotası kartındaki "Reklam izle" butonuna basıldığında çağrılır.
-   * Hak, Google'ın sunucumuza yaptığı SSV çağrısıyla eklenir; burada o
-   * çağrının kotaya yansımasını bekleriz. Yansıyınca bekleyen kolonun
-   * geçmişi otomatik açılır.
-   */
-  const handleWatchAd = useCallback(async () => {
-    if (!user) return;
-    softHaptic();
-    setWatchingAd(true);
-    try {
-      const before = await getFeatureQuotaStatus('report', { isPro });
-      const result = await showRewardedAd('report', { userId: user.id });
-      if (result.status === 'earned') {
-        const granted = await waitForRewardGrant('report', before.used);
-        if (!granted) {
-          showAlert(
-            'Ödülün yolda',
-            'Reklamı izledin ama hakkın henüz yansımadı. Birkaç saniye içinde eklenecek, sonra tekrar dener misin?',
-          );
-          return;
-        }
-        setReportQuotaVisible(false);
-        const couponId = pendingHistoryId;
-        const coupon = couponId != null ? couponsRef.current.find((cp) => cp.id === couponId) : null;
-        setPendingHistoryId(null);
-        if (coupon && user) {
-          void recordFeatureUsage('report');
-          void markHistoryViewedToday(user.id, coupon.id);
-          setHistoryModalCoupon(coupon);
-        } else if (coupon) {
-          setHistoryModalCoupon(coupon);
-        }
-      } else if (result.status === 'closed_without_reward') {
-        showAlert('Tamamlanmadı', 'Ödül kazanmak için reklamı sonuna kadar izlemen gerekiyor.');
-      } else {
-        showAlert('Reklam yüklenemedi', 'Şu an reklam gösterilemiyor, birazdan tekrar dener misin?');
-      }
-    } finally {
-      setWatchingAd(false);
-    }
-  }, [pendingHistoryId, showAlert, user, isPro]);
-
   const handleCancelReportQuota = useCallback(() => {
     softHaptic();
     setReportQuotaVisible(false);
-    setPendingHistoryId(null);
   }, []);
+
+  const handleReportQuotaPro = useCallback(() => {
+    softHaptic();
+    setReportQuotaVisible(false);
+    router.push('/pro' as never);
+  }, [router]);
 
   const goGenerate = useCallback(() => {
     router.push('/(tabs)/generate');
@@ -783,40 +737,23 @@ export default function SavedScreen() {
               <StatsIcon color={c.brand} size={26} />
             </View>
             <Text style={s.quotaTitle}>Geçmiş görüntüleme hakkın bitti</Text>
-            {ADS_REWARDS_ENABLED ? (
-              <>
-                <Text style={s.quotaDesc}>
-                  Bugün için {featureDailyLimit('report')} kolon geçmişi görüntüleme hakkını kullandın. Kısa bir reklam izleyip {FEATURE_REWARD_AMOUNT} hak daha kazanabilirsin.
-                </Text>
-                <AppButton
-                  haptic={false}
-                  label={watchingAd ? 'Reklam yükleniyor…' : `Reklam izle, +${FEATURE_REWARD_AMOUNT} hak kazan`}
-                  accent={c.brand}
-                  onPress={handleWatchAd}
-                  disabled={watchingAd}
-                  iconLeft={(color, size) =>
-                    watchingAd ? <ActivityIndicator color={color} size="small" /> : <PlayIcon color={color} size={size} />
-                  }
-                  style={{ marginTop: 6 }}
-                />
-                <Pressable onPress={handleCancelReportQuota} style={{ marginTop: 16, alignItems: 'center' }} hitSlop={8}>
-                  <Text style={[s.quotaCancel, { color: c.text3 }]}>Vazgeç</Text>
-                </Pressable>
-              </>
-            ) : (
-              <>
-                <Text style={s.quotaDesc}>
-                  Bugün için {featureDailyLimit('report')} kolon geçmişi görüntüleme hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek.
-                </Text>
-                <AppButton
-                  haptic={false}
-                  label="Tamam"
-                  variant="secondary"
-                  onPress={handleCancelReportQuota}
-                  style={{ marginTop: 10 }}
-                />
-              </>
-            )}
+            <Text style={s.quotaDesc}>
+              Bugün için {featureDailyLimit('report')} kolon geçmişi görüntüleme hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek.
+            </Text>
+            <AppButton
+              haptic={false}
+              label="Pro ile sınırsız kullan"
+              onPress={handleReportQuotaPro}
+              iconLeft={(color, size) => <LotaMark color={color} size={size} />}
+              style={{ marginTop: 6 }}
+            />
+            <AppButton
+              haptic={false}
+              label="Tamam"
+              variant="secondary"
+              onPress={handleCancelReportQuota}
+              style={{ marginTop: 10 }}
+            />
           </View>
         </View>
       </Modal>

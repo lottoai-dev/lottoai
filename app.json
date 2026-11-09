@@ -76,13 +76,6 @@
         }
       ],
       [
-        "react-native-google-mobile-ads",
-        {
-          "androidAppId": "ca-app-pub-6473293791186582~4038773731",
-          "iosAppId": "ca-app-pub-6473293791186582~6686024934"
-        }
-      ],
-      [
         "expo-build-properties",
         {
           "ios": {

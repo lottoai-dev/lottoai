@@ -28,18 +28,14 @@ import { AppTheme, spacing } from '../../constants/theme';
 import { useAlert } from '../../contexts/AlertContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePro } from '../../contexts/ProContext';
-import { showRewardedAd } from '../../lib/adMob';
 import { markCouponsDirty } from '../../lib/couponsStore';
 import { GameEmblem } from '../../lib/emblems';
 import {
-    ADS_REWARDS_ENABLED,
     featureDailyLimit,
-    FEATURE_REWARD_AMOUNT,
     formatQuotaResetIn,
     getFeatureQuotaStatus,
     msUntilQuotaReset,
     recordFeatureUsage,
-    waitForRewardGrant,
 } from '../../lib/featureQuota';
 import { GAMES, getGameAccentColor } from '../../lib/games';
 import {
@@ -59,7 +55,6 @@ import {
     CloseIcon,
     DiceIcon,
     LotaMark,
-    PlayIcon,
     SlidersIcon,
     TrashIcon,
 } from '../../lib/icons';
@@ -311,11 +306,8 @@ export default function GenerateScreen() {
   const [savingCoupon, setSavingCoupon] = useState(false);
   const savingCouponRef = useRef(false);
   // Filtreli kolon üretimi günlük ücretsiz hakkı doldurduğunda bu kart
-  // açılır: kullanıcı ya reklam izleyip +3 hak kazanır ya da filtresiz
-  // üretime geçer. generateAfterAd, "reklam izlendi" sonrası hangi
-  // isteğin otomatik tekrar deneneceğini tutar.
+  // açılır: kullanıcı Pro'ya geçebilir ya da filtresiz üretime devam eder.
   const [quotaCardVisible, setQuotaCardVisible] = useState(false);
-  const [watchingAd, setWatchingAd] = useState(false);
   const [checkingQuota, setCheckingQuota] = useState(false);
   const [generating, setGenerating] = useState(false);
   const generatingRef = useRef(false);
@@ -443,7 +435,7 @@ export default function GenerateScreen() {
   };
 
   /**
-   * Üretim giriş noktası: generatingRef kilidi burada. handleWatchAd /
+   * Üretim giriş noktası: generatingRef kilidi burada.
    * handleUseWithoutFilter / filtresiz handleGenerate bu fonksiyonu çağırır;
    * yeni çağıranlar da otomatik korunur.
    */
@@ -462,7 +454,7 @@ export default function GenerateScreen() {
   /**
    * "Kolon üret" butonuna basıldığında çağrılır. Filtresiz üretim her
    * zaman anında çalışır. Filtreli üretimde önce günlük hak kontrol
-   * edilir — hak varsa direkt üretilir, yoksa reklam kartı açılır.
+   * edilir — hak varsa direkt üretilir, yoksa kota kartı açılır (Pro / filtresiz).
    * Kota await'i boyunca da kilidi tutar (çift tık → çift recordFeatureUsage önlenir).
    */
   const handleGenerate = async () => {
@@ -494,41 +486,6 @@ export default function GenerateScreen() {
       setCheckingQuota(false);
       generatingRef.current = false;
       setGenerating(false);
-    }
-  };
-
-  /**
-   * Kota kartındaki "Reklam izle" butonuna basıldığında çağrılır.
-   * Hak, reklam bitince Google'ın sunucumuza yaptığı SSV çağrısıyla
-   * eklenir; burada o çağrının kotaya yansımasını bekleriz. Yansıyınca
-   * üretim otomatik tekrar denenir — kullanıcının "reklamı izledim, şimdi
-   * tekrar dokunmam mı gerekiyor?" diye sormasına gerek kalmaz.
-   */
-  const handleWatchAd = async () => {
-    if (!user) return;
-    softHaptic();
-    setWatchingAd(true);
-    try {
-      const before = await getFeatureQuotaStatus('filtered_coupon', { isPro });
-      const result = await showRewardedAd('filtered_coupon', { userId: user.id });
-      if (result.status === 'earned') {
-        const granted = await waitForRewardGrant('filtered_coupon', before.used);
-        if (!granted) {
-          showAlert(
-            'Ödülün yolda',
-            'Reklamı izledin ama hakkın henüz yansımadı. Birkaç saniye içinde eklenecek, sonra tekrar dener misin?',
-          );
-          return;
-        }
-        setQuotaCardVisible(false);
-        performGeneration();
-      } else if (result.status === 'closed_without_reward') {
-        showAlert('Tamamlanmadı', 'Ödül kazanmak için reklamı sonuna kadar izlemen gerekiyor.');
-      } else {
-        showAlert('Reklam yüklenemedi', 'Şu an reklam gösterilemiyor, birazdan tekrar dener misin?');
-      }
-    } finally {
-      setWatchingAd(false);
     }
   };
 
@@ -1133,28 +1090,20 @@ export default function GenerateScreen() {
               <SlidersIcon color={mainColor} size={26} />
             </View>
             <Text style={s.quotaTitle}>Filtreli üretim hakkın bitti</Text>
-            {ADS_REWARDS_ENABLED ? (
-              <>
-                <Text style={s.quotaDesc}>
-                  Bugün için {featureDailyLimit('filtered_coupon')} filtreli kolon hakkını kullandın. Kısa bir reklam izleyip {FEATURE_REWARD_AMOUNT} hak daha kazanabilir, ya da filtresiz üretmeye devam edebilirsin.
-                </Text>
-                <AppButton
-                  haptic={false}
-                  label={watchingAd ? 'Reklam yükleniyor…' : `Reklam izle, +${FEATURE_REWARD_AMOUNT} hak kazan`}
-                  accent={mainColor}
-                  onPress={handleWatchAd}
-                  disabled={watchingAd}
-                  iconLeft={(color, size) =>
-                    watchingAd ? <ActivityIndicator color={color} size="small" /> : <PlayIcon color={color} size={size} />
-                  }
-                  style={{ marginTop: 6 }}
-                />
-              </>
-            ) : (
-              <Text style={s.quotaDesc}>
-                Bugün için {featureDailyLimit('filtered_coupon')} filtreli kolon hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek. İstersen filtresiz üretmeye devam edebilirsin.
-              </Text>
-            )}
+            <Text style={s.quotaDesc}>
+              Bugün için {featureDailyLimit('filtered_coupon')} filtreli kolon hakkını kullandın. Hakların {formatQuotaResetIn(msUntilQuotaReset())} sonra yenilenecek. İstersen filtresiz üretmeye devam edebilirsin.
+            </Text>
+            <AppButton
+              haptic={false}
+              label="Pro ile sınırsız kullan"
+              onPress={() => {
+                softHaptic();
+                setQuotaCardVisible(false);
+                router.push('/pro' as never);
+              }}
+              iconLeft={(color, size) => <LotaMark color={color} size={size} />}
+              style={{ marginTop: 6 }}
+            />
 
             <AppButton
               haptic={false}

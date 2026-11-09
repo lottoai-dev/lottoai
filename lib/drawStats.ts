@@ -5,13 +5,8 @@
 
 import { countConsecutivePairs } from './kolonFacts';
 
-/**
- * Toplam ve Ardışık istatistikleri Pro'ya ayrıldı. Pro (1.2.0) gelene kadar
- * mağaza sürümünde gizli: önce ücretsiz verip sonra kilitlemek kullanıcıdan
- * özellik geri almak olur. Pro gelince bu bayrak yerine `isPro` kontrolü gelir.
- * Tek/Çift ücretsiz ve her zaman görünür.
- */
-export const PRO_STATS_ENABLED = false;
+// Toplam ve Ardışık istatistikleri Pro'ya ait: StatisticsTab, Pro olmayan
+// kullanıcıya bu sekmeleri kilitli gösterir (usePro). Tek/Çift ücretsiz.
 
 export type ParityRow = {
   odd: number;

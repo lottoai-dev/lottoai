@@ -172,6 +172,15 @@ export function PlusIcon({ color, size = 24, strokeWidth = 2.2 }: IconProps) {
   );
 }
 
+export function LockIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Rect x="5" y="11" width="14" height="9" rx="2.5" stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function CheckIcon({ color, size = 24, strokeWidth = 2 }: IconProps) {
   return (
     <Svg {...base(size)}>

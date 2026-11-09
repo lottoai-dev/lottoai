@@ -21,7 +21,6 @@ export type FeatureKey = 'filtered_coupon' | 'report' | 'lota';
  * kullanılan varsayılandır. Pro kullanıcıda sınır yoktur.
  */
 const DEFAULT_DAILY_LIMIT = 5;
-const REWARD_AMOUNT = 3;
 
 /** Sunucudaki sınırların bellekte tutulma süresi; sonra yeniden okunur. */
 const LIMITS_TTL_MS = 10 * 60 * 1000;
@@ -32,13 +31,6 @@ const LIMITS_TTL_MS = 10 * 60 * 1000;
  * (sınırı ve Pro'yu telefonda denemek için). Mağaza build'inde her zaman açık.
  */
 const QUOTA_BYPASSED = __DEV__ && process.env.EXPO_PUBLIC_ENFORCE_QUOTA_IN_DEV !== '1';
-
-/**
- * Ödüllü reklamla ek hak kapalı: AdMob yolu iptal edildi (Eyl 2026).
- * Reklam kodu ve bu bayrak Pro'nun 5. adımında (kota kartlarına "Pro'ya geç")
- * temizlenecek.
- */
-export const ADS_REWARDS_ENABLED = false;
 
 const FIELD_BY_FEATURE: Record<FeatureKey, 'filtered_coupon_count' | 'report_count' | 'lota_count'> = {
   filtered_coupon: 'filtered_coupon_count',
@@ -315,37 +307,3 @@ export async function recordFeatureUsage(feature: FeatureKey): Promise<void> {
   }
 }
 
-/**
- * Ödül, istemcide DEĞİL sunucuda verilir: reklam tamamlanınca Google,
- * admob-ssv Edge Function'ına imzalı bir çağrı yapar ve hak orada yazılır
- * (kullanımı REWARD_AMOUNT kadar azaltarak — limiti yükseltmek yerine tek
- * sayaç üzerinden gitmek organik ve reklamla kazanılan hakları aynı yerde
- * tutar). feature_usage_daily üzerindeki trigger, kotanın service_role
- * dışında azaltılmasını engeller; bu yüzden istemci tarafında ödül veren
- * bir fonksiyon kasıtlı olarak yoktur.
- *
- * Bu fonksiyon o çağrının gelmesini bekler: kullanım usedBefore'un altına
- * düşene kadar kotayı yoklar. Zaman aşımında null döner — çağıran taraf
- * kullanıcıya "birazdan yansıyacak" demeli, hakkı kendisi vermemeli.
- */
-export async function waitForRewardGrant(
-  feature: FeatureKey,
-  usedBefore: number,
-  timeoutMs = 12000,
-): Promise<FeatureQuotaStatus | null> {
-  const deadline = Date.now() + timeoutMs;
-  // İlk yoklamadan önce kısa bir bekleme: SSV çağrısı reklam kapanmadan
-  // hemen önce yola çıkar, genelde ilk saniyede ulaşır.
-  let delay = 700;
-
-  while (Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    const status = await getFeatureQuotaStatus(feature);
-    if (status.used < usedBefore) return status;
-    delay = 1500;
-  }
-
-  return null;
-}
-
-export const FEATURE_REWARD_AMOUNT = REWARD_AMOUNT;

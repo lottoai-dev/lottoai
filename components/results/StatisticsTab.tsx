@@ -4,10 +4,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppTheme } from '../../constants/theme';
+import { usePro } from '../../contexts/ProContext';
 import {
   consecutiveDistribution,
   parityDistribution,
-  PRO_STATS_ENABLED,
   sumDistribution,
   supportsParityStats,
   supportsSumStats,
@@ -18,9 +18,10 @@ import {
 import { GameEmblem } from '../../lib/emblems';
 import { getGameAccentColor, type Game } from '../../lib/games';
 import { softHaptic } from '../../lib/haptics';
-import { DiceIcon } from '../../lib/icons';
+import { DiceIcon, LockIcon, LotaMark } from '../../lib/icons';
 import { safeQuery, supabase } from '../../lib/supabase';
 import { useTheme } from '../../lib/theme';
+import { AppButton } from '../ui/app-button';
 import { NumberBall } from '../ui/number-ball';
 import { EmptyState, ErrorState, LoadingState } from '../ui/states';
 import { Surface } from '../ui/surface';
@@ -45,8 +46,22 @@ const SUBTABS = [
   { key: 'consecutive', label: 'Ardışık', pro: true },
 ] as const;
 type SubKey = (typeof SUBTABS)[number]['key'];
-/** Pro'ya ayrılan sekmeler PRO_STATS_ENABLED açılana kadar listelenmez. */
-const VISIBLE_SUBTABS = SUBTABS.filter((tab) => !('pro' in tab) || PRO_STATS_ENABLED);
+
+/** Pro sekmeleri ücretsiz kullanıcıda kilitli görünür; dokununca ne gösterdiği anlatılır. */
+const PRO_TAB_INFO: Partial<Record<SubKey, { title: string; desc: string }>> = {
+  sum: {
+    title: 'Toplam dağılımı',
+    desc: 'Seçili dönemde çekilişlerin ana sayı toplamlarının hangi aralıklarda yoğunlaştığını ve ortalama toplamı gösterir.',
+  },
+  consecutive: {
+    title: 'Ardışık sayı sıklığı',
+    desc: 'Seçili dönemde çekilişlerin kaçında ardışık sayı olmadığını, kaçında 1, 2 ya da daha fazla ardışık çift çıktığını gösterir.',
+  },
+};
+
+function isProTab(key: SubKey): boolean {
+  return SUBTABS.some((t) => t.key === key && 'pro' in t);
+}
 
 /** Tek/Çift ve Toplam sekmelerinin ortak satırı: etiket · çubuk · adet + yüzde. */
 type DistRow = { key: string | number; label: string; count: number; percentage: number };
@@ -104,6 +119,7 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
   const theme = useTheme();
   const c = theme.colors;
   const router = useRouter();
+  const { isPro } = usePro();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const mainColor = getGameAccentColor(game.id);
 
@@ -276,8 +292,9 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
       ) : (
         <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.subtabRow}>
-            {VISIBLE_SUBTABS.map((tab) => {
+            {SUBTABS.map((tab) => {
               const active = activeTab === tab.key;
+              const locked = !isPro && isProTab(tab.key);
               return (
                 <Pressable
                   key={tab.key}
@@ -285,8 +302,10 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
                     if (!active) softHaptic();
                     setActiveTab(tab.key);
                   }}
-                  style={[s.subtab, { backgroundColor: active ? mainColor : c.surface }]}
+                  style={[s.subtab, s.subtabInner, { backgroundColor: active ? mainColor : c.surface }]}
+                  accessibilityLabel={locked ? `${tab.label}, Pro` : tab.label}
                 >
+                  {locked ? <LockIcon color={active ? '#fff' : c.text3} size={12} strokeWidth={2.4} /> : null}
                   <Text style={[s.subtabText, { color: active ? '#fff' : c.text2 }]}>{tab.label}</Text>
                 </Pressable>
               );
@@ -294,7 +313,24 @@ export function StatisticsTab({ game, refreshKey = 0 }: { game: Game; refreshKey
             <View style={{ width: 8 }} />
           </ScrollView>
 
-          {activeTab === 'parity' || activeTab === 'sum' || activeTab === 'consecutive' ? (
+          {!isPro && isProTab(activeTab) ? (
+            <Surface style={s.proTeaser}>
+              <View style={[s.proTeaserIcon, { backgroundColor: `${mainColor}14` }]}>
+                <LockIcon color={mainColor} size={22} />
+              </View>
+              <Text style={s.proTeaserTitle}>{PRO_TAB_INFO[activeTab]?.title}</Text>
+              <Text style={s.proTeaserDesc}>{PRO_TAB_INFO[activeTab]?.desc}</Text>
+              <AppButton
+                label="Pro ile aç"
+                onPress={() => {
+                  softHaptic();
+                  router.push('/pro' as never);
+                }}
+                iconLeft={(color, size) => <LotaMark color={color} size={size} />}
+                style={{ marginTop: 14, alignSelf: 'stretch' }}
+              />
+            </Surface>
+          ) : activeTab === 'parity' || activeTab === 'sum' || activeTab === 'consecutive' ? (
             game.id === 'onnumara' ? (
               <Text style={s.note}>
                 On Numara{"'"}da çekilişte 22 sayı çıktığı için bu istatistik gösterilmiyor.
@@ -419,6 +455,11 @@ function makeStyles(theme: AppTheme) {
     subtabRow: { paddingHorizontal: 20, gap: 8, marginBottom: spacing.lg },
     subtab: { paddingHorizontal: 15, paddingVertical: 9, borderRadius: radius.pill },
     subtabText: { ...ty.caption, fontFamily: theme.font.semibold },
+    subtabInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    proTeaser: { marginHorizontal: 20, padding: 20, alignItems: 'center' },
+    proTeaserIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+    proTeaserTitle: { ...ty.h3, color: c.text, textAlign: 'center' },
+    proTeaserDesc: { ...ty.body, color: c.text2, textAlign: 'center', marginTop: 6 },
     barRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, marginBottom: 11 },
     rank: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     rankText: { ...ty.caption, fontFamily: theme.font.semibold, color: c.text3, fontSize: 11 },
