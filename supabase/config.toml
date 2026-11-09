@@ -432,3 +432,9 @@ entrypoint = "./functions/admob-ssv/index.ts"
 enabled = true
 verify_jwt = true
 entrypoint = "./functions/lota-generate/index.ts"
+
+[functions.revenuecat-webhook]
+enabled = true
+# Cagriyi RevenueCat yapar, Supabase oturumu yoktur; guvenlik Authorization basligindan gelir.
+verify_jwt = false
+entrypoint = "./functions/revenuecat-webhook/index.ts"

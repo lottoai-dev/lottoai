@@ -29,6 +29,18 @@
 - Family Sharing kapalı; "Monthly with a 12-Month Commitment" kullanılmıyor.
 - **Kalan:** her iki ürüne paywall ekran görüntüsü (Review Information → Screenshot). İlk abonelik grubu **1.2.0 ile birlikte** incelemeye gönderilmeli — o zamana kadar "Add for Review"a basılmaz ve 1.1.2'ye eklenmez.
 
+### RevenueCat (iOS tarafı tamamlandı — 9 Kas 2026)
+
+- Proje **LottoAI**; ücretsiz plan (aylık takip edilen gelir 2.500 $'a kadar), kart eklenmedi.
+- Uygulama **LottoAI (App Store)**, bundle `app.getlottoai.ios`: In-App Purchase Key (.p8) yüklendi, "Valid credentials"; Small Business Program başlangıcı 2026-08-15; App-Specific Shared Secret girildi (iOS 15 için).
+- App Store Server Notifications (Production + Sandbox, Version 2) RevenueCat adresine yönlendirildi.
+- App Store Connect API anahtarı **eklenmedi** (ürün içe aktarma gerekmiyor; ürünler elle eklendi, durum "Could not check" normal).
+- Entitlement: **`lottoai_pro`** (görünen ad "LottoAI Pro").
+- Ürünler: `lottoai_pro_monthly` (Pro Aylık), `lottoai_pro_yearly` (Pro Yıllık) — ikisi de `lottoai_pro`'ya bağlı.
+- Offering **`default`** (geçerli): `$rc_monthly` → Pro Aylık, `$rc_annual` → Pro Yıllık (+ RevenueCat Test Store ürünleri).
+- iOS public SDK anahtarı (uygulamaya gömülür, gizli değil): `appl_jlMxnyyCtCtKhtMpfvbjhTtPeCk`
+- Kalan: Google Play uygulaması (Play abonelikleri oluşunca), webhook ayarı (adım 2).
+
 ### Google Play Console — 1.2.0'ın ilk test build'inden sonra
 
 - Abonelik oluşturmak için Play'e **Play Billing Library (≥ 8.0.0) içeren** bir paket yüklenmiş olmalı. Yalnızca `com.android.vending.BILLING` izni yetmez: Play bunu eski AIDL faturalandırma sayıp paketi yayından engelliyor (1.1.2'de denendi, geri alındı). Sıra: 1.2.0'ın RevenueCat'li ilk build'i dahili teste → Play'de ürünleri oluştur → test.
@@ -63,6 +75,11 @@
 - `feature_usage_daily` şemasını da bir migration'a almak.
 
 ### 2. Sunucu: `revenuecat-webhook` Edge Function
+
+> **Durum (9 Kas 2026, `pro` dalı):** fonksiyon yazıldı (`supabase/functions/revenuecat-webhook/index.ts`, `config.toml`'da `verify_jwt = false`), canlıya gönderilmedi.
+> - Olayın içeriğine güvenmez: olaydaki kullanıcı(lar)ın **güncel** durumunu RevenueCat REST API'den (`GET /v1/subscribers/{id}`) okuyup `user_entitlements`'a yazar → sırasız/tekrar gelen olaylarda da doğru. Ödeme sorununda ek süre (grace period) boyunca Pro kalır. TRANSFER'de iki taraf da güncellenir.
+> - `Authorization` başlığı sabit süreli karşılaştırmayla doğrulanır; `TEST` olayı 200 döner; işlenen olay kimliği `revenuecat_events`'e yazılır; silinmiş kullanıcı (FK hatası) atlanır; RevenueCat'e ulaşılamazsa 502 → RevenueCat tekrar dener.
+> - **Canlıya alma sırası:** (1) RevenueCat'te salt-okuma **secret API key** (`sk_…`) oluştur; (2) rastgele bir webhook parolası üret; (3) Supabase secret'ları: `REVENUECAT_SECRET_API_KEY`, `REVENUECAT_WEBHOOK_AUTH`; (4) migration'ları uygula (önce baseline için `migration repair`); (5) `npx supabase functions deploy revenuecat-webhook`; (6) RevenueCat → Integrations → Webhooks: URL `https://tsxzukctomvnyzalgxap.supabase.co/functions/v1/revenuecat-webhook`, Authorization = aynı parola; (7) panelden "Send test event" → 200.
 
 - RevenueCat olaylarını (satın alma, yenileme, iptal, süre bitimi, ödeme sorunu, ürün değişikliği, transfer) işleyip `user_entitlements`'ı günceller.
 - İstek gizli anahtarla (Authorization başlığı) doğrulanır.
