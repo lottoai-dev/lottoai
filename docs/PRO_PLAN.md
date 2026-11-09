@@ -64,11 +64,10 @@
 
 ### 1. Veritabanı (Supabase migration)
 
-> **Durum (9 Kas 2026, `pro` dalı):** migration dosyaları yazıldı, canlıya uygulanmadı.
+> **Durum: CANLIDA (9 Kas 2026).** Baseline `migration repair` ile "uygulandı" işaretlendi, iki yeni migration `db push` ile uygulandı; canlı ve yerel geçmiş eşit. Kontrol: `app_config` anonim okunuyor (5/5/5), `user_entitlements` anonim için boş, `revenuecat_events` anonim için erişim reddi.
 > - `20260831190000_feature_usage_daily_baseline.sql` — paneldeki tablonun canlı tanımı (kayıt amaçlı). Canlıya göndermeden önce `npx supabase migration repair --status applied 20260831190000` ile "uygulandı" işaretlenir.
 > - `20261109120000_app_config.sql` — `feature_daily_limits` = 5/5/5.
 > - `20261109120100_user_entitlements.sql` — `user_entitlements`, `is_pro()`, `revenuecat_events` (+180 gün temizlik).
-> - Canlıya uygulama: webhook (adım 2) ile birlikte, kullanıcı onayıyla.
 
 - **`app_config`:** Özellik başına günlük sınır (`filtered_coupon`, `report`, `lota` = 5). Herkes okuyabilir, yalnızca service_role yazar.
 - **`user_entitlements`:** `user_id` (PK), `is_pro`, `expires_at`, `product_id`, `store`, `updated_at`. RLS: kullanıcı yalnızca kendi satırını okur; yazma yalnızca service_role.
@@ -76,7 +75,7 @@
 
 ### 2. Sunucu: `revenuecat-webhook` Edge Function
 
-> **Durum (9 Kas 2026, `pro` dalı):** fonksiyon yazıldı (`supabase/functions/revenuecat-webhook/index.ts`, `config.toml`'da `verify_jwt = false`), canlıya gönderilmedi.
+> **Durum: CANLIDA (9 Kas 2026).** Fonksiyon `supabase/functions/revenuecat-webhook/index.ts` (`config.toml`'da `verify_jwt = false`) yayında; RevenueCat → Integrations → Webhooks "Supabase" (All apps, All events, Production + Sandbox) kuruldu, panel test olayı **200** döndü. Secret'lar Supabase'de: `REVENUECAT_SECRET_API_KEY` (RevenueCat V1 secret key "supabase-webhook"), `REVENUECAT_WEBHOOK_AUTH`. Authorization karşılaştırması iki tarafı kırpar (panelden yapıştırırken eklenen satır sonu ilk testte 401'e yol açmıştı).
 > - Olayın içeriğine güvenmez: olaydaki kullanıcı(lar)ın **güncel** durumunu RevenueCat REST API'den (`GET /v1/subscribers/{id}`) okuyup `user_entitlements`'a yazar → sırasız/tekrar gelen olaylarda da doğru. Ödeme sorununda ek süre (grace period) boyunca Pro kalır. TRANSFER'de iki taraf da güncellenir.
 > - `Authorization` başlığı sabit süreli karşılaştırmayla doğrulanır; `TEST` olayı 200 döner; işlenen olay kimliği `revenuecat_events`'e yazılır; silinmiş kullanıcı (FK hatası) atlanır; RevenueCat'e ulaşılamazsa 502 → RevenueCat tekrar dener.
 > - **Canlıya alma sırası:** (1) RevenueCat'te salt-okuma **secret API key** (`sk_…`) oluştur; (2) rastgele bir webhook parolası üret; (3) Supabase secret'ları: `REVENUECAT_SECRET_API_KEY`, `REVENUECAT_WEBHOOK_AUTH`; (4) migration'ları uygula (önce baseline için `migration repair`); (5) `npx supabase functions deploy revenuecat-webhook`; (6) RevenueCat → Integrations → Webhooks: URL `https://tsxzukctomvnyzalgxap.supabase.co/functions/v1/revenuecat-webhook`, Authorization = aynı parola; (7) panelden "Send test event" → 200.

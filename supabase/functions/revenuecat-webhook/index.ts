@@ -139,13 +139,16 @@ async function fetchProState(userId: string, secretKey: string) {
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  const expectedAuth = Deno.env.get("REVENUECAT_WEBHOOK_AUTH") ?? "";
-  const secretKey = Deno.env.get("REVENUECAT_SECRET_API_KEY") ?? "";
+  // Panelde kopyala-yapistir sirasinda eklenen satir sonu / bosluklar
+  // karsilastirmayi bozmasin diye iki taraf da kirpilir.
+  const expectedAuth = (Deno.env.get("REVENUECAT_WEBHOOK_AUTH") ?? "").trim();
+  const secretKey = (Deno.env.get("REVENUECAT_SECRET_API_KEY") ?? "").trim();
   if (!expectedAuth || !secretKey) {
     console.error("[revenuecat-webhook] secret eksik");
     return json({ error: "Server not configured" }, 500);
   }
-  if (!safeEqual(req.headers.get("Authorization") ?? "", expectedAuth)) {
+  if (!safeEqual((req.headers.get("Authorization") ?? "").trim(), expectedAuth)) {
+    console.warn("[revenuecat-webhook] Authorization eslesmedi");
     return json({ error: "Unauthorized" }, 401);
   }
 
