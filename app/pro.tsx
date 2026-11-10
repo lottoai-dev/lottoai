@@ -59,6 +59,8 @@ function annualDiscountPct(offer: ProOffer | null): number | null {
 
 export default function ProScreen() {
   const insets = useSafeAreaInsets();
+  // iOS'ta modal sayfa kartı durum çubuğunun altından başlar; güvenli alanı tekrar eklemek boşluk bırakır.
+  const topPad = Platform.OS === 'ios' ? 12 : insets.top + 6;
   const router = useRouter();
   const theme = useTheme();
   const c = theme.colors;
@@ -189,21 +191,8 @@ export default function ProScreen() {
   return (
     <View style={s.container}>
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
-      <View style={[s.nav, { paddingTop: insets.top + 6 }]}>
-        <View style={{ width: 38 }} />
-        <View style={{ flex: 1 }} />
-        <Pressable
-          onPress={close}
-          style={[s.navBtn, { backgroundColor: c.surface }]}
-          hitSlop={8}
-          accessibilityLabel="Kapat"
-        >
-          <CloseIcon color={c.text2} size={20} />
-        </Pressable>
-      </View>
-
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: topPad + 10, paddingBottom: insets.bottom + 32 }}
         showsVerticalScrollIndicator={false}
       >
         <View style={s.hero}>
@@ -353,6 +342,18 @@ export default function ProScreen() {
           etmez ve kazanma şansını artırmaz.
         </Text>
       </ScrollView>
+
+      {/* Kapat dugmesi icerigin ustunde yuzer: kaydirilan icerik keskin bir cizgide kesilmez. */}
+      <View style={[s.nav, { top: topPad }]} pointerEvents="box-none">
+        <Pressable
+          onPress={close}
+          style={[s.navBtn, { backgroundColor: c.surface }]}
+          hitSlop={8}
+          accessibilityLabel="Kapat"
+        >
+          <CloseIcon color={c.text2} size={20} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -423,7 +424,7 @@ function makeStyles(theme: AppTheme) {
   const { radius, typography: ty } = theme;
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
-    nav: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 6 },
+    nav: { position: 'absolute', right: 20 },
     navBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
     hero: { alignItems: 'center', marginTop: 4, marginBottom: 20 },
     heroIcon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
