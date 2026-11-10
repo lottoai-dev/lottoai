@@ -142,7 +142,7 @@
 > - **Profil:** "ABONELİK" kartı — "LottoAI Pro'ya geç" / "LottoAI Pro aktif".
 > - **İstatistik:** Toplam ve Ardışık sekmeleri her zaman görünür; Pro değilse 🔒 ve sekme içeriği yerine açıklama + "Pro ile aç". `PRO_STATS_ENABLED` kaldırıldı (1.1.2'deki gizleme bu dalda yok).
 > - **AdMob tamamen kaldırıldı:** `lib/adMob.ts`, `ADS_REWARDS_ENABLED`, `waitForRewardGrant`, `FEATURE_REWARD_AMOUNT`, `react-native-google-mobile-ads` paketi ve `app.json` eklentisi. Sunucudaki `admob-ssv` fonksiyonu ve `admob_ssv_rewards` tablosu henüz duruyor (zararsız; ayrıca temizlenebilir).
-> - ⚠️ **Mağaza beyanları (adım 7):** reklam SDK'sı çıktığı için Play **Veri güvenliği** formundan reklam/advertising ID beyanları ve Apple **App Privacy** etiketlerindeki reklam amaçlı veri beyanları 1.2.0 ile güncellenmeli; abonelik eklendiği için "Satın alımlar" beyanı eklenmeli.
+> - ⚠️ **Mağaza beyanları (adım 7):** reklam SDK'sı çıktığı için Play **Veri güvenliği** formundan reklam/advertising ID beyanları ve Apple **App Privacy** etiketlerindeki reklam amaçlı veri beyanları 1.2.0 ile güncellenmeli; abonelik eklendiği için "Satın alımlar" beyanı eklenmeli. Ayrıntılı liste: adım 9.
 
 - **Paywall (`app/pro.tsx`):** Aylık/yıllık (fiyatlar mağazadan, yerel para birimiyle), "Satın alımları geri yükle" (Apple zorunlu), otomatik yenileme açıklaması, Kullanım Şartları ve Gizlilik bağlantıları.
 - **Giriş noktaları:** `generate.tsx`, `saved.tsx`, `ai-studio.tsx` içindeki "hakkın bitti" kartlarında reklam butonu yerine "Pro'ya geç". Profil ekranında Pro satırı/rozeti; Pro kullanıcıya "Aboneliği yönet" bağlantısı.
@@ -193,6 +193,11 @@
 - iOS ve Android production build, aynı commit'ten.
 - Apple'da abonelik ürünleri ilk kez **build ile birlikte** incelemeye gönderilir.
 - Eski sürümler sınırı koddan okuduğu için güncelleyene kadar 10 hak kullanır; kabul edilebilir. İleride sınır sunucuda da zorlanabilir (`increment_feature_usage` / `lota-generate`).
+- App Store abonelik ürünleri (10 Kas 2026): iki üründe Review Information ekran görüntüsü + not girildi → durum "Prepare for Submission". 1.2.0 sürüm sayfasında "In-App Purchases and Subscriptions" bölümünden **iki abonelik de seçilecek**.
+
+**Gönderim günü gizlilik beyanları** (yayındaki 1.1.2 hâlâ AdMob SDK'sını içerdiği için 1.2.0 gönderilirken yapılır; Apple App Privacy değişiklikleri anında yayına girer):
+- **Apple App Privacy:** Device ID (Third-Party Advertising) ve Advertising Data (Third-Party Advertising) **kaldır**. **Purchases → Purchase History** ekle: App Functionality, kimliğe bağlı, izleme yok. Diğerleri kalır: Name, Email, User ID, Product Interaction (kota sayaçları), Other User Content, Other Diagnostic Data (`app_logs`, kimliğe bağlı değil).
+- **Play Veri güvenliği:** reklam amaçlı cihaz/reklam kimliği beyanını kaldır, "Satın alma geçmişi" (uygulama işlevi) ekle. **Uygulama içeriği → Reklamlar:** "reklam içermiyor". **Reklam kimliği** beyanı: 1.2.0 paketinde `com.google.android.gms.permission.AD_ID` yoksa "Hayır" (paket yüklendikten sonra Play'in manifest uyarısına bakılarak).
 
 ## Fiyat ve altyapı kararları (8 Kas 2026)
 
