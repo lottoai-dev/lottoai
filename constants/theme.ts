@@ -136,8 +136,8 @@ const darkColors: AppColors = {
   dangerSoft: 'rgba(229,112,107,0.12)',
   success: '#3DD68C',
   warning: '#E0954A',
-  tabBg: 'rgba(10,12,16,0.94)',
-  tabBorder: 'rgba(255,255,255,0.04)',
+  tabBg: '#12151B',
+  tabBorder: 'rgba(255,255,255,0.07)',
   overlay: 'rgba(0,0,0,0.55)',
   highlight: 'rgba(255,255,255,0.04)',
 };

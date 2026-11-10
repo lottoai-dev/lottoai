@@ -4,7 +4,8 @@ import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../components/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnalyzeTab } from '../../components/results/AnalyzeTab';
@@ -153,7 +154,7 @@ export default function ResultsHub() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}
+        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: 28 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -200,7 +201,7 @@ function makeStyles(theme: AppTheme) {
   const { spacing, typography: ty } = theme;
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
-    header: { paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 18 },
+    header: { paddingHorizontal: spacing.xl, paddingTop: 4, paddingBottom: 14 },
     title: { ...ty.h1, color: c.text },
     subtitle: { ...ty.bodyMedium, color: c.text2, marginTop: 3 },
     segmentWrap: { marginTop: 14 },

@@ -1,7 +1,8 @@
 // components/results/StatisticsTab.tsx
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/text';
 
 import { AppTheme } from '../../constants/theme';
 import { usePro } from '../../contexts/ProContext';

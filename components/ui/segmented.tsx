@@ -1,6 +1,7 @@
 // components/ui/segmented.tsx
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './text';
 import { FontFamily } from '../../constants/theme';
 import { softHaptic } from '../../lib/haptics';
 import { useTheme } from '../../lib/theme';

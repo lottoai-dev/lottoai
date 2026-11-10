@@ -3,16 +3,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    View,
 } from 'react-native';
+import { Text, TextInput } from '../../components/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandMark } from '../../lib/emblems';
 import { softHaptic } from '../../lib/haptics';

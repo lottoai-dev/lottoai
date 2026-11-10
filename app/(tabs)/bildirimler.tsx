@@ -9,10 +9,10 @@ import {
     Pressable,
     ScrollView,
     StyleSheet,
-    Text,
-    TouchableOpacity,
     View,
 } from 'react-native';
+import { PressableScale } from '../../components/ui/surface';
+import { Text } from '../../components/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppTheme } from '../../constants/theme';
@@ -121,7 +121,7 @@ export default function BildirimlerScreen() {
           contentContainerStyle={{
             paddingHorizontal: 20,
             paddingTop: 8,
-            paddingBottom: insets.bottom + 40,
+            paddingBottom: 28,
           }}
         >
           {bildirimler.map((b) => (
@@ -154,10 +154,10 @@ const BildirimRow = React.memo(function BildirimRow({
   onPress: (b: Bildirim) => void;
 }) {
   return (
-    <TouchableOpacity
+    <PressableScale
+      haptic={false}
       style={[s.item, { backgroundColor: bildirim.isRead ? c.surface : c.brandSoft }]}
       onPress={() => onPress(bildirim)}
-      activeOpacity={1}
     >
       <View style={[s.dot, { backgroundColor: bildirim.isRead ? 'transparent' : c.brand }]} />
       <View style={{ flex: 1 }}>
@@ -169,7 +169,7 @@ const BildirimRow = React.memo(function BildirimRow({
         </Text>
         <Text style={s.itemTime}>{formatBildirimTime(bildirim.createdAt, nowMs)}</Text>
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 });
 

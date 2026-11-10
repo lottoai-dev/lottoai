@@ -4,9 +4,9 @@ import {
     Modal,
     Pressable,
     StyleSheet,
-    Text,
     View,
 } from 'react-native';
+import { Text } from './text';
 import { softHaptic } from '../../lib/haptics';
 import { useTheme } from '../../lib/theme';
 

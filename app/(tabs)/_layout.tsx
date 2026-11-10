@@ -3,7 +3,8 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../components/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FontFamily } from '../../constants/theme';
@@ -58,6 +59,8 @@ function LottoTabBar({ state, navigation }: BottomTabBarProps) {
         styles.bar,
         {
           backgroundColor: c.tabBg,
+          borderTopWidth: 1,
+          borderTopColor: c.tabBorder,
           paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
           height: 64 + (insets.bottom > 0 ? insets.bottom : 10),
         },
@@ -109,7 +112,11 @@ function LottoTabBar({ state, navigation }: BottomTabBarProps) {
 }
 
 export default function TabLayout() {
+  const c = useTheme().colors;
+  const insets = useSafeAreaInsets();
+
   return (
+    <View style={styles.root}>
     <Tabs
       tabBar={(props) => <LottoTabBar {...props} />}
       screenOptions={{ headerShown: false, animation: 'none', freezeOnBlur: true }}
@@ -124,10 +131,18 @@ export default function TabLayout() {
       <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="legal" options={{ href: null }} />
     </Tabs>
+      {/* Kaydirilan icerik saat/pil gostergesinin altinda gorunmesin diye durum cubugu arkasina zemin rengi. */}
+      <View
+        pointerEvents="none"
+        style={[styles.statusBarBackdrop, { height: insets.top, backgroundColor: c.bg }]}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
+  statusBarBackdrop: { position: 'absolute', top: 0, left: 0, right: 0 },
   bar: {
     flexDirection: 'row',
     alignItems: 'flex-start',

@@ -1,6 +1,7 @@
 // components/results/AnalyzeTab.tsx
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Keyboard, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '../ui/text';
 
 import { AppTheme } from '../../constants/theme';
 import { getGameAccentColor, type Game } from '../../lib/games';

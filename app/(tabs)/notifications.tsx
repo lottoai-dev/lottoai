@@ -5,7 +5,8 @@ import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../components/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale, Surface } from '../../components/ui/surface';
@@ -380,10 +381,7 @@ export default function NotificationsScreen() {
   return (
     <View style={s.container}>
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 40 }}
-      >
+      <View style={{ paddingTop: insets.top + 6 }}>
         <View style={s.nav}>
           <Pressable
             onPress={() => { toggleHaptic(); router.back(); }}
@@ -395,7 +393,13 @@ export default function NotificationsScreen() {
           <Text style={s.navTitle}>Hatırlatıcılar</Text>
           <View style={{ width: 38 }} />
         </View>
+      </View>
 
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: 8, paddingBottom: 28 }}
+      >
         <Text style={s.subtitle}>Çekiliş hatırlatıcısı ve sonuç bildirimi</Text>
 
         {!hasPermission ? (
@@ -465,7 +469,7 @@ function makeStyles(theme: AppTheme) {
     container: { flex: 1, backgroundColor: c.bg },
     nav: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingHorizontal: 16, paddingBottom: 6,
+      paddingHorizontal: 16, paddingBottom: 10,
     },
     navBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' },
     navTitle: { ...ty.h3, color: c.text },

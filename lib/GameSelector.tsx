@@ -1,6 +1,7 @@
 // lib/GameSelector.tsx
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../components/ui/text';
 import { PressableScale } from '../components/ui/surface';
 import { GameAccent } from '../constants/theme';
 import { GameEmblem } from './emblems';

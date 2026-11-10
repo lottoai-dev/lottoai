@@ -2,7 +2,8 @@
 // Shared loading / error / empty state blocks for the Results hub and beyond.
 
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Text } from './text';
 import { RefreshIcon, WifiOffIcon } from '../../lib/icons';
 import { useTheme } from '../../lib/theme';
 import { AppButton } from './app-button';

@@ -1,7 +1,8 @@
 // lib/OfflineBanner.tsx
 import NetInfo from '@react-native-community/netinfo';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '../components/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontFamily } from '../constants/theme';
 import { WifiOffIcon } from './icons';

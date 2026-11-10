@@ -3,7 +3,8 @@
 // (✓ 3 çift · 3 tek, ✓ Toplam 142 (120–160) …). Hesap lib/kolonFacts.ts'te.
 // Filtre yoksa hiçbir şey çizmez.
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from './text';
 
 import type { KolonFact } from '../../lib/kolonFacts';
 import { CheckIcon, CloseIcon } from '../../lib/icons';

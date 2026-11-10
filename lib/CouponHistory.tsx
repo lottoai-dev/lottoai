@@ -3,7 +3,8 @@
 // it would have matched. Uses safeQuery, Set lookups, limit, and result cache.
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../components/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NumberBall } from '../components/ui/number-ball';

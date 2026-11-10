@@ -5,7 +5,8 @@ import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useMemo, useState } from 'react';
-import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '../../components/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale, Surface } from '../../components/ui/surface';
@@ -194,7 +195,7 @@ export default function ProfileScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}
+        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: 28 }}
       >
         <View style={s.header}>
           <Text style={s.title}>Profil</Text>
@@ -421,7 +422,7 @@ function makeStyles(theme: AppTheme) {
     statValue: { fontFamily: theme.font.bold, fontSize: 20, lineHeight: 25, letterSpacing: -0.3, color: c.text, fontVariant: ['tabular-nums'] },
     statLabel: { ...ty.caption, color: c.text3, marginTop: 2 },
 
-    card: { marginHorizontal: spacing.xl, marginBottom: spacing.md, paddingHorizontal: 22, paddingVertical: 16, overflow: 'hidden' },
+    card: { marginHorizontal: spacing.xl, marginBottom: spacing.md, paddingHorizontal: spacing.lg, paddingLeft: spacing.lg + 4, paddingVertical: 16, overflow: 'hidden' },
     cardLabel: { ...ty.micro, color: c.text3, marginBottom: 10 },
 
     menuRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13 },
@@ -448,7 +449,7 @@ function makeStyles(theme: AppTheme) {
     },
     dangerText: { ...ty.title },
 
-    footer: { alignItems: 'center', gap: 5, paddingTop: 18, paddingBottom: 28 },
+    footer: { alignItems: 'center', gap: 5, paddingTop: 18 },
     footerText: { ...ty.label, color: c.text2, marginTop: 4 },
     footerSub: { ...ty.caption, color: c.text3 },
   });

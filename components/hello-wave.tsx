@@ -1,4 +1,4 @@
-import { Text } from 'react-native';
+import { Text } from './ui/text';
 
 export function HelloWave() {
   return (

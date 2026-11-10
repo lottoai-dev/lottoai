@@ -13,9 +13,9 @@ import {
     ScrollView,
     Share,
     StyleSheet,
-    Text,
     View,
 } from 'react-native';
+import { Text } from '../../components/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '../../components/ui/app-button';
@@ -616,7 +616,7 @@ export default function SavedScreen() {
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}
+        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: 28 }}
       >
         <SavedHeader styles={s} />
 

@@ -1,6 +1,7 @@
 // components/ErrorBoundary.tsx
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from './ui/text';
 import { AppButton } from './ui/app-button';
 import { Surface } from './ui/surface';
 import { RefreshIcon } from '../lib/icons';

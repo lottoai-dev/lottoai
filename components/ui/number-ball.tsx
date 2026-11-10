@@ -1,6 +1,7 @@
 // components/ui/number-ball.tsx
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type ViewStyle } from 'react-native';
+import { Text } from './text';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,

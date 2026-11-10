@@ -6,17 +6,16 @@ import * as ExpoLinking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Linking,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Linking,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    View,
 } from 'react-native';
+import { Text, TextInput } from '../components/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandMark } from '../lib/emblems';
 import { softHaptic } from '../lib/haptics';

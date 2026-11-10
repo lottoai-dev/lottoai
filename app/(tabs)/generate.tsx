@@ -11,11 +11,10 @@ import {
     Pressable,
     ScrollView,
     StyleSheet,
-    Text,
-    TextInput,
     useWindowDimensions,
     View,
 } from 'react-native';
+import { Text, TextInput } from '../../components/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '../../components/ui/app-button';
@@ -716,7 +715,7 @@ export default function GenerateScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 90 }}
+        contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: 28 }}
       >
         <View style={s.header}>
           <View style={s.headerText}>
