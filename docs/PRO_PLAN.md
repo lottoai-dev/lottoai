@@ -39,12 +39,32 @@
 - Ürünler: `lottoai_pro_monthly` (Pro Aylık), `lottoai_pro_yearly` (Pro Yıllık) — ikisi de `lottoai_pro`'ya bağlı.
 - Offering **`default`** (geçerli): `$rc_monthly` → Pro Aylık, `$rc_annual` → Pro Yıllık (+ RevenueCat Test Store ürünleri).
 - iOS public SDK anahtarı (uygulamaya gömülür, gizli değil): `appl_jlMxnyyCtCtKhtMpfvbjhTtPeCk`
-- Kalan: Google Play uygulaması (Play abonelikleri oluşunca), webhook ayarı (adım 2).
+- Google Play uygulaması 10 Kas 2026'da eklendi (aşağıda).
 
 ### Google Play Console — 1.2.0'ın ilk test build'inden sonra
 
 - Abonelik oluşturmak için Play'e **Play Billing Library (≥ 8.0.0) içeren** bir paket yüklenmiş olmalı. Yalnızca `com.android.vending.BILLING` izni yetmez: Play bunu eski AIDL faturalandırma sayıp paketi yayından engelliyor (1.1.2'de denendi, geri alındı). Sıra: 1.2.0'ın RevenueCat'li ilk build'i dahili teste → Play'de ürünleri oluştur → test.
 - Yapı: tek abonelik (`lottoai_pro`), içinde iki temel plan (aylık ₺79,99, yıllık ₺599,99); yıllık plana 7 günlük ücretsiz deneme teklifi. Ödeme profili gerekiyorsa o adımda bağlanır.
+
+> **Tamamlandı — 10 Kas 2026:**
+> - Abonelik `lottoai_pro` ("LottoAI Pro"). Temel planlar: **`monthly`** (Aylık, eski sürümlerle uyumlu) ve **`annual`** (Yıllık). İkisi de: otomatik yenileme, 7 gün ödemesiz dönem, hesap askıya alma otomatik, plan değişikliği bir sonraki fatura tarihinde, yeniden abone olma izinli.
+> - **Play Türkiye fiyatını KDV hariç ister, %20 ekler:** aylık **66,66** girildi → TRY 79,99; yıllık **499,99** → TRY 599,99. Diğer 174 ülke Google'ın otomatik çevirdiği fiyatlarla açık (uygulama oralarda yoksa görünmez).
+> - ⚠️ `yearly` temel planı yanlışlıkla **Aylık** dönemle oluşturuldu → **devre dışı**; kimliği tekrar kullanılamaz. Yıllık plan `annual`.
+> - Teklif **`free-trial-7d`** (annual): yeni müşteri, "bu aboneliği hiç edinmemiş", 7 gün ücretsiz deneme.
+> - Lisans testi: yalnızca **"LottoAI lisans testi"** listesi (kullanıcının Gmail'i) işaretli; 23 kişilik "LottoAI Test Kullanıcıları" listesi bilerek lisans testine **eklenmedi** (lisans test kullanıcıları ücretsiz test satın alması yapabilir).
+>
+> **RevenueCat Play uygulaması — 10 Kas 2026:**
+> - App "LottoAI (Play Store)", paket `app.getlottoai.android`, public SDK anahtarı `goog_GyngMFLvrSSrFRvrCQShaOSKoYt` (`lib/purchases.ts`'e eklendi).
+> - Hizmet hesabı `revenuecat@lottoai-f66aa.iam.gserviceaccount.com` (Google Cloud projesi `lottoai-f66aa` = Firebase projesi; roller Pub/Sub Admin + Monitoring Viewer; Play Console hesap izinleri: uygulama bilgilerini görüntüleme, finansal verileri görüntüleme, siparişleri ve abonelikleri yönetme). JSON anahtarı yalnızca kullanıcıda, repoda yok. Kimlik bilgileri **Valid** (ilk "need attention" uyarısı abonelik avantaj metni düzenlenip kaydedilince düzeldi).
+> - Google developer notifications (RTDN) bağlandı: topic `projects/lottoai-f66aa/topics/Play-Store-Not…`.
+> - Ürünler `lottoai_pro:monthly`, `lottoai_pro:annual` içe aktarıldı → `lottoai_pro` entitlement'ı; `default` offering: `$rc_monthly` ← `lottoai_pro:monthly`, `$rc_annual` ← `lottoai_pro:annual` (fallback yok; SDK v10).
+> - ⚠️ RevenueCat'teki "Connect to Google" topic'i oluşturdu ama Play'e yazmadı: Play Console → **Para kazanma kurulumu** → "Anlık bildirimleri etkinleştir" + Konu adı elle girildi. Bundan önce deneme sonrası yenileme sunucuya geç ulaştı.
+>
+> **Android test satın alması — 10 Kas 2026 (dev build, lisans test hesabı): uçtan uca doğrulandı.**
+> - Paywall → Play sayfası: LottoAI Pro yıllık ₺599,99, deneme (test hesabında 7 gün = 3 dk, 1 yıl = 30 dk), "Test kartı". Satın alma sonrası "Hoş geldin, Pro aktif!" kartı, donma yok. Google Play test makbuzu ₺0,00.
+> - Webhook: `INITIAL_PURCHASE` (10:43 UTC) → `user_entitlements`: is_pro=true, store=play_store, product_id=lottoai_pro, period_type=trial. RTDN açıldıktan sonra `RENEWAL` (11:16) → period_type=normal, expires_at 11:46.
+> - Önceki gece iOS sandbox aboneliği `CANCELLATION` (03:45) + `EXPIRATION` (04:46 UTC) ile sona erdi; webhook ikisini de işledi.
+> - Kalan: Play test aboneliği kendiliğinden bitince (~6 yenileme) `EXPIRATION` → is_pro=false → uygulamada ücretsiz görünüm (kota 5, kilitli Toplam/Ardışık).
 
 ## Mevcut durum (plan yazılırken)
 

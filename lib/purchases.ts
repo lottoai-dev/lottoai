@@ -26,7 +26,7 @@ export const PRO_ENTITLEMENT_ID = 'lottoai_pro';
  */
 const REVENUECAT_API_KEYS: Partial<Record<typeof Platform.OS, string>> = {
   ios: 'appl_jlMxnyyCtCtKhtMpfvbjhTtPeCk',
-  // android: 'goog_...', // Play abonelikleri olusunca RevenueCat'ten eklenecek
+  android: 'goog_GyngMFLvrSSrFRvrCQShaOSKoYt',
 };
 
 let configured = false;
