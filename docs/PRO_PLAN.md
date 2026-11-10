@@ -64,7 +64,8 @@
 > - Paywall → Play sayfası: LottoAI Pro yıllık ₺599,99, deneme (test hesabında 7 gün = 3 dk, 1 yıl = 30 dk), "Test kartı". Satın alma sonrası "Hoş geldin, Pro aktif!" kartı, donma yok. Google Play test makbuzu ₺0,00.
 > - Webhook: `INITIAL_PURCHASE` (10:43 UTC) → `user_entitlements`: is_pro=true, store=play_store, product_id=lottoai_pro, period_type=trial. RTDN açıldıktan sonra `RENEWAL` (11:16) → period_type=normal, expires_at 11:46.
 > - Önceki gece iOS sandbox aboneliği `CANCELLATION` (03:45) + `EXPIRATION` (04:46 UTC) ile sona erdi; webhook ikisini de işledi.
-> - Kalan: Play test aboneliği kendiliğinden bitince (~6 yenileme) `EXPIRATION` → is_pro=false → uygulamada ücretsiz görünüm (kota 5, kilitli Toplam/Ardışık).
+> - Play test aboneliği 30 dk aralıklarla yenilendi (son `RENEWAL` 13:46), 14:16 UTC'de `CANCELLATION` + `EXPIRATION` → `user_entitlements`: is_pro=false, will_renew=false, expires_at 14:16. **Sona erme yolu sunucuda doğrulandı.**
+> - Uygulamada ücretsiz görünüm doğrulandı (10 Kas 2026): Profil'de Pro yok, kota kartları günde 5 + "Pro ile sınırsız kullan", Toplam/Ardışık kilitli. Not: dev build'de kota varsayılan kapalı; görmek için `$env:EXPO_PUBLIC_ENFORCE_QUOTA_IN_DEV="1"; npx expo start --dev-client --clear`. Production build'de (`__DEV__` false) kota her zaman açık.
 
 ## Mevcut durum (plan yazılırken)
 
