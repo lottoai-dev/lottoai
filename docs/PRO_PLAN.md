@@ -199,7 +199,7 @@
 - **Apple App Privacy:** Device ID (Third-Party Advertising) ve Advertising Data (Third-Party Advertising) **kaldır**. **Purchases → Purchase History** ekle: App Functionality, kimliğe bağlı, izleme yok. Diğerleri kalır: Name, Email, User ID, Product Interaction (kota sayaçları), Other User Content, Other Diagnostic Data (`app_logs`, kimliğe bağlı değil).
 - **Play Veri güvenliği:** reklam amaçlı cihaz/reklam kimliği beyanını kaldır, "Satın alma geçmişi" (uygulama işlevi) ekle. **Uygulama içeriği → Reklamlar:** "reklam içermiyor". **Reklam kimliği** beyanı: 1.2.0 paketinde `com.google.android.gms.permission.AD_ID` yoksa "Hayır" (paket yüklendikten sonra Play'in manifest uyarısına bakılarak).
 
-> **Durum: İNCELEMEDE (11 Kas 2026).** Yayın elle yapılacak; iki mağaza onaylayınca aynı gün.
+> **Durum: YAYINDA (11 Kas 2026).** İki mağaza aynı gün onayladı; Apple "Release This Version" ve Play "4 değişikliği yayınla" ile aynı gün elle yayınlandı.
 > - Build'ler: iOS 1.2.0 (9), Android 1.2.0 (sürüm kodu 13), commit `245c4ad`. `eas submit` ile yüklendi (Android production kanalına taslak).
 > - `lottoai-legal` Pro metinleri (`b218208`) push edildi.
 > - **Apple:** 1.2.0 sürümü oluşturuldu. What's New ve açıklama Pro, ücretsiz kullanım, abonelik koşulları ve Şartlar/Gizlilik bağlantılarıyla güncellendi. İnceleme notları 1.2.0'a göre yeniden yazıldı (AdMob cümlesi çıktı, RevenueCat ve Pro test adımları eklendi). "Manually release this version" seçili. Yeni ASC'de sürüm sayfasında IAP bölümü yok: grup, iki abonelik ve sürüm aynı **Draft Submission**'a ayrı ayrı "Add for Review" ile eklendi (ilk grup, içindeki abonelikler olmadan gönderilemiyor), sonra Submit for Review. App Privacy planlandığı gibi değiştirildi ve yayınlandı.
