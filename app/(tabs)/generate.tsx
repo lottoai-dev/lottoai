@@ -758,7 +758,7 @@ export default function GenerateScreen() {
         <Text style={s.sectionLabel}>OYUN SEÇ</Text>
         <GameSelector selectedGame={selectedGame} onSelect={handleGameSelect} />
 
-        <Surface style={s.resultCard} elevated>
+        <Surface style={s.resultCard}>
           {generatedNumbers.length === 0 ? (
             <View style={s.empty}>
               <View style={[s.emptyIcon, { backgroundColor: `${mainColor}14` }]}>

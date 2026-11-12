@@ -428,7 +428,7 @@ export default function AiStudioScreen() {
         <Text style={s.sectionLabel}>OYUN SEÇ</Text>
         <GameSelector selectedGame={selectedGame} onSelect={handleGameSelect} />
 
-        <Surface style={s.resultCard} elevated>
+        <Surface style={s.resultCard}>
           {generating && !hasResult ? (
             <AiGeneratingPreview
               game={selectedGame}
