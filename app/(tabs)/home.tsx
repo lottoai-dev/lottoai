@@ -398,7 +398,6 @@ export default function HomeScreen() {
 
   // Özet kartlarından sadece biri görünüyorsa (XOR), yatay bar düzenine geçilir —
   // tek başına kalan kare kart tam genişlikte boş ve seyrek görünüyordu.
-  const singleSummary = (pendingCoupons > 0) !== (todayDrawCount > 0);
 
   return (
     <View style={s.container}>
@@ -502,58 +501,32 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {/* Smart summary — stat cards */}
+        {/* Smart summary — compact stat tiles (same layout whether one or two are shown) */}
         {!error && (pendingCoupons > 0 || todayDrawCount > 0) ? (
           <View style={s.summaryRowWrap}>
             {pendingCoupons > 0 ? (
-              <PressableScale haptic={false} style={[s.summaryCard, singleSummary && s.summaryCardSingle]} onPress={() => { softHaptic(); router.push('/(tabs)/saved' as any); }}>
-              {singleSummary ? (
-                <>
-                  <View style={[s.summaryIcon, { backgroundColor: c.brandSoft }]}>
-                    <TicketIcon color={c.brand} size={19} />
-                  </View>
-                  <Text style={s.summaryValueSingle}>{pendingCoupons}</Text>
-                  <Text style={s.summaryLabelSingle}>kolon · Sonuç bekliyor</Text>
-                  <ChevronRightIcon color={c.text3} size={16} />
-                </>
-              ) : (
-                <>
-                  <View style={s.summaryCardTop}>
-                    <View style={[s.summaryIcon, { backgroundColor: c.brandSoft }]}>
-                      <TicketIcon color={c.brand} size={19} />
-                    </View>
-                    <ChevronRightIcon color={c.text3} size={16} />
-                  </View>
-                  <Text style={s.summaryValue}>{pendingCoupons}</Text>
-                  <Text style={s.summaryLabel}>kolon · Sonuç bekliyor</Text>
-                </>
-              )}
-            </PressableScale>
+              <PressableScale haptic={false} style={s.summaryCard} onPress={() => { softHaptic(); router.push('/(tabs)/saved' as any); }}>
+                <View style={[s.summaryIcon, { backgroundColor: c.brandSoft }]}>
+                  <TicketIcon color={c.brand} size={19} />
+                </View>
+                <View style={s.summaryText}>
+                  <Text style={s.summaryValue} numberOfLines={1}>{pendingCoupons} kolon</Text>
+                  <Text style={s.summaryLabel} numberOfLines={1}>sonuç bekliyor</Text>
+                </View>
+                <ChevronRightIcon color={c.text3} size={16} />
+              </PressableScale>
             ) : null}
             {todayDrawCount > 0 ? (
-              <PressableScale haptic={false} style={[s.summaryCard, singleSummary && s.summaryCardSingle]} onPress={() => { softHaptic(); router.push('/(tabs)/generate' as any); }}>
-              {singleSummary ? (
-                <>
-                  <View style={[s.summaryIcon, { backgroundColor: c.goldSoft }]}>
-                    <CalendarIcon color={c.gold} size={19} />
-                  </View>
-                  <Text style={s.summaryValueSingle}>{todayDrawCount}</Text>
-                  <Text style={s.summaryLabelSingle}>çekiliş · Bugün</Text>
-                  <ChevronRightIcon color={c.text3} size={16} />
-                </>
-              ) : (
-                <>
-                  <View style={s.summaryCardTop}>
-                    <View style={[s.summaryIcon, { backgroundColor: c.goldSoft }]}>
-                      <CalendarIcon color={c.gold} size={19} />
-                    </View>
-                    <ChevronRightIcon color={c.text3} size={16} />
-                  </View>
-                  <Text style={s.summaryValue}>{todayDrawCount}</Text>
-                  <Text style={s.summaryLabel}>çekiliş · Bugün</Text>
-                </>
-              )}
-            </PressableScale>
+              <PressableScale haptic={false} style={s.summaryCard} onPress={() => { softHaptic(); router.push('/(tabs)/generate' as any); }}>
+                <View style={[s.summaryIcon, { backgroundColor: c.goldSoft }]}>
+                  <CalendarIcon color={c.gold} size={19} />
+                </View>
+                <View style={s.summaryText}>
+                  <Text style={s.summaryValue} numberOfLines={1}>{todayDrawCount} çekiliş</Text>
+                  <Text style={s.summaryLabel} numberOfLines={1}>bugün</Text>
+                </View>
+                <ChevronRightIcon color={c.text3} size={16} />
+              </PressableScale>
             ) : null}
           </View>
         ) : null}
@@ -950,15 +923,14 @@ function makeStyles(theme: AppTheme) {
     },
     summaryCard: {
       flex: 1,
-      backgroundColor: c.surface,
-      borderRadius: radius.xl,
-      padding: 14,
-    },
-    summaryCardTop: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 12,
+      gap: 10,
+      backgroundColor: c.surface,
+      borderRadius: radius.xl,
+      paddingVertical: 12,
+      paddingLeft: 12,
+      paddingRight: 10,
     },
     summaryIcon: {
       width: 36,
@@ -967,29 +939,16 @@ function makeStyles(theme: AppTheme) {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    summaryText: { flex: 1, minWidth: 0 },
     summaryValue: {
       fontFamily: theme.font.bold,
-      fontSize: 26,
-      lineHeight: 30,
-      letterSpacing: -0.3,
+      fontSize: 16,
+      lineHeight: 20,
+      letterSpacing: -0.2,
       color: c.text,
       fontVariant: ['tabular-nums'],
     },
-    summaryLabel: { ...ty.caption, color: c.text3, marginTop: 2 },
-    summaryCardSingle: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      paddingVertical: 12,
-    },
-    summaryValueSingle: {
-      fontFamily: theme.font.bold,
-      fontSize: 20,
-      letterSpacing: -0.3,
-      color: c.text,
-      fontVariant: ['tabular-nums'],
-    },
-    summaryLabelSingle: { ...ty.caption, color: c.text3, flex: 1 },
+    summaryLabel: { ...ty.caption, color: c.text3, marginTop: 1 },
 
     sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, marginTop: spacing.xxl, marginBottom: 13 },
     sectionTitle: { ...ty.h2, color: c.text },
