@@ -53,6 +53,8 @@ const LAST_SEEN_PREFIX = 'lastSeenResult_';
 /** Skip full network reload when returning to Home within this window. */
 const HOME_FETCH_TTL_MS = 60_000;
 const LAST_DRAW_SELECT = 'game, numbers, bonus, superstar, draw_date, draw_no, estimated_prize';
+/** While a jackpot is still pending, Home re-checks the draws this often (only while focused). */
+const PRIZE_POLL_MS = 60_000;
 
 /* ----------------------------- helpers ----------------------------- */
 function getTodayIndex(): number {
@@ -78,6 +80,17 @@ type LastDraw = {
   draw_no: string;
   estimated_prize?: number | null;
 };
+
+/**
+ * Milli Piyango usually publishes the jackpot a few minutes after the numbers.
+ * A draw from today with no jackpot yet is "pending"; older draws without one are left alone.
+ */
+function isPrizePending(draw: LastDraw): boolean {
+  if (draw.estimated_prize != null && draw.estimated_prize > 0) return false;
+  const now = new Date();
+  const today = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
+  return draw.draw_date === today;
+}
 
 function getNextDraw() {
   const now = new Date();
@@ -325,6 +338,19 @@ export default function HomeScreen() {
     useCallback(() => {
       void loadAll();
     }, [loadAll]),
+  );
+
+  // Jackpot announced a few minutes after the numbers: keep re-checking while it is pending
+  // and Home is on screen, so the amount appears without a manual pull-to-refresh.
+  const hasPendingPrize = lastDraws.some(isPrizePending);
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasPendingPrize) return undefined;
+      const id = setInterval(() => {
+        void loadAll({ force: true });
+      }, PRIZE_POLL_MS);
+      return () => clearInterval(id);
+    }, [hasPendingPrize, loadAll]),
   );
 
   const onRefresh = useCallback(async () => {
@@ -612,6 +638,16 @@ export default function HomeScreen() {
                           </View>
                           <View style={s.prizeArrow}>
                             <ChevronRightIcon color={c.text2} size={17} />
+                          </View>
+                        </View>
+                      ) : isPrizePending(draw) ? (
+                        <View style={[s.prizeRow, { backgroundColor: `${meta.color}0A` }]}>
+                          <View>
+                            <Text style={s.prizeLabel}>BÜYÜK İKRAMİYE</Text>
+                            <Text style={s.prizePending}>Açıklanması bekleniyor…</Text>
+                          </View>
+                          <View style={s.prizeArrow}>
+                            <ClockIcon color={c.text3} size={16} />
                           </View>
                         </View>
                       ) : null}
@@ -1030,6 +1066,7 @@ function makeStyles(theme: AppTheme) {
       marginBottom: 2,
     },
     prizeAmount: { fontFamily: theme.font.bold, fontSize: 15, color: c.text, fontVariant: ['tabular-nums'] },
+    prizePending: { fontFamily: theme.font.semibold, fontSize: 14, lineHeight: 20, color: c.text2 },
     prizeArrow: {
       width: 30,
       height: 30,

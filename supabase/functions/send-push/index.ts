@@ -39,7 +39,7 @@ serve(async (req) => {
 
     const { data: tokens, error } = await supabase
       .from('push_tokens')
-      .select('token, user_id, updated_at')
+      .select('token, user_id')
       .eq('notify_results', true);
 
     if (error || !tokens || tokens.length === 0) {
@@ -49,15 +49,15 @@ serve(async (req) => {
       });
     }
 
-    const latestByUser = new Map<string, { token: string; updated_at: string }>();
+    // One message per device. push_tokens already keeps a single row per
+    // (user_id, platform), so a user with an iPhone and an Android phone has two
+    // rows and must get two pushes. (Collapsing to one row per user used to drop
+    // whichever device registered less recently.) Dedupe only identical tokens.
+    const byToken = new Map<string, string | null>();
     for (const t of tokens) {
-      const key = t.user_id ?? `no-user:${t.token}`;
-      const existing = latestByUser.get(key);
-      if (!existing || new Date(t.updated_at) > new Date(existing.updated_at)) {
-        latestByUser.set(key, { token: t.token, updated_at: t.updated_at });
-      }
+      if (t.token && !byToken.has(t.token)) byToken.set(t.token, t.user_id ?? null);
     }
-    const uniqueTokens = Array.from(latestByUser.values());
+    const uniqueTokens = Array.from(byToken, ([token, user_id]) => ({ token, user_id }));
 
     const messages = uniqueTokens.map((t) => ({
       to: t.token,
@@ -67,20 +67,24 @@ serve(async (req) => {
       data: { screen },
     }));
 
-    const response = await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(messages),
-    });
+    // Expo accepts at most 100 messages per request.
+    const result: unknown[] = [];
+    for (let i = 0; i < messages.length; i += 100) {
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(messages.slice(i, i + 100)),
+      });
+      result.push(await response.json());
+    }
 
-    const result = await response.json();
-
-    const notificationRows = Array.from(latestByUser.entries()).map(([key, t]) => ({
+    // The app reads in-app notifications by token, so each device needs its own row.
+    const notificationRows = uniqueTokens.map((t) => ({
       token: t.token,
-      user_id: key.startsWith('no-user:') ? null : key,
+      user_id: t.user_id,
       title,
       body,
       screen,
