@@ -22,7 +22,7 @@
         "CFBundleLocalizations": ["tr", "en"]
       },
       "splash": {
-        "backgroundColor": "#0A0C10"
+        "backgroundColor": "#131C21"
       }
     },
     "android": {
@@ -51,7 +51,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0A0C10",
+          "backgroundColor": "#131C21",
           "image": "./assets/images/splash-icon-dark.png",
           "imageWidth": 200,
           "resizeMode": "contain"

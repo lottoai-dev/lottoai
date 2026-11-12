@@ -31,7 +31,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 // duration: 0 Android'deki varsayılan fade'i kapatır; fade: false iOS içindir.
 SplashScreen.setOptions({ duration: 0, fade: false });
 
-const SPLASH_BG = '#0A0C10';
+const SPLASH_BG = '#131C21';
 // Logo en az bu kadar görünsün (fontlar daha erken hazır olsa bile).
 const SPLASH_MIN_MS = 1000;
 // Fontlar hiç yüklenmezse splash sonsuza dek takılı kalmasın.

@@ -115,16 +115,18 @@ const lightColors: AppColors = {
   highlight: 'rgba(255,255,255,0.7)',
 };
 
+// Petrol tonlu koyu tema (1.2.1): zemin nötr siyah yerine hafif yeşil-mavi; kartlar
+// zeminden belirgin ayrılır, sekme çubuğu zeminle aynı renkte ve üstünde net bir çizgi var.
 const darkColors: AppColors = {
-  bg: '#0A0C10',
-  surface: '#12151B',
-  surfaceAlt: '#181C24',
-  elevated: '#1E232C',
-  border: 'rgba(255,255,255,0.05)',
-  hairline: 'rgba(255,255,255,0.04)',
+  bg: '#131C21',
+  surface: '#1C2930',
+  surfaceAlt: '#24343C',
+  elevated: '#2C3E47',
+  border: 'rgba(160,200,215,0.10)',
+  hairline: 'rgba(160,200,215,0.06)',
   text: '#F2F4F7',
-  text2: '#98A0AD',
-  text3: '#5C6470',
+  text2: '#A0B0B8',
+  text3: '#728690',
   brand: '#3DD68C',
   brandText: '#06110B',
   brandSoft: 'rgba(61,214,140,0.12)',
@@ -136,8 +138,8 @@ const darkColors: AppColors = {
   dangerSoft: 'rgba(229,112,107,0.12)',
   success: '#3DD68C',
   warning: '#E0954A',
-  tabBg: '#12151B',
-  tabBorder: 'rgba(255,255,255,0.07)',
+  tabBg: '#131C21',
+  tabBorder: '#2A3A42',
   overlay: 'rgba(0,0,0,0.55)',
   highlight: 'rgba(255,255,255,0.04)',
 };
